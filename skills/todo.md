@@ -13,11 +13,11 @@
 - [x] Playlist CRUD — Remove, Reorder, Copy, Paste tracks within/between playlists
 - [x] Metadata enhancement — Calculated vs Played duration, filename fallback improvements
 - [x] Auto-Intro system — Check intros folder, play intro before matching artist tracks
-- [x] Auto-Intro dot indicator — Data structure flag for "has_intro" per track
+- [x] Auto-Intro dot indicator — `has_intro: bool` data flag implemented; GUI dot indicator deferred to Phase E
 
 ## Phase C: Scheduler
 
-- [ ] Scheduler data model — Scheduled events with time, mode, file path, priority
+- [x] Scheduler data model — Scheduled events with time, mode, file path, priority
 - [ ] Overlay mode — Play sound on top of current audio
 - [ ] Stop mode — Kill current audio, play scheduled item
 - [ ] Insert mode — Queue scheduled item as next track

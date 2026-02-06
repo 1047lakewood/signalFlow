@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use signal_flow::engine::Engine;
 use signal_flow::player::{play_playlist, PlaybackResult, Player, SilenceConfig};
+use signal_flow::scheduler::{self, Priority, ScheduleMode};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -42,6 +43,11 @@ enum Commands {
     Config {
         #[command(subcommand)]
         action: ConfigCmd,
+    },
+    /// Schedule management (timed events)
+    Schedule {
+        #[command(subcommand)]
+        action: ScheduleCmd,
     },
 }
 
@@ -143,6 +149,40 @@ enum IntrosCmd {
     Off,
 }
 
+#[derive(Subcommand)]
+enum ScheduleCmd {
+    /// Add a scheduled event
+    Add {
+        /// Time of day (HH:MM or HH:MM:SS)
+        time: String,
+        /// Mode: overlay, stop, or insert
+        mode: String,
+        /// Audio file path
+        file: PathBuf,
+        /// Priority level 1-9 (default: 5)
+        #[arg(short, long, default_value = "5")]
+        priority: u8,
+        /// Optional label/description
+        #[arg(short, long)]
+        label: Option<String>,
+        /// Days of week (0=Mon..6=Sun), comma-separated. Omit for daily.
+        #[arg(short, long)]
+        days: Option<String>,
+    },
+    /// List all scheduled events
+    List,
+    /// Remove a scheduled event by ID
+    Remove {
+        /// Event ID to remove
+        id: u32,
+    },
+    /// Enable or disable a scheduled event
+    Toggle {
+        /// Event ID to toggle
+        id: u32,
+    },
+}
+
 fn main() {
     let cli = Cli::parse();
     let mut engine = Engine::load();
@@ -162,8 +202,9 @@ fn main() {
                 .intros_folder
                 .as_deref()
                 .unwrap_or("off");
+            let sched_count = engine.schedule.len();
             println!(
-                "Playlists: {} | Active: {} | Crossfade: {}s | Silence: {} | Intros: {}",
+                "Playlists: {} | Active: {} | Crossfade: {}s | Silence: {} | Intros: {} | Schedule: {} event(s)",
                 engine.playlists.len(),
                 engine
                     .active_playlist()
@@ -171,7 +212,8 @@ fn main() {
                     .unwrap_or("none"),
                 engine.crossfade_secs,
                 silence_status,
-                intros_status
+                intros_status,
+                sched_count
             );
             if let Some(pl) = engine.active_playlist() {
                 if let Some(idx) = pl.current_index {
@@ -420,6 +462,134 @@ fn main() {
                 match &engine.intros_folder {
                     Some(folder) => println!("Intros folder: {}", folder),
                     None => println!("Auto-intros: off"),
+                }
+            }
+        },
+        Commands::Schedule { action } => match action {
+            ScheduleCmd::Add {
+                time,
+                mode,
+                file,
+                priority,
+                label,
+                days,
+            } => {
+                let parsed_time = match scheduler::parse_time(&time) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                };
+                let parsed_mode = match ScheduleMode::from_str_loose(&mode) {
+                    Ok(m) => m,
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                };
+                if priority == 0 || priority > 9 {
+                    eprintln!("Error: priority must be 1-9");
+                    std::process::exit(1);
+                }
+                let parsed_days: Vec<u8> = match days {
+                    Some(d) => {
+                        let mut result = Vec::new();
+                        for part in d.split(',') {
+                            match part.trim().parse::<u8>() {
+                                Ok(v) if v <= 6 => result.push(v),
+                                _ => {
+                                    eprintln!("Error: invalid day '{}'. Use 0=Mon..6=Sun", part.trim());
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+                        result.sort_unstable();
+                        result.dedup();
+                        result
+                    }
+                    None => vec![],
+                };
+                let id = engine.schedule.add_event(
+                    parsed_time,
+                    parsed_mode,
+                    file.clone(),
+                    Priority(priority),
+                    label.clone(),
+                    parsed_days,
+                );
+                engine.save().expect("Failed to save state");
+                println!(
+                    "Added schedule event #{}: {} {} {} (priority {})",
+                    id,
+                    time,
+                    parsed_mode,
+                    file.display(),
+                    priority
+                );
+                if let Some(lbl) = &label {
+                    println!("  Label: {}", lbl);
+                }
+            }
+            ScheduleCmd::List => {
+                if engine.schedule.is_empty() {
+                    println!("No scheduled events. Use 'schedule add' to create one.");
+                    return;
+                }
+                println!(
+                    "{:<4} {:<10} {:<8} {:<30} {:<4} {:<8} {}",
+                    "ID", "Time", "Mode", "File", "Pri", "Status", "Days"
+                );
+                println!("{}", "-".repeat(80));
+                for event in engine.schedule.events_by_time() {
+                    let status = if event.enabled { "on" } else { "off" };
+                    let label_suffix = event
+                        .label
+                        .as_ref()
+                        .map(|l| format!(" ({})", l))
+                        .unwrap_or_default();
+                    println!(
+                        "{:<4} {:<10} {:<8} {:<30} {:<4} {:<8} {}{}",
+                        event.id,
+                        event.time_display(),
+                        event.mode,
+                        truncate(&event.file.display().to_string(), 29),
+                        event.priority,
+                        status,
+                        event.days_display(),
+                        label_suffix
+                    );
+                }
+            }
+            ScheduleCmd::Remove { id } => {
+                match engine.schedule.remove_event(id) {
+                    Ok(event) => {
+                        engine.save().expect("Failed to save state");
+                        println!(
+                            "Removed schedule event #{}: {} {} {}",
+                            id,
+                            event.time_display(),
+                            event.mode,
+                            event.file.display()
+                        );
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+            ScheduleCmd::Toggle { id } => {
+                match engine.schedule.toggle_event(id) {
+                    Ok(enabled) => {
+                        engine.save().expect("Failed to save state");
+                        let status = if enabled { "enabled" } else { "disabled" };
+                        println!("Schedule event #{} {}", id, status);
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
                 }
             }
         },

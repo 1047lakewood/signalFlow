@@ -1,4 +1,5 @@
 use crate::playlist::Playlist;
+use crate::scheduler::Schedule;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -21,6 +22,9 @@ pub struct Engine {
     /// Path to folder containing artist intro files (None = disabled).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub intros_folder: Option<String>,
+    /// Scheduled events (timed triggers for overlay, stop, insert).
+    #[serde(default)]
+    pub schedule: Schedule,
 }
 
 impl Engine {
@@ -33,6 +37,7 @@ impl Engine {
             silence_threshold: 0.01,
             silence_duration_secs: 0.0,
             intros_folder: None,
+            schedule: Schedule::new(),
         }
     }
 

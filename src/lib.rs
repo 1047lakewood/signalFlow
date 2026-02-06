@@ -7,5 +7,6 @@ pub mod auto_intro;
 pub mod engine;
 pub mod player;
 pub mod playlist;
+pub mod scheduler;
 pub mod silence;
 pub mod track;

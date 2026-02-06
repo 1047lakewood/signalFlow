@@ -1,5 +1,23 @@
 # signalFlow — Changelog
 
+## 2026-02-06 — Scheduler Data Model
+- Created `src/scheduler.rs` — `Schedule`, `ScheduleEvent`, `ScheduleMode`, `Priority` types
+- `ScheduleMode` enum: Overlay (play on top), Stop (kill + play), Insert (queue next)
+- `ScheduleEvent` struct: id, time (NaiveTime), mode, file, priority(1-9), enabled, label, days
+- `Schedule` struct: CRUD (`add_event`, `remove_event`, `find_event`, `toggle_event`), `events_by_time()` sorted view
+- `Priority` type with constants: LOW(1), NORMAL(5), HIGH(9)
+- `parse_time()` utility: accepts HH:MM or HH:MM:SS formats
+- Days field: `Vec<u8>` (0=Mon..6=Sun), empty = daily recurrence
+- Added `Engine.schedule: Schedule` — `#[serde(default)]` for backward compat
+- CLI: `schedule add <time> <mode> <file> [-p priority] [-l label] [-d days]`
+- CLI: `schedule list` — sorted by time, shows mode/priority/status/days
+- CLI: `schedule remove <id>` — remove event by ID
+- CLI: `schedule toggle <id>` — enable/disable event
+- `status` command now shows schedule event count
+- Added `chrono` dependency for time handling
+- Created `skills/scheduler.md` design doc
+- 83 unit tests passing (+19 new scheduler tests)
+
 ## 2026-02-06 — Auto-Intro System
 - Created `src/auto_intro.rs` — `find_intro()` and `has_intro()` functions
 - `find_intro()` scans intros folder for `Artist.*` files (case-insensitive, supports mp3/wav/flac/ogg/aac/m4a)
