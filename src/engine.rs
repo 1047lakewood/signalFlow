@@ -229,6 +229,7 @@ mod tests {
             title: name.into(),
             artist: "X".into(),
             duration: std::time::Duration::new(60, 0),
+            played_duration: None,
         }
     }
 
@@ -328,6 +329,7 @@ mod tests {
             title: "Test".into(),
             artist: "Artist".into(),
             duration: std::time::Duration::new(60, 0),
+            played_duration: None,
         });
         assert_eq!(engine.active_playlist().unwrap().track_count(), 1);
     }

@@ -56,6 +56,26 @@ Every feature goes through this cycle. Do not skip steps.
 - If all tests pass and `cargo check` has no warnings, commit the changes
 - Commit message format: short summary of what was built
 - Stage only the files changed in this cycle
+- After committing, push to origin
+
+## The "Remember" Protocol
+
+When the user says **"remember"**, **"add this to CLAUDE.md"**, **"note that"**, or similar:
+
+- Add the information to the appropriate section of this file (`CLAUDE.md`)
+- If no section fits, add it under **Rules** or create a new section
+- Confirm what was added
+
+## The "Roadmap" Protocol
+
+When the user says **"future feature"**, **"add to roadmap"**, **"add to todo"**, or similar:
+
+1. Add the feature to the appropriate phase in `skills/roadmap.md` (or create a new phase if none fits)
+2. Add a corresponding `- [ ]` item to `skills/todo.md` under the matching phase
+3. **Do NOT implement anything** — no code changes, no build, no tests
+4. Confirm what was added and where
+
+This is planning only. Implementation happens through the "Continue" protocol.
 
 ## Rules
 
@@ -65,6 +85,7 @@ Every feature goes through this cycle. Do not skip steps.
 - **Test everything:** Every module gets `#[cfg(test)]` unit tests
 - **Design before complexity:** Multi-step features get a `skills/*.md` doc first
 - **Full roadmap:** See `skills/roadmap.md` for the complete feature spec
+- **Keep skills docs current:** When a feature is implemented during the Workloop, update any `skills/*.md` design docs that reference it to reflect the actual implementation (mark sections as done, correct any discrepancies between spec and reality)
 
 ## Directory Map
 

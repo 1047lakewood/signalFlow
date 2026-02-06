@@ -105,6 +105,7 @@ mod tests {
             title: name.into(),
             artist: "X".into(),
             duration: std::time::Duration::new(60, 0),
+            played_duration: None,
         }
     }
 
@@ -162,24 +163,9 @@ mod tests {
     fn remove_adjusts_current_index() {
         let mut pl = Playlist::new(1, "Test".to_string());
         // Manually add tracks for unit testing without real files
-        pl.tracks.push(crate::track::Track {
-            path: "a.mp3".into(),
-            title: "A".into(),
-            artist: "X".into(),
-            duration: std::time::Duration::new(60, 0),
-        });
-        pl.tracks.push(crate::track::Track {
-            path: "b.mp3".into(),
-            title: "B".into(),
-            artist: "X".into(),
-            duration: std::time::Duration::new(60, 0),
-        });
-        pl.tracks.push(crate::track::Track {
-            path: "c.mp3".into(),
-            title: "C".into(),
-            artist: "X".into(),
-            duration: std::time::Duration::new(60, 0),
-        });
+        pl.tracks.push(make_track("A"));
+        pl.tracks.push(make_track("B"));
+        pl.tracks.push(make_track("C"));
         pl.current_index = Some(2);
 
         // Remove track before current -> index shifts down

@@ -11,6 +11,9 @@ pub struct Track {
     pub artist: String,
     #[serde(with = "duration_serde")]
     pub duration: Duration,
+    /// Actual playback time (set after track finishes playing).
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "option_duration_serde")]
+    pub played_duration: Option<Duration>,
 }
 
 impl Track {
@@ -28,31 +31,73 @@ impl Track {
 
         let tag = tagged_file.primary_tag().or_else(|| tagged_file.first_tag());
 
-        let title = tag
-            .and_then(|t| t.title().map(|s| s.to_string()))
-            .unwrap_or_else(|| {
-                path.file_stem()
-                    .map(|s| s.to_string_lossy().to_string())
-                    .unwrap_or_else(|| "Unknown".to_string())
-            });
+        let tag_title = tag.and_then(|t| t.title().map(|s| s.to_string()));
+        let tag_artist = tag.and_then(|t| t.artist().map(|s| s.to_string()));
 
-        let artist = tag
-            .and_then(|t| t.artist().map(|s| s.to_string()))
-            .unwrap_or_else(|| "Unknown".to_string());
+        let (title, artist) = match (tag_title, tag_artist) {
+            (Some(t), Some(a)) => (t, a),
+            (Some(t), None) => (t, filename_fallback_artist(&path)),
+            (None, Some(a)) => (filename_fallback_title(&path), a),
+            (None, None) => {
+                let (a, t) = parse_filename(&path);
+                (t, a)
+            }
+        };
 
         Ok(Track {
             path,
             title,
             artist,
             duration,
+            played_duration: None,
         })
     }
 
-    /// Format duration as MM:SS.
+    /// Format calculated duration as MM:SS.
     pub fn duration_display(&self) -> String {
-        let secs = self.duration.as_secs();
-        format!("{}:{:02}", secs / 60, secs % 60)
+        format_duration(self.duration)
     }
+
+    /// Format played duration as MM:SS, if available.
+    pub fn played_duration_display(&self) -> Option<String> {
+        self.played_duration.map(format_duration)
+    }
+}
+
+/// Format a Duration as M:SS.
+fn format_duration(d: Duration) -> String {
+    let secs = d.as_secs();
+    format!("{}:{:02}", secs / 60, secs % 60)
+}
+
+/// Parse "Artist - Title" from a filename. Falls back gracefully.
+fn parse_filename(path: &Path) -> (String, String) {
+    let stem = path
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "Unknown".to_string());
+
+    if let Some((artist, title)) = stem.split_once(" - ") {
+        let artist = artist.trim();
+        let title = title.trim();
+        if !artist.is_empty() && !title.is_empty() {
+            return (artist.to_string(), title.to_string());
+        }
+    }
+
+    ("Unknown".to_string(), stem)
+}
+
+/// Extract artist from filename when tag is missing.
+fn filename_fallback_artist(path: &Path) -> String {
+    let (artist, _) = parse_filename(path);
+    artist
+}
+
+/// Extract title from filename when tag is missing.
+fn filename_fallback_title(path: &Path) -> String {
+    let (_, title) = parse_filename(path);
+    title
 }
 
 mod duration_serde {
@@ -79,9 +124,46 @@ mod duration_serde {
     }
 }
 
+mod option_duration_serde {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::time::Duration;
+
+    #[derive(Serialize, Deserialize)]
+    struct DurationRepr {
+        secs: u64,
+        nanos: u32,
+    }
+
+    pub fn serialize<S: Serializer>(dur: &Option<Duration>, s: S) -> Result<S::Ok, S::Error> {
+        match dur {
+            Some(d) => DurationRepr {
+                secs: d.as_secs(),
+                nanos: d.subsec_nanos(),
+            }
+            .serialize(s),
+            None => s.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Duration>, D::Error> {
+        let opt = Option::<DurationRepr>::deserialize(d)?;
+        Ok(opt.map(|repr| Duration::new(repr.secs, repr.nanos)))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn make_track(title: &str, artist: &str) -> Track {
+        Track {
+            path: PathBuf::from("test.mp3"),
+            title: title.to_string(),
+            artist: artist.to_string(),
+            duration: Duration::new(60, 0),
+            played_duration: None,
+        }
+    }
 
     #[test]
     fn duration_display_formats_correctly() {
@@ -90,13 +172,64 @@ mod tests {
             title: "Test".to_string(),
             artist: "Artist".to_string(),
             duration: Duration::new(185, 0), // 3:05
+            played_duration: None,
         };
         assert_eq!(track.duration_display(), "3:05");
+    }
+
+    #[test]
+    fn played_duration_display_none_when_unset() {
+        let track = make_track("Test", "Artist");
+        assert!(track.played_duration_display().is_none());
+    }
+
+    #[test]
+    fn played_duration_display_shows_value() {
+        let mut track = make_track("Test", "Artist");
+        track.played_duration = Some(Duration::new(45, 0));
+        assert_eq!(track.played_duration_display(), Some("0:45".to_string()));
     }
 
     #[test]
     fn from_path_rejects_missing_file() {
         let result = Track::from_path(Path::new("nonexistent.mp3"));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_filename_artist_dash_title() {
+        let (artist, title) = parse_filename(Path::new("Cool Band - Great Song.mp3"));
+        assert_eq!(artist, "Cool Band");
+        assert_eq!(title, "Great Song");
+    }
+
+    #[test]
+    fn parse_filename_no_dash() {
+        let (artist, title) = parse_filename(Path::new("just_a_filename.mp3"));
+        assert_eq!(artist, "Unknown");
+        assert_eq!(title, "just_a_filename");
+    }
+
+    #[test]
+    fn parse_filename_empty_parts() {
+        let (artist, title) = parse_filename(Path::new(" - .mp3"));
+        assert_eq!(artist, "Unknown");
+        assert_eq!(title, " - ");
+    }
+
+    #[test]
+    fn played_duration_survives_serialization() {
+        let mut track = make_track("Test", "Artist");
+        track.played_duration = Some(Duration::new(120, 500_000_000));
+        let json = serde_json::to_string(&track).unwrap();
+        let loaded: Track = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.played_duration, Some(Duration::new(120, 500_000_000)));
+    }
+
+    #[test]
+    fn played_duration_defaults_when_missing() {
+        let json = r#"{"path":"test.mp3","title":"T","artist":"A","duration":{"secs":60,"nanos":0}}"#;
+        let track: Track = serde_json::from_str(json).unwrap();
+        assert!(track.played_duration.is_none());
     }
 }

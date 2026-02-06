@@ -1,5 +1,15 @@
 # signalFlow — Changelog
 
+## 2026-02-06 — Metadata Enhancement
+- Filename fallback: parses `Artist - Title.ext` pattern when lofty tags are missing
+- Smart fallback logic: uses tag data when available, fills gaps from filename pattern
+- Added `played_duration` field to `Track` — records actual playback time per track
+- `played_duration` is `Option<Duration>`, defaults to `None`, backward-compatible with existing state files
+- `play_playlist()` now returns `PlaybackResult` with `last_index` and per-track `played_durations`
+- `playlist show` displays a "Played" column when any track has played_duration data
+- Added `played_duration_display()` method to `Track`
+- 49 unit tests passing (+7 new: filename parsing, played duration display, serialization)
+
 ## 2026-02-06 — Playlist CRUD
 - Added `insert_tracks()` to `Playlist` — bulk insert at position or append
 - Added `copy_tracks()` to `Engine` — clone tracks from a playlist by indices

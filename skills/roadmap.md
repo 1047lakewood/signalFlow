@@ -58,3 +58,38 @@
   - Schedule waits until current track ends (soft break)
   - Schedule is skipped (manual override)
 - Priority levels for scheduled events
+
+## Phase D: Data & Integration
+
+### Track Metadata Editing
+- Allow editing track metadata (artist, title, etc.) from within the app
+- Changes persist to the audio file's embedded tags (via lofty)
+
+### Now-Playing XML Export
+- Output an XML file with current track info, next track info, and playback state
+- Fields: artist, title, duration, elapsed, remaining, playlist name
+- File updates in real-time as playback progresses
+- Useful for stream overlays, web widgets, and external integrations
+
+## Phase E: GUI (Tauri)
+
+### Schedule Side Pane
+- Side pane displaying all scheduled events
+- Inline editing of schedule entries (time, mode, file, priority)
+- Add/remove schedule items from the pane
+
+### Log Pane
+- Log output panel underneath the schedule pane
+- Shows playback events, schedule triggers, errors, and system messages
+
+## Phase F: Future / Long-Term
+
+### Hosted Web Interface
+- Browser-based remote control and monitoring dashboard
+- Accessible over LAN or internet
+
+### Ad Scheduler
+- Dedicated ad/spot scheduling system with rotation, frequency caps, and reporting
+
+### Advanced Auto Playlist Builder
+- Rule-based automatic playlist generation (genre, tempo, artist separation, dayparting, etc.)

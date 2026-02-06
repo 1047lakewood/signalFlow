@@ -11,7 +11,7 @@
 ## Phase B: Playlist Management
 
 - [x] Playlist CRUD — Remove, Reorder, Copy, Paste tracks within/between playlists
-- [ ] Metadata enhancement — Calculated vs Played duration, filename fallback improvements
+- [x] Metadata enhancement — Calculated vs Played duration, filename fallback improvements
 - [ ] Auto-Intro system — Check intros folder, play intro before matching artist tracks
 - [ ] Auto-Intro dot indicator — Data structure flag for "has_intro" per track
 
@@ -22,3 +22,19 @@
 - [ ] Stop mode — Kill current audio, play scheduled item
 - [ ] Insert mode — Queue scheduled item as next track
 - [ ] Conflict resolution — Define behavior when manual play conflicts with schedule
+
+## Phase D: Data & Integration
+
+- [ ] Track metadata editing — Edit artist, title, etc. and persist to file tags
+- [ ] Now-Playing XML export — Output XML with current/next track info and playback state
+
+## Phase E: GUI (Tauri)
+
+- [ ] Schedule side pane — Editable schedule list in a side panel
+- [ ] Log pane — Playback events and system logs underneath the schedule pane
+
+## Phase F: Future / Long-Term
+
+- [ ] Hosted web interface — Browser-based remote control and monitoring
+- [ ] Ad scheduler — Spot scheduling with rotation, frequency caps, reporting
+- [ ] Advanced auto playlist builder — Rule-based automatic playlist generation

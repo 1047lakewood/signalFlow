@@ -207,22 +207,32 @@ impl SilenceConfig {
     }
 }
 
+/// Result of playing through a playlist.
+pub struct PlaybackResult {
+    /// Index of the last track that was started.
+    pub last_index: usize,
+    /// Played durations for each track that was played: (track_index, duration).
+    pub played_durations: Vec<(usize, Duration)>,
+}
+
 /// Play through a playlist starting at `start_index`, auto-advancing.
 /// Supports crossfading when `crossfade_secs > 0.0`.
 /// Supports silence detection when `silence.enabled()`.
 /// Blocks until all tracks finish or the process is interrupted.
-/// Returns the index of the last track that was started.
+/// Returns a `PlaybackResult` with the last index and per-track played durations.
 pub fn play_playlist(
     player: &Player,
     tracks: &[crate::track::Track],
     start_index: usize,
     crossfade_secs: f32,
     silence: SilenceConfig,
-) -> usize {
+) -> PlaybackResult {
     let crossfade_dur = Duration::from_secs_f32(crossfade_secs.max(0.0));
     let mut current = start_index;
     let mut current_sink: Option<Sink> = None;
     let mut current_monitor: Option<SilenceMonitor> = None;
+    let mut current_start_time: Option<Instant> = None;
+    let mut played_durations: Vec<(usize, Duration)> = Vec::new();
 
     while current < tracks.len() {
         let track = &tracks[current];
@@ -236,11 +246,11 @@ pub fn play_playlist(
         );
 
         // Start playback if not already playing via crossfade
-        let (sink, monitor) = if let Some(s) = current_sink.take() {
-            (s, current_monitor.take())
+        let (sink, monitor, start_time) = if let Some(s) = current_sink.take() {
+            (s, current_monitor.take(), current_start_time.take().unwrap_or_else(Instant::now))
         } else {
             match start_track(player, &track.path, &silence) {
-                Ok(pair) => pair,
+                Ok(pair) => (pair.0, pair.1, Instant::now()),
                 Err(e) => {
                     eprintln!("  Error: {} — skipping", e);
                     current += 1;
@@ -249,7 +259,6 @@ pub fn play_playlist(
             }
         };
 
-        let start_time = Instant::now();
         let track_duration = track.duration;
         let next_index = current + 1;
         let do_crossfade =
@@ -274,6 +283,9 @@ pub fn play_playlist(
                 std::thread::sleep(Duration::from_millis(50));
             }
 
+            // Record played duration for this track
+            played_durations.push((current, start_time.elapsed()));
+
             if !silence_skipped && !sink.empty() {
                 let next_track = &tracks[next_index];
                 let crossfade_result = if silence.enabled() {
@@ -297,6 +309,7 @@ pub fn play_playlist(
                         sink.stop();
                         current_sink = Some(next_sink);
                         current_monitor = next_monitor;
+                        current_start_time = Some(Instant::now());
                         current += 1;
                         continue;
                     }
@@ -305,28 +318,34 @@ pub fn play_playlist(
                     }
                 }
             }
-        }
-
-        // Wait for track to finish (if not already silence-skipped)
-        if !silence_skipped {
-            loop {
-                if sink.empty() {
-                    break;
+        } else {
+            // Wait for track to finish (if not already silence-skipped)
+            if !silence_skipped {
+                loop {
+                    if sink.empty() {
+                        break;
+                    }
+                    if check_silence(&monitor) {
+                        println!("  Silence detected — skipping to next track");
+                        sink.stop();
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
                 }
-                if check_silence(&monitor) {
-                    println!("  Silence detected — skipping to next track");
-                    sink.stop();
-                    break;
-                }
-                std::thread::sleep(Duration::from_millis(100));
             }
+
+            // Record played duration for this track
+            played_durations.push((current, start_time.elapsed()));
         }
 
         current += 1;
     }
 
     println!("Playlist finished.");
-    current.saturating_sub(1)
+    PlaybackResult {
+        last_index: current.saturating_sub(1),
+        played_durations,
+    }
 }
 
 /// Start a track, optionally with silence monitoring.

@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use signal_flow::engine::Engine;
-use signal_flow::player::{play_playlist, Player, SilenceConfig};
+use signal_flow::player::{play_playlist, PlaybackResult, Player, SilenceConfig};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -249,11 +249,17 @@ fn main() {
                     info_parts.join(", ")
                 );
             }
-            let last_index = play_playlist(&player, &tracks, start, crossfade_secs, silence_cfg);
+            let PlaybackResult { last_index, played_durations } =
+                play_playlist(&player, &tracks, start, crossfade_secs, silence_cfg);
 
-            // Update current_index after playback
+            // Update current_index and played durations after playback
             if let Some(pl_mut) = engine.active_playlist_mut() {
                 pl_mut.current_index = Some(last_index);
+                for (idx, played) in &played_durations {
+                    if let Some(track) = pl_mut.tracks.get_mut(*idx) {
+                        track.played_duration = Some(*played);
+                    }
+                }
             }
             engine.save().expect("Failed to save state");
         }
@@ -557,23 +563,44 @@ fn main() {
                         std::process::exit(1);
                     }
                 };
+                let has_played = pl.tracks.iter().any(|t| t.played_duration.is_some());
                 println!("Playlist: {} ({} tracks)", pl.name, pl.track_count());
-                println!("{:<4} {:<20} {:<30} {:>8}", "#", "Artist", "Title", "Dur");
-                println!("{}", "-".repeat(66));
+                if has_played {
+                    println!("{:<4} {:<20} {:<30} {:>8} {:>8}", "#", "Artist", "Title", "Dur", "Played");
+                    println!("{}", "-".repeat(75));
+                } else {
+                    println!("{:<4} {:<20} {:<30} {:>8}", "#", "Artist", "Title", "Dur");
+                    println!("{}", "-".repeat(66));
+                }
                 for (i, t) in pl.tracks.iter().enumerate() {
                     let marker = if pl.current_index == Some(i) {
                         ">"
                     } else {
                         " "
                     };
-                    println!(
-                        "{}{:<3} {:<20} {:<30} {:>8}",
-                        marker,
-                        i + 1,
-                        truncate(&t.artist, 19),
-                        truncate(&t.title, 29),
-                        t.duration_display()
-                    );
+                    if has_played {
+                        let played = t
+                            .played_duration_display()
+                            .unwrap_or_else(|| "-".to_string());
+                        println!(
+                            "{}{:<3} {:<20} {:<30} {:>8} {:>8}",
+                            marker,
+                            i + 1,
+                            truncate(&t.artist, 19),
+                            truncate(&t.title, 29),
+                            t.duration_display(),
+                            played
+                        );
+                    } else {
+                        println!(
+                            "{}{:<3} {:<20} {:<30} {:>8}",
+                            marker,
+                            i + 1,
+                            truncate(&t.artist, 19),
+                            truncate(&t.title, 29),
+                            t.duration_display()
+                        );
+                    }
                 }
             }
         },
