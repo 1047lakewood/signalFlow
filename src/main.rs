@@ -39,6 +39,11 @@ enum Commands {
     Stop,
     /// Skip to the next track in the active playlist
     Skip,
+    /// Play a sound on top of current audio (overlay)
+    Overlay {
+        /// Audio file to play as overlay
+        file: PathBuf,
+    },
     /// Engine configuration
     Config {
         #[command(subcommand)]
@@ -390,6 +395,27 @@ fn main() {
                 artist,
                 title
             );
+        }
+        Commands::Overlay { file } => {
+            if !file.exists() {
+                eprintln!("Error: file '{}' not found", file.display());
+                std::process::exit(1);
+            }
+            let player = match Player::new() {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
+            };
+            println!("Overlay: {}", file.display());
+            match player.play_overlay(&file) {
+                Ok(()) => println!("Overlay finished."),
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
         Commands::Config { action } => match action {
             ConfigCmd::Crossfade { seconds } => {

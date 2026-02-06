@@ -1,5 +1,12 @@
 # signalFlow — Changelog
 
+## 2026-02-06 — Overlay Mode
+- Added `Player::play_overlay(path)` — plays audio file on new independent sink, blocks until finished
+- CLI: `overlay <file>` — plays a sound on top of current audio
+- Works via OS-level audio mixing (WASAPI shared mode) — run alongside `play` in another terminal
+- Validates file exists before playback attempt
+- 84 unit tests passing (+1 new: `play_overlay_rejects_missing_file`)
+
 ## 2026-02-06 — Scheduler Data Model
 - Created `src/scheduler.rs` — `Schedule`, `ScheduleEvent`, `ScheduleMode`, `Priority` types
 - `ScheduleMode` enum: Overlay (play on top), Stop (kill + play), Insert (queue next)

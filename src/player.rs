@@ -156,6 +156,16 @@ impl Player {
     pub fn is_paused(&self) -> bool {
         self.sink.is_paused()
     }
+
+    /// Play an audio file as an overlay on top of current audio.
+    /// Creates a new independent sink and blocks until playback finishes.
+    pub fn play_overlay(&self, path: &Path) -> Result<(), String> {
+        let sink = self.play_file_new_sink(path)?;
+        while !sink.empty() {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        Ok(())
+    }
 }
 
 /// Returns true if crossfading should occur for this track transition.
@@ -458,6 +468,14 @@ mod tests {
     fn silence_config_disabled_constructor() {
         let cfg = SilenceConfig::disabled();
         assert!(!cfg.enabled());
+    }
+
+    #[test]
+    fn play_overlay_rejects_missing_file() {
+        if let Ok(player) = Player::new() {
+            let result = player.play_overlay(Path::new("nonexistent_overlay.mp3"));
+            assert!(result.is_err());
+        }
     }
 
     #[test]

@@ -73,6 +73,68 @@
 
 ## Phase E: GUI (Tauri)
 
+### Tauri Project Scaffolding
+- Initialize Tauri app with React + TypeScript frontend
+- Configure build pipeline, dev server, and Tauri config
+- Set up project structure: components, hooks, state management
+
+### IPC Bridge
+- Define Tauri commands exposing all core engine functions to the frontend
+- Playlist CRUD, transport controls, scheduler, config read/write
+- Event system for engine → frontend updates (track change, position, levels)
+
+### Main Playlist View
+- Track list table with columns: artist, title, duration, status
+- Highlight currently playing track
+- Right-click context menu for track operations (remove, copy, move)
+
+### Playlist Tabs
+- Tabbed interface for multiple playlists
+- Add, close, rename tabs
+- Tab switching sets active playlist context
+
+### Transport Controls
+- Play, Stop, Skip Next buttons
+- Seek bar with click-to-seek
+- Elapsed / remaining time display
+- Volume control
+
+### Drag-and-Drop
+- Reorder tracks within a playlist via drag-and-drop
+- Move/copy tracks between playlist tabs
+
+### File Browser / Add Tracks
+- Native file dialog to add audio files
+- Drag-and-drop files from OS file explorer into playlist
+
+### Now-Playing Display
+- Current track artist, title, duration
+- Progress bar synced to playback position
+- Album art display if embedded metadata contains artwork
+
+### Auto-Intro Dot Indicator
+- Visual dot/icon on tracks that have a matching intro file in the intros folder
+- Driven by the `has_intro: bool` flag on track data
+
+### Crossfade Settings Panel
+- Configure fade duration (seconds)
+- Select crossfade curve type (linear, equal-power, etc.)
+- Preview/test crossfade behavior
+
+### Silence Detection Settings
+- Configure silence threshold (dB)
+- Configure minimum silence duration before auto-skip
+- Enable/disable toggle
+
+### Auto-Intro Configuration
+- Set intros folder path via folder picker
+- Enable/disable auto-intro system
+- List detected intro files and their matched artists
+
+### Track Metadata Editor
+- Inline editing or modal dialog for artist, title, album fields
+- Save changes back to file tags (via lofty through IPC)
+
 ### Schedule Side Pane
 - Side pane displaying all scheduled events
 - Inline editing of schedule entries (time, mode, file, priority)
@@ -81,6 +143,18 @@
 ### Log Pane
 - Log output panel underneath the schedule pane
 - Shows playback events, schedule triggers, errors, and system messages
+
+### Level Meter
+- Real-time audio level visualization (VU or peak meter)
+- Stereo L/R display
+
+### Waveform Display
+- Waveform overview for the currently playing track
+- Playhead position indicator synced to playback
+
+### Theme / Dark Mode
+- Dark-first UI design suitable for studio environments
+- Optional light theme toggle
 
 ## Phase F: Future / Long-Term
 

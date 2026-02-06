@@ -18,7 +18,7 @@
 ## Phase C: Scheduler
 
 - [x] Scheduler data model — Scheduled events with time, mode, file path, priority
-- [ ] Overlay mode — Play sound on top of current audio
+- [x] Overlay mode — Play sound on top of current audio
 - [ ] Stop mode — Kill current audio, play scheduled item
 - [ ] Insert mode — Queue scheduled item as next track
 - [ ] Conflict resolution — Define behavior when manual play conflicts with schedule
@@ -30,8 +30,24 @@
 
 ## Phase E: GUI (Tauri)
 
+- [ ] Tauri project scaffolding — Initialize Tauri + React/TypeScript frontend
+- [ ] IPC bridge — Rust ↔ JS command layer exposing all core engine functions
+- [ ] Main playlist view — Track list with columns (artist, title, duration, status)
+- [ ] Playlist tabs — Multiple playlist tabs with add/close/rename
+- [ ] Transport controls — Play, Stop, Skip, Seek bar, elapsed/remaining display
+- [ ] Drag-and-drop reordering — Reorder tracks within and between playlists
+- [ ] File browser / Add tracks — Dialog or drag-drop to add audio files to playlist
+- [ ] Now-playing display — Current track info, progress bar, album art if available
+- [ ] Auto-intro dot indicator — Visual dot on tracks that have a matching intro file
+- [ ] Crossfade settings panel — Configure fade duration and curve type
+- [ ] Silence detection settings — Configure threshold and skip duration
+- [ ] Auto-intro config — Set intros folder path, enable/disable
+- [ ] Track metadata editor — Inline or dialog editing of artist, title, etc.
 - [ ] Schedule side pane — Editable schedule list in a side panel
 - [ ] Log pane — Playback events and system logs underneath the schedule pane
+- [ ] Level meter — Real-time audio level visualization
+- [ ] Waveform display — Waveform overview for the currently playing track
+- [ ] Theme / dark mode — Dark-first UI with optional light theme
 
 ## Phase F: Future / Long-Term
 

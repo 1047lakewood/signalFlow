@@ -57,9 +57,15 @@ signalflow schedule toggle 2
 - `#[serde(default)]` for backward compatibility with existing state files
 - `status` command shows schedule event count
 
+## Overlay Mode Execution (DONE)
+
+- `Player::play_overlay(path)` — plays a file on a new independent sink, blocks until finished
+- CLI: `overlay <file>` — plays a sound on top of current audio (OS-level mixing via WASAPI shared mode)
+- Validates file existence before attempting playback
+- Works alongside `play` command running in another terminal — true overlay behavior
+
 ## Not Yet Built
 
-- Overlay mode execution (Phase C next items)
 - Stop mode execution
 - Insert mode execution
 - Real-time schedule monitoring loop
@@ -67,7 +73,7 @@ signalflow schedule toggle 2
 
 ## Tests
 
-19 unit tests:
+20 unit tests (19 scheduler + 1 overlay):
 - 3 time parsing (HH:MM, HH:MM:SS, invalid)
 - 4 mode tests (from_str × 4, display × 3)
 - 2 CRUD (add+find, remove)

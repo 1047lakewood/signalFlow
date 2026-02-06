@@ -50,12 +50,13 @@ Every feature goes through this cycle. Do not skip steps.
 
 ### 5. LOG
 - Update `skills/changelog.md` with what was built
-- Update `skills/todo.md` — mark the item `- [x]` (complete)
+- Update all `skills/*.md` design docs that reference the feature (see "Keep skills docs current" rule)
+- Update `skills/todo.md` — mark the item `- [x]` (complete) only after docs are accurate
 
 ### 6. COMMIT
 - If all tests pass and `cargo check` has no warnings, commit the changes
 - Commit message format: short summary of what was built
-- Stage only the files changed in this cycle
+- Stage all changes (not just the current cycle)
 - After committing, push to origin
 
 ## The "Remember" Protocol
@@ -85,7 +86,13 @@ This is planning only. Implementation happens through the "Continue" protocol.
 - **Test everything:** Every module gets `#[cfg(test)]` unit tests
 - **Design before complexity:** Multi-step features get a `skills/*.md` doc first
 - **Full roadmap:** See `skills/roadmap.md` for the complete feature spec
-- **Keep skills docs current:** When a feature is implemented during the Workloop, update any `skills/*.md` design docs that reference it to reflect the actual implementation (mark sections as done, correct any discrepancies between spec and reality)
+- **Keep skills docs current (hard gate):** Do NOT mark a todo item `[x]` until its design docs are accurate. During the LOG step, update all `skills/*.md` files that reference the completed feature:
+  - Add status markers (DONE) to completed sections
+  - Fix data model descriptions to match actual struct fields
+  - Update test counts
+  - Correct CLI syntax to match actual clap definitions
+  - Remove or fix any "not built" claims that are now false
+  - If unsure, re-read the relevant `src/` files before updating docs
 
 ## Directory Map
 

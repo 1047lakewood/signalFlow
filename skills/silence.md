@@ -1,4 +1,4 @@
-# Silence Detection — Design Doc
+# Silence Detection — Design Doc (DONE)
 
 ## Goal
 Auto-skip tracks when audio signal drops below a configurable threshold for a configurable duration. Prevents dead air in radio automation.
@@ -29,7 +29,7 @@ Auto-skip tracks when audio signal drops below a configurable threshold for a co
 - On silence detection: print message, stop current sink, advance to next track
 
 ### CLI
-- `config silence <threshold> <duration>` — enable with params
+- `config silence set <threshold> <duration>` — enable with params
 - `config silence off` — disable (sets duration to 0)
 - `config show` — includes silence settings
 - `play --silence-threshold <f32>` / `--silence-duration <f32>` — per-session override
