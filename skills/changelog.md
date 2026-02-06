@@ -1,5 +1,15 @@
 # signalFlow — Changelog
 
+## 2026-02-06 — Playlist CRUD
+- Added `insert_tracks()` to `Playlist` — bulk insert at position or append
+- Added `copy_tracks()` to `Engine` — clone tracks from a playlist by indices
+- Added `paste_tracks()` to `Engine` — insert tracks into a playlist at position or append
+- CLI: `playlist remove <name> <track_numbers...>` — remove tracks by 1-based index (handles descending removal)
+- CLI: `playlist move <name> <from> <to>` — reorder a track within a playlist (1-based)
+- CLI: `playlist copy <source> <dest> <track_numbers...> [--at <pos>]` — copy tracks between playlists
+- CLI: `playlist add` now supports `--at <pos>` for insert-at-position
+- 42 unit tests passing (+12 new: 5 insert_tracks, 7 engine copy/paste)
+
 ## 2026-02-06 — Silence Detection
 - Created `src/silence.rs` — `SilenceDetector<S>` source wrapper + `SilenceMonitor` shared flag
 - `SilenceDetector` wraps any `Source<Item=f32>`, measures RMS amplitude per ~100ms window

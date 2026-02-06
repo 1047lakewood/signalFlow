@@ -61,6 +61,28 @@ impl Playlist {
         Ok(())
     }
 
+    /// Insert tracks at a specific position, or append if `at` is None.
+    pub fn insert_tracks(&mut self, tracks: Vec<Track>, at: Option<usize>) -> Result<(), String> {
+        match at {
+            Some(pos) => {
+                if pos > self.tracks.len() {
+                    return Err(format!(
+                        "Insert position {} out of range (playlist has {} tracks)",
+                        pos,
+                        self.tracks.len()
+                    ));
+                }
+                for (i, track) in tracks.into_iter().enumerate() {
+                    self.tracks.insert(pos + i, track);
+                }
+            }
+            None => {
+                self.tracks.extend(tracks);
+            }
+        }
+        Ok(())
+    }
+
     pub fn track_count(&self) -> usize {
         self.tracks.len()
     }
@@ -75,6 +97,65 @@ mod tests {
         let pl = Playlist::new(1, "Test".to_string());
         assert_eq!(pl.track_count(), 0);
         assert!(pl.current_index.is_none());
+    }
+
+    fn make_track(name: &str) -> crate::track::Track {
+        crate::track::Track {
+            path: format!("{}.mp3", name).into(),
+            title: name.into(),
+            artist: "X".into(),
+            duration: std::time::Duration::new(60, 0),
+        }
+    }
+
+    #[test]
+    fn insert_tracks_appends_when_no_position() {
+        let mut pl = Playlist::new(1, "Test".to_string());
+        pl.tracks.push(make_track("A"));
+        pl.insert_tracks(vec![make_track("B"), make_track("C")], None).unwrap();
+        assert_eq!(pl.track_count(), 3);
+        assert_eq!(pl.tracks[1].title, "B");
+        assert_eq!(pl.tracks[2].title, "C");
+    }
+
+    #[test]
+    fn insert_tracks_at_beginning() {
+        let mut pl = Playlist::new(1, "Test".to_string());
+        pl.tracks.push(make_track("A"));
+        pl.insert_tracks(vec![make_track("B"), make_track("C")], Some(0)).unwrap();
+        assert_eq!(pl.track_count(), 3);
+        assert_eq!(pl.tracks[0].title, "B");
+        assert_eq!(pl.tracks[1].title, "C");
+        assert_eq!(pl.tracks[2].title, "A");
+    }
+
+    #[test]
+    fn insert_tracks_at_middle() {
+        let mut pl = Playlist::new(1, "Test".to_string());
+        pl.tracks.push(make_track("A"));
+        pl.tracks.push(make_track("D"));
+        pl.insert_tracks(vec![make_track("B"), make_track("C")], Some(1)).unwrap();
+        assert_eq!(pl.track_count(), 4);
+        assert_eq!(pl.tracks[0].title, "A");
+        assert_eq!(pl.tracks[1].title, "B");
+        assert_eq!(pl.tracks[2].title, "C");
+        assert_eq!(pl.tracks[3].title, "D");
+    }
+
+    #[test]
+    fn insert_tracks_at_end() {
+        let mut pl = Playlist::new(1, "Test".to_string());
+        pl.tracks.push(make_track("A"));
+        pl.insert_tracks(vec![make_track("B")], Some(1)).unwrap();
+        assert_eq!(pl.track_count(), 2);
+        assert_eq!(pl.tracks[1].title, "B");
+    }
+
+    #[test]
+    fn insert_tracks_out_of_range_errors() {
+        let mut pl = Playlist::new(1, "Test".to_string());
+        let result = pl.insert_tracks(vec![make_track("A")], Some(5));
+        assert!(result.is_err());
     }
 
     #[test]

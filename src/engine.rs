@@ -98,6 +98,37 @@ impl Engine {
         self.active_playlist_id
             .and_then(|id| self.playlists.iter_mut().find(|p| p.id == id))
     }
+
+    /// Copy tracks from a playlist by indices (0-based). Returns cloned tracks.
+    pub fn copy_tracks(&self, from_name: &str, indices: &[usize]) -> Result<Vec<crate::track::Track>, String> {
+        let pl = self
+            .find_playlist(from_name)
+            .ok_or_else(|| format!("Playlist '{}' not found", from_name))?;
+        let mut tracks = Vec::new();
+        for &idx in indices {
+            if idx >= pl.tracks.len() {
+                return Err(format!(
+                    "Index {} out of range (playlist '{}' has {} tracks)",
+                    idx, from_name, pl.tracks.len()
+                ));
+            }
+            tracks.push(pl.tracks[idx].clone());
+        }
+        Ok(tracks)
+    }
+
+    /// Paste (insert) tracks into a playlist at a position, or append.
+    pub fn paste_tracks(
+        &mut self,
+        to_name: &str,
+        tracks: Vec<crate::track::Track>,
+        at: Option<usize>,
+    ) -> Result<(), String> {
+        let pl = self
+            .find_playlist_mut(to_name)
+            .ok_or_else(|| format!("Playlist '{}' not found", to_name))?;
+        pl.insert_tracks(tracks, at)
+    }
 }
 
 impl Default for Engine {
@@ -190,6 +221,100 @@ mod tests {
         let engine: Engine = serde_json::from_str(json).unwrap();
         assert_eq!(engine.silence_threshold, 0.0);
         assert_eq!(engine.silence_duration_secs, 0.0);
+    }
+
+    fn make_track(name: &str) -> crate::track::Track {
+        crate::track::Track {
+            path: format!("{}.mp3", name).into(),
+            title: name.into(),
+            artist: "X".into(),
+            duration: std::time::Duration::new(60, 0),
+        }
+    }
+
+    #[test]
+    fn copy_tracks_returns_clones() {
+        let mut engine = Engine::new();
+        engine.create_playlist("Src".to_string());
+        let pl = engine.find_playlist_mut("Src").unwrap();
+        pl.tracks.push(make_track("A"));
+        pl.tracks.push(make_track("B"));
+        pl.tracks.push(make_track("C"));
+
+        let copied = engine.copy_tracks("Src", &[0, 2]).unwrap();
+        assert_eq!(copied.len(), 2);
+        assert_eq!(copied[0].title, "A");
+        assert_eq!(copied[1].title, "C");
+    }
+
+    #[test]
+    fn copy_tracks_bad_name_errors() {
+        let engine = Engine::new();
+        assert!(engine.copy_tracks("Ghost", &[0]).is_err());
+    }
+
+    #[test]
+    fn copy_tracks_bad_index_errors() {
+        let mut engine = Engine::new();
+        engine.create_playlist("Src".to_string());
+        let pl = engine.find_playlist_mut("Src").unwrap();
+        pl.tracks.push(make_track("A"));
+
+        assert!(engine.copy_tracks("Src", &[5]).is_err());
+    }
+
+    #[test]
+    fn paste_tracks_appends() {
+        let mut engine = Engine::new();
+        engine.create_playlist("Dest".to_string());
+        let pl = engine.find_playlist_mut("Dest").unwrap();
+        pl.tracks.push(make_track("A"));
+
+        engine
+            .paste_tracks("Dest", vec![make_track("B")], None)
+            .unwrap();
+        assert_eq!(engine.find_playlist("Dest").unwrap().track_count(), 2);
+        assert_eq!(engine.find_playlist("Dest").unwrap().tracks[1].title, "B");
+    }
+
+    #[test]
+    fn paste_tracks_at_position() {
+        let mut engine = Engine::new();
+        engine.create_playlist("Dest".to_string());
+        let pl = engine.find_playlist_mut("Dest").unwrap();
+        pl.tracks.push(make_track("A"));
+        pl.tracks.push(make_track("C"));
+
+        engine
+            .paste_tracks("Dest", vec![make_track("B")], Some(1))
+            .unwrap();
+        let dest = engine.find_playlist("Dest").unwrap();
+        assert_eq!(dest.track_count(), 3);
+        assert_eq!(dest.tracks[1].title, "B");
+        assert_eq!(dest.tracks[2].title, "C");
+    }
+
+    #[test]
+    fn paste_tracks_bad_name_errors() {
+        let mut engine = Engine::new();
+        assert!(engine.paste_tracks("Ghost", vec![make_track("A")], None).is_err());
+    }
+
+    #[test]
+    fn copy_paste_across_playlists() {
+        let mut engine = Engine::new();
+        engine.create_playlist("Src".to_string());
+        engine.create_playlist("Dest".to_string());
+        let pl = engine.find_playlist_mut("Src").unwrap();
+        pl.tracks.push(make_track("A"));
+        pl.tracks.push(make_track("B"));
+
+        let copied = engine.copy_tracks("Src", &[0, 1]).unwrap();
+        engine.paste_tracks("Dest", copied, None).unwrap();
+
+        assert_eq!(engine.find_playlist("Dest").unwrap().track_count(), 2);
+        // Source unchanged
+        assert_eq!(engine.find_playlist("Src").unwrap().track_count(), 2);
     }
 
     #[test]

@@ -58,11 +58,44 @@ enum PlaylistCmd {
         /// Audio file path(s)
         #[arg(required = true)]
         files: Vec<PathBuf>,
+        /// Insert at position (1-based) instead of appending
+        #[arg(long)]
+        at: Option<usize>,
     },
     /// Show tracks in a playlist
     Show { name: String },
     /// Set a playlist as the active context
     Activate { name: String },
+    /// Remove track(s) from a playlist by position (1-based)
+    Remove {
+        /// Playlist name
+        name: String,
+        /// Track numbers to remove (1-based)
+        #[arg(required = true)]
+        tracks: Vec<usize>,
+    },
+    /// Move a track from one position to another (1-based)
+    Move {
+        /// Playlist name
+        name: String,
+        /// Current position (1-based)
+        from: usize,
+        /// New position (1-based)
+        to: usize,
+    },
+    /// Copy tracks from one playlist to another
+    Copy {
+        /// Source playlist name
+        source: String,
+        /// Destination playlist name
+        dest: String,
+        /// Track numbers to copy (1-based)
+        #[arg(required = true)]
+        tracks: Vec<usize>,
+        /// Insert at position in destination (1-based)
+        #[arg(long)]
+        at: Option<usize>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -364,7 +397,16 @@ fn main() {
                     );
                 }
             }
-            PlaylistCmd::Add { playlist, files } => {
+            PlaylistCmd::Add { playlist, files, at } => {
+                // Convert 1-based --at to 0-based
+                let insert_at = at.map(|n| {
+                    if n == 0 {
+                        eprintln!("Error: --at position must be >= 1");
+                        std::process::exit(1);
+                    }
+                    n - 1
+                });
+
                 let pl = match engine.find_playlist_mut(&playlist) {
                     Some(p) => p,
                     None => {
@@ -372,18 +414,25 @@ fn main() {
                         std::process::exit(1);
                     }
                 };
+
+                // Parse all tracks first, then insert at position or append
+                let mut parsed_tracks = Vec::new();
                 for file in &files {
-                    match pl.add_track(file) {
-                        Ok(idx) => {
-                            let t = &pl.tracks[idx];
+                    match signal_flow::track::Track::from_path(file) {
+                        Ok(t) => {
                             println!(
                                 "  Added: {} — {} [{}]",
-                                t.artist,
-                                t.title,
-                                t.duration_display()
+                                t.artist, t.title, t.duration_display()
                             );
+                            parsed_tracks.push(t);
                         }
                         Err(e) => eprintln!("  Skip: {} — {}", file.display(), e),
+                    }
+                }
+                if !parsed_tracks.is_empty() {
+                    if let Err(e) = pl.insert_tracks(parsed_tracks, insert_at) {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
                     }
                 }
                 engine.save().expect("Failed to save state");
@@ -398,6 +447,108 @@ fn main() {
                     std::process::exit(1);
                 }
             },
+            PlaylistCmd::Remove { name, tracks } => {
+                let pl = match engine.find_playlist_mut(&name) {
+                    Some(p) => p,
+                    None => {
+                        eprintln!("Error: playlist '{}' not found", name);
+                        std::process::exit(1);
+                    }
+                };
+                // Sort indices descending so removals don't shift later indices
+                let mut indices: Vec<usize> = tracks
+                    .iter()
+                    .map(|&n| {
+                        if n == 0 {
+                            eprintln!("Error: track numbers are 1-based");
+                            std::process::exit(1);
+                        }
+                        n - 1
+                    })
+                    .collect();
+                indices.sort_unstable();
+                indices.dedup();
+                indices.reverse();
+
+                for idx in indices {
+                    match pl.remove_track(idx) {
+                        Ok(t) => println!("  Removed: {} — {}", t.artist, t.title),
+                        Err(e) => eprintln!("  Error: {}", e),
+                    }
+                }
+                engine.save().expect("Failed to save state");
+            }
+            PlaylistCmd::Move { name, from, to } => {
+                if from == 0 || to == 0 {
+                    eprintln!("Error: positions are 1-based");
+                    std::process::exit(1);
+                }
+                let pl = match engine.find_playlist_mut(&name) {
+                    Some(p) => p,
+                    None => {
+                        eprintln!("Error: playlist '{}' not found", name);
+                        std::process::exit(1);
+                    }
+                };
+                match pl.reorder(from - 1, to - 1) {
+                    Ok(()) => {
+                        println!("Moved track {} → {} in '{}'", from, to, name);
+                        engine.save().expect("Failed to save state");
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+            PlaylistCmd::Copy {
+                source,
+                dest,
+                tracks,
+                at,
+            } => {
+                let indices: Vec<usize> = tracks
+                    .iter()
+                    .map(|&n| {
+                        if n == 0 {
+                            eprintln!("Error: track numbers are 1-based");
+                            std::process::exit(1);
+                        }
+                        n - 1
+                    })
+                    .collect();
+
+                let copied = match engine.copy_tracks(&source, &indices) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                };
+
+                let count = copied.len();
+                let insert_at = at.map(|n| {
+                    if n == 0 {
+                        eprintln!("Error: --at position must be >= 1");
+                        std::process::exit(1);
+                    }
+                    n - 1
+                });
+
+                match engine.paste_tracks(&dest, copied, insert_at) {
+                    Ok(()) => {
+                        println!(
+                            "Copied {} track(s) from '{}' to '{}'",
+                            count, source, dest
+                        );
+                        engine.save().expect("Failed to save state");
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
             PlaylistCmd::Show { name } => {
                 let pl = match engine.find_playlist(&name) {
                     Some(p) => p,
