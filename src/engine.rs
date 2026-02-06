@@ -18,6 +18,9 @@ pub struct Engine {
     /// Seconds of continuous silence before auto-skip (0 = disabled).
     #[serde(default)]
     pub silence_duration_secs: f32,
+    /// Path to folder containing artist intro files (None = disabled).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intros_folder: Option<String>,
 }
 
 impl Engine {
@@ -29,6 +32,7 @@ impl Engine {
             crossfade_secs: 0.0,
             silence_threshold: 0.01,
             silence_duration_secs: 0.0,
+            intros_folder: None,
         }
     }
 
@@ -230,6 +234,7 @@ mod tests {
             artist: "X".into(),
             duration: std::time::Duration::new(60, 0),
             played_duration: None,
+            has_intro: false,
         }
     }
 
@@ -319,6 +324,28 @@ mod tests {
     }
 
     #[test]
+    fn intros_folder_defaults_to_none() {
+        let engine = Engine::new();
+        assert!(engine.intros_folder.is_none());
+    }
+
+    #[test]
+    fn intros_folder_survives_serialization() {
+        let mut engine = Engine::new();
+        engine.intros_folder = Some("C:\\intros".to_string());
+        let json = serde_json::to_string(&engine).unwrap();
+        let loaded: Engine = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.intros_folder, Some("C:\\intros".to_string()));
+    }
+
+    #[test]
+    fn intros_folder_defaults_when_missing_from_json() {
+        let json = r#"{"playlists":[],"active_playlist_id":null,"next_id":1}"#;
+        let engine: Engine = serde_json::from_str(json).unwrap();
+        assert!(engine.intros_folder.is_none());
+    }
+
+    #[test]
     fn active_playlist_mut_allows_modification() {
         let mut engine = Engine::new();
         engine.create_playlist("Main".to_string());
@@ -330,6 +357,7 @@ mod tests {
             artist: "Artist".into(),
             duration: std::time::Duration::new(60, 0),
             played_duration: None,
+            has_intro: false,
         });
         assert_eq!(engine.active_playlist().unwrap().track_count(), 1);
     }

@@ -1,5 +1,21 @@
 # signalFlow — Changelog
 
+## 2026-02-06 — Auto-Intro System
+- Created `src/auto_intro.rs` — `find_intro()` and `has_intro()` functions
+- `find_intro()` scans intros folder for `Artist.*` files (case-insensitive, supports mp3/wav/flac/ogg/aac/m4a)
+- Skips "Unknown" artists and empty strings
+- Added `Engine.intros_folder: Option<String>` — persisted config, `#[serde(default)]`
+- Added `Track.has_intro: bool` — data flag for future GUI dot indicator, `#[serde(default)]`
+- `play_playlist()` now accepts `intros_folder: Option<&Path>` parameter
+- Plays artist intro before each track when configured; skips for consecutive same-artist tracks
+- CLI: `config intros set <path>` — set intros folder (validates directory exists)
+- CLI: `config intros off` — disable auto-intros
+- CLI: `config show` displays intros folder setting
+- CLI: `status` displays intros setting
+- CLI: `play` output shows "auto-intros: on" when enabled
+- Created `skills/auto_intro.md` design doc
+- 64 unit tests passing (+15 new: 9 auto_intro, 3 engine intros_folder, 3 track has_intro)
+
 ## 2026-02-06 — Metadata Enhancement
 - Filename fallback: parses `Artist - Title.ext` pattern when lofty tags are missing
 - Smart fallback logic: uses tag data when available, fills gaps from filename pattern

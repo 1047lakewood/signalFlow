@@ -110,6 +110,11 @@ enum ConfigCmd {
         #[command(subcommand)]
         action: SilenceCmd,
     },
+    /// Configure auto-intro system
+    Intros {
+        #[command(subcommand)]
+        action: IntrosCmd,
+    },
     /// Show current configuration
     Show,
 }
@@ -124,6 +129,17 @@ enum SilenceCmd {
         duration: f32,
     },
     /// Disable silence detection
+    Off,
+}
+
+#[derive(Subcommand)]
+enum IntrosCmd {
+    /// Set the intros folder path
+    Set {
+        /// Path to folder containing artist intro files
+        path: String,
+    },
+    /// Disable auto-intros
     Off,
 }
 
@@ -142,15 +158,20 @@ fn main() {
             } else {
                 "off".to_string()
             };
+            let intros_status = engine
+                .intros_folder
+                .as_deref()
+                .unwrap_or("off");
             println!(
-                "Playlists: {} | Active: {} | Crossfade: {}s | Silence: {}",
+                "Playlists: {} | Active: {} | Crossfade: {}s | Silence: {} | Intros: {}",
                 engine.playlists.len(),
                 engine
                     .active_playlist()
                     .map(|p| p.name.as_str())
                     .unwrap_or("none"),
                 engine.crossfade_secs,
-                silence_status
+                silence_status,
+                intros_status
             );
             if let Some(pl) = engine.active_playlist() {
                 if let Some(idx) = pl.current_index {
@@ -225,6 +246,8 @@ fn main() {
                 duration_secs: silence_duration.unwrap_or(engine.silence_duration_secs),
             };
 
+            let intros_path = engine.intros_folder.as_ref().map(std::path::PathBuf::from);
+
             let mut info_parts = Vec::new();
             if crossfade_secs > 0.0 {
                 info_parts.push(format!("crossfade: {}s", crossfade_secs));
@@ -234,6 +257,9 @@ fn main() {
                     "silence detect: thresh={}, dur={}s",
                     silence_cfg.threshold, silence_cfg.duration_secs
                 ));
+            }
+            if intros_path.is_some() {
+                info_parts.push("auto-intros: on".to_string());
             }
             if info_parts.is_empty() {
                 println!(
@@ -250,7 +276,7 @@ fn main() {
                 );
             }
             let PlaybackResult { last_index, played_durations } =
-                play_playlist(&player, &tracks, start, crossfade_secs, silence_cfg);
+                play_playlist(&player, &tracks, start, crossfade_secs, silence_cfg, intros_path.as_deref());
 
             // Update current_index and played durations after playback
             if let Some(pl_mut) = engine.active_playlist_mut() {
@@ -364,6 +390,23 @@ fn main() {
                     println!("Silence detection disabled.");
                 }
             },
+            ConfigCmd::Intros { action } => match action {
+                IntrosCmd::Set { path } => {
+                    let p = std::path::Path::new(&path);
+                    if !p.is_dir() {
+                        eprintln!("Error: '{}' is not a valid directory", path);
+                        std::process::exit(1);
+                    }
+                    engine.intros_folder = Some(path.clone());
+                    engine.save().expect("Failed to save state");
+                    println!("Intros folder set to: {}", path);
+                }
+                IntrosCmd::Off => {
+                    engine.intros_folder = None;
+                    engine.save().expect("Failed to save state");
+                    println!("Auto-intros disabled.");
+                }
+            },
             ConfigCmd::Show => {
                 println!("Crossfade: {}s", engine.crossfade_secs);
                 if engine.silence_duration_secs > 0.0 {
@@ -373,6 +416,10 @@ fn main() {
                     );
                 } else {
                     println!("Silence detection: off");
+                }
+                match &engine.intros_folder {
+                    Some(folder) => println!("Intros folder: {}", folder),
+                    None => println!("Auto-intros: off"),
                 }
             }
         },

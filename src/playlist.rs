@@ -106,6 +106,7 @@ mod tests {
             artist: "X".into(),
             duration: std::time::Duration::new(60, 0),
             played_duration: None,
+            has_intro: false,
         }
     }
 

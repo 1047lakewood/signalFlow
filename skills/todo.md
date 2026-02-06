@@ -12,8 +12,8 @@
 
 - [x] Playlist CRUD — Remove, Reorder, Copy, Paste tracks within/between playlists
 - [x] Metadata enhancement — Calculated vs Played duration, filename fallback improvements
-- [ ] Auto-Intro system — Check intros folder, play intro before matching artist tracks
-- [ ] Auto-Intro dot indicator — Data structure flag for "has_intro" per track
+- [x] Auto-Intro system — Check intros folder, play intro before matching artist tracks
+- [x] Auto-Intro dot indicator — Data structure flag for "has_intro" per track
 
 ## Phase C: Scheduler
 

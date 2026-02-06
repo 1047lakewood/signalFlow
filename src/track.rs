@@ -14,6 +14,9 @@ pub struct Track {
     /// Actual playback time (set after track finishes playing).
     #[serde(default, skip_serializing_if = "Option::is_none", with = "option_duration_serde")]
     pub played_duration: Option<Duration>,
+    /// Whether an intro file exists for this track's artist.
+    #[serde(default)]
+    pub has_intro: bool,
 }
 
 impl Track {
@@ -50,6 +53,7 @@ impl Track {
             artist,
             duration,
             played_duration: None,
+            has_intro: false,
         })
     }
 
@@ -162,6 +166,7 @@ mod tests {
             artist: artist.to_string(),
             duration: Duration::new(60, 0),
             played_duration: None,
+            has_intro: false,
         }
     }
 
@@ -173,6 +178,7 @@ mod tests {
             artist: "Artist".to_string(),
             duration: Duration::new(185, 0), // 3:05
             played_duration: None,
+            has_intro: false,
         };
         assert_eq!(track.duration_display(), "3:05");
     }
@@ -224,6 +230,28 @@ mod tests {
         let json = serde_json::to_string(&track).unwrap();
         let loaded: Track = serde_json::from_str(&json).unwrap();
         assert_eq!(loaded.played_duration, Some(Duration::new(120, 500_000_000)));
+    }
+
+    #[test]
+    fn has_intro_defaults_to_false() {
+        let track = make_track("Test", "Artist");
+        assert!(!track.has_intro);
+    }
+
+    #[test]
+    fn has_intro_survives_serialization() {
+        let mut track = make_track("Test", "Artist");
+        track.has_intro = true;
+        let json = serde_json::to_string(&track).unwrap();
+        let loaded: Track = serde_json::from_str(&json).unwrap();
+        assert!(loaded.has_intro);
+    }
+
+    #[test]
+    fn has_intro_defaults_when_missing_from_json() {
+        let json = r#"{"path":"test.mp3","title":"T","artist":"A","duration":{"secs":60,"nanos":0}}"#;
+        let track: Track = serde_json::from_str(json).unwrap();
+        assert!(!track.has_intro);
     }
 
     #[test]

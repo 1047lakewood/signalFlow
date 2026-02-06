@@ -218,6 +218,7 @@ pub struct PlaybackResult {
 /// Play through a playlist starting at `start_index`, auto-advancing.
 /// Supports crossfading when `crossfade_secs > 0.0`.
 /// Supports silence detection when `silence.enabled()`.
+/// Supports auto-intros when `intros_folder` is provided.
 /// Blocks until all tracks finish or the process is interrupted.
 /// Returns a `PlaybackResult` with the last index and per-track played durations.
 pub fn play_playlist(
@@ -226,6 +227,7 @@ pub fn play_playlist(
     start_index: usize,
     crossfade_secs: f32,
     silence: SilenceConfig,
+    intros_folder: Option<&Path>,
 ) -> PlaybackResult {
     let crossfade_dur = Duration::from_secs_f32(crossfade_secs.max(0.0));
     let mut current = start_index;
@@ -233,6 +235,7 @@ pub fn play_playlist(
     let mut current_monitor: Option<SilenceMonitor> = None;
     let mut current_start_time: Option<Instant> = None;
     let mut played_durations: Vec<(usize, Duration)> = Vec::new();
+    let mut last_intro_artist: Option<String> = None;
 
     while current < tracks.len() {
         let track = &tracks[current];
@@ -244,6 +247,33 @@ pub fn play_playlist(
             track.title,
             track.duration_display()
         );
+
+        // Play artist intro if configured and not a consecutive same-artist track
+        if current_sink.is_none() {
+            if let Some(intros_dir) = intros_folder {
+                let same_artist = last_intro_artist
+                    .as_ref()
+                    .map_or(false, |a| a.eq_ignore_ascii_case(&track.artist));
+                if !same_artist {
+                    if let Some(intro_path) =
+                        crate::auto_intro::find_intro(intros_dir, &track.artist)
+                    {
+                        println!("  Playing intro for {}...", track.artist);
+                        match player.play_file_new_sink(&intro_path) {
+                            Ok(intro_sink) => {
+                                while !intro_sink.empty() {
+                                    std::thread::sleep(Duration::from_millis(100));
+                                }
+                                last_intro_artist = Some(track.artist.clone());
+                            }
+                            Err(e) => {
+                                eprintln!("  Intro error: {} — skipping intro", e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         // Start playback if not already playing via crossfade
         let (sink, monitor, start_time) = if let Some(s) = current_sink.take() {
