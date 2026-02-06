@@ -12,6 +12,12 @@ pub struct Engine {
     next_id: u32,
     #[serde(default)]
     pub crossfade_secs: f32,
+    /// RMS threshold below which audio is considered silent (e.g., 0.01).
+    #[serde(default)]
+    pub silence_threshold: f32,
+    /// Seconds of continuous silence before auto-skip (0 = disabled).
+    #[serde(default)]
+    pub silence_duration_secs: f32,
 }
 
 impl Engine {
@@ -21,6 +27,8 @@ impl Engine {
             active_playlist_id: None,
             next_id: 1,
             crossfade_secs: 0.0,
+            silence_threshold: 0.01,
+            silence_duration_secs: 0.0,
         }
     }
 
@@ -156,6 +164,32 @@ mod tests {
         let json = r#"{"playlists":[],"active_playlist_id":null,"next_id":1}"#;
         let engine: Engine = serde_json::from_str(json).unwrap();
         assert_eq!(engine.crossfade_secs, 0.0);
+    }
+
+    #[test]
+    fn silence_fields_default_correctly() {
+        let engine = Engine::new();
+        assert_eq!(engine.silence_threshold, 0.01);
+        assert_eq!(engine.silence_duration_secs, 0.0);
+    }
+
+    #[test]
+    fn silence_fields_survive_serialization() {
+        let mut engine = Engine::new();
+        engine.silence_threshold = 0.005;
+        engine.silence_duration_secs = 5.0;
+        let json = serde_json::to_string(&engine).unwrap();
+        let loaded: Engine = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.silence_threshold, 0.005);
+        assert_eq!(loaded.silence_duration_secs, 5.0);
+    }
+
+    #[test]
+    fn silence_fields_default_when_missing_from_json() {
+        let json = r#"{"playlists":[],"active_playlist_id":null,"next_id":1}"#;
+        let engine: Engine = serde_json::from_str(json).unwrap();
+        assert_eq!(engine.silence_threshold, 0.0);
+        assert_eq!(engine.silence_duration_secs, 0.0);
     }
 
     #[test]

@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use signal_flow::engine::Engine;
-use signal_flow::player::{play_playlist, Player};
+use signal_flow::player::{play_playlist, Player, SilenceConfig};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -27,6 +27,12 @@ enum Commands {
         /// Crossfade duration in seconds (overrides config)
         #[arg(short = 'x', long)]
         crossfade: Option<f32>,
+        /// Silence detection threshold (RMS level, overrides config)
+        #[arg(long)]
+        silence_threshold: Option<f32>,
+        /// Silence duration in seconds before auto-skip (overrides config)
+        #[arg(long)]
+        silence_duration: Option<f32>,
     },
     /// Stop playback and clear the current track
     Stop,
@@ -66,8 +72,26 @@ enum ConfigCmd {
         /// Duration in seconds
         seconds: f32,
     },
+    /// Configure silence detection (auto-skip on dead air)
+    Silence {
+        #[command(subcommand)]
+        action: SilenceCmd,
+    },
     /// Show current configuration
     Show,
+}
+
+#[derive(Subcommand)]
+enum SilenceCmd {
+    /// Enable silence detection with threshold and duration
+    Set {
+        /// RMS threshold (e.g., 0.01 for ~-40dB)
+        threshold: f32,
+        /// Seconds of silence before auto-skip
+        duration: f32,
+    },
+    /// Disable silence detection
+    Off,
 }
 
 fn main() {
@@ -77,14 +101,23 @@ fn main() {
     match cli.command {
         Commands::Status => {
             println!("signalFlow engine v{}", env!("CARGO_PKG_VERSION"));
+            let silence_status = if engine.silence_duration_secs > 0.0 {
+                format!(
+                    "thresh={}, dur={}s",
+                    engine.silence_threshold, engine.silence_duration_secs
+                )
+            } else {
+                "off".to_string()
+            };
             println!(
-                "Playlists: {} | Active: {} | Crossfade: {}s",
+                "Playlists: {} | Active: {} | Crossfade: {}s | Silence: {}",
                 engine.playlists.len(),
                 engine
                     .active_playlist()
                     .map(|p| p.name.as_str())
                     .unwrap_or("none"),
-                engine.crossfade_secs
+                engine.crossfade_secs,
+                silence_status
             );
             if let Some(pl) = engine.active_playlist() {
                 if let Some(idx) = pl.current_index {
@@ -100,7 +133,12 @@ fn main() {
                 }
             }
         }
-        Commands::Play { track, crossfade } => {
+        Commands::Play {
+            track,
+            crossfade,
+            silence_threshold,
+            silence_duration,
+        } => {
             let pl = match engine.active_playlist() {
                 Some(p) => p,
                 None => {
@@ -149,21 +187,36 @@ fn main() {
                 }
             };
 
+            let silence_cfg = SilenceConfig {
+                threshold: silence_threshold.unwrap_or(engine.silence_threshold),
+                duration_secs: silence_duration.unwrap_or(engine.silence_duration_secs),
+            };
+
+            let mut info_parts = Vec::new();
             if crossfade_secs > 0.0 {
-                println!(
-                    "Playing playlist '{}' from track {} (crossfade: {}s)...",
-                    playlist_name,
-                    start + 1,
-                    crossfade_secs
-                );
-            } else {
+                info_parts.push(format!("crossfade: {}s", crossfade_secs));
+            }
+            if silence_cfg.enabled() {
+                info_parts.push(format!(
+                    "silence detect: thresh={}, dur={}s",
+                    silence_cfg.threshold, silence_cfg.duration_secs
+                ));
+            }
+            if info_parts.is_empty() {
                 println!(
                     "Playing playlist '{}' from track {}...",
                     playlist_name,
                     start + 1
                 );
+            } else {
+                println!(
+                    "Playing playlist '{}' from track {} ({})...",
+                    playlist_name,
+                    start + 1,
+                    info_parts.join(", ")
+                );
             }
-            let last_index = play_playlist(&player, &tracks, start, crossfade_secs);
+            let last_index = play_playlist(&player, &tracks, start, crossfade_secs, silence_cfg);
 
             // Update current_index after playback
             if let Some(pl_mut) = engine.active_playlist_mut() {
@@ -245,8 +298,43 @@ fn main() {
                     println!("Crossfade set to {}s.", seconds);
                 }
             }
+            ConfigCmd::Silence { action } => match action {
+                SilenceCmd::Set {
+                    threshold,
+                    duration,
+                } => {
+                    if threshold <= 0.0 {
+                        eprintln!("Error: threshold must be > 0");
+                        std::process::exit(1);
+                    }
+                    if duration <= 0.0 {
+                        eprintln!("Error: duration must be > 0");
+                        std::process::exit(1);
+                    }
+                    engine.silence_threshold = threshold;
+                    engine.silence_duration_secs = duration;
+                    engine.save().expect("Failed to save state");
+                    println!(
+                        "Silence detection enabled: threshold={}, duration={}s",
+                        threshold, duration
+                    );
+                }
+                SilenceCmd::Off => {
+                    engine.silence_duration_secs = 0.0;
+                    engine.save().expect("Failed to save state");
+                    println!("Silence detection disabled.");
+                }
+            },
             ConfigCmd::Show => {
                 println!("Crossfade: {}s", engine.crossfade_secs);
+                if engine.silence_duration_secs > 0.0 {
+                    println!(
+                        "Silence detection: threshold={}, duration={}s",
+                        engine.silence_threshold, engine.silence_duration_secs
+                    );
+                } else {
+                    println!("Silence detection: off");
+                }
             }
         },
         Commands::Playlist { action } => match action {

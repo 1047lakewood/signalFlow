@@ -52,6 +52,11 @@ Every feature goes through this cycle. Do not skip steps.
 - Update `skills/changelog.md` with what was built
 - Update `skills/todo.md` — mark the item `- [x]` (complete)
 
+### 6. COMMIT
+- If all tests pass and `cargo check` has no warnings, commit the changes
+- Commit message format: short summary of what was built
+- Stage only the files changed in this cycle
+
 ## Rules
 
 - **CLI-first:** If it doesn't work in the CLI, it doesn't exist

@@ -6,4 +6,5 @@
 pub mod engine;
 pub mod player;
 pub mod playlist;
+pub mod silence;
 pub mod track;

@@ -1,5 +1,22 @@
 # signalFlow — Changelog
 
+## 2026-02-06 — Silence Detection
+- Created `src/silence.rs` — `SilenceDetector<S>` source wrapper + `SilenceMonitor` shared flag
+- `SilenceDetector` wraps any `Source<Item=f32>`, measures RMS amplitude per ~100ms window
+- Sets `SilenceMonitor` atomic flag when continuous silence exceeds configured duration
+- `SilenceMonitor` uses `Arc<AtomicBool>` for lock-free cross-thread signaling
+- Engine config: `silence_threshold` (f32, default 0.01) + `silence_duration_secs` (f32, default 0 = disabled)
+- Both fields `#[serde(default)]` for backward compat with existing state files
+- Player: `play_file_new_sink_monitored()` and `play_file_new_sink_fadein_monitored()` — wrap source with silence detection
+- `play_playlist()` now accepts `SilenceConfig` — checks monitor in poll loops, auto-skips on silence
+- Silence detection works with both sequential and crossfade playback modes
+- CLI: `config silence set <threshold> <duration>` — enable silence detection
+- CLI: `config silence off` — disable
+- CLI: `play --silence-threshold <f32> --silence-duration <f32>` — per-session override
+- `config show` and `status` display silence detection settings
+- Created `skills/silence.md` design doc
+- 30 unit tests passing (+11 new: 6 silence detector tests, 4 silence config tests, 1 engine serialization test)
+
 ## 2026-02-06 — Crossfading
 - Dual-sink architecture in `Player` — `create_sink()`, `play_file_new_sink()`, `play_file_new_sink_fadein()`
 - `play_playlist()` now accepts `crossfade_secs` parameter for overlapping track transitions

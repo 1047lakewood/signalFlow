@@ -6,7 +6,7 @@
 - [x] Active context switching — Playing a track switches the active playlist context
 - [x] Transport controls — Play, Stop, Skip Next, Seek
 - [x] Crossfading — Configurable fade duration between tracks
-- [ ] Silence detection — Auto-skip when signal drops below threshold for X seconds
+- [x] Silence detection — Auto-skip when signal drops below threshold for X seconds
 
 ## Phase B: Playlist Management
 
