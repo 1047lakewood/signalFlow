@@ -1,5 +1,17 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Silence Detection Settings (GUI)
+- Created `SilenceSettings.tsx` — modal dialog for configuring silence detection threshold and skip duration
+- Numeric input for silence threshold (RMS amplitude 0–1, step 0.005) with hint text
+- Numeric input for skip-after duration (seconds, 0 = disabled)
+- Enabled/Disabled status indicator (green/gray) computed from current values
+- "Disable" button (red) to quickly zero out both fields
+- Saves via existing `set_silence_detection` IPC command with "Saved!" feedback
+- Refactored gear icon (`⚙`) into a dropdown settings menu with "Crossfade" and "Silence Detection" items
+- `.settings-menu-wrapper` with click-outside dismiss, `.settings-dropdown` and `.settings-dropdown-item` CSS
+- Added reusable `.settings-status`, `.status-enabled`/`.status-disabled`, `.settings-btn-danger` CSS classes
+- 129 unit tests passing (no new tests — frontend-only changes over existing `set_silence_detection` IPC)
+
 ## 2026-02-08 — Crossfade Settings Panel (GUI)
 - Created `CrossfadeSettings.tsx` — modal dialog for configuring crossfade duration
 - Numeric input for fade duration (0–30 seconds, step 0.5), loads current value from `get_config` IPC on mount

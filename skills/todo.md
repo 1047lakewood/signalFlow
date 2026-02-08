@@ -41,7 +41,7 @@
 - [x] Now-playing display — Current track info, progress bar (no album art)
 - [x] Auto-intro dot indicator — Visual dot on tracks that have a matching intro file
 - [x] Crossfade settings panel — Configure fade duration and curve type
-- [ ] Silence detection settings — Configure threshold and skip duration
+- [x] Silence detection settings — Configure threshold and skip duration
 - [ ] Auto-intro config — Set intros folder path, enable/disable
 - [ ] Track metadata editor — Inline or dialog editing of artist, title, etc.
 - [ ] Schedule side pane — Editable schedule list in a side panel
@@ -51,9 +51,24 @@
 - [ ] Settings config window — Centralized settings dialog for all engine configuration (crossfade, silence detection, intros, now-playing, conflict policy)
 - [ ] Theme / dark mode — Dark-first UI with optional light theme
 
-## Phase F: Future / Long-Term
+## Phase F: Ad Inserter / Scheduler System
+
+- [ ] Ad scheduler handler — Intelligent hourly ad scheduling with lecture detection and track boundary awareness
+- [ ] Ad inserter service — MP3 concatenation, RadioBoss URL triggering, XML polling confirmation
+- [ ] Ad play logger — JSON play statistics (per-ad, per-date, per-hour), failure tracking
+- [ ] Ad report generator — CSV and PDF verified-play reports with hourly/daily breakdowns
+- [ ] Ad config UI — Modal editor for ad CRUD, enable/disable, MP3 file picker, day/hour scheduling
+- [ ] Ad statistics UI — Play calendar, sortable treeview, date filtering, export/report generation
+
+## Phase G: RDS Engine (Radio Data System)
+
+- [ ] RDS message rotation handler — TCP socket protocol (DPSTEXT commands), keepalive resends, configurable rotation timing
+- [ ] RDS message filtering — Enable/disable, lecture detection, placeholder support ({artist}, {title}), day/hour scheduling
+- [ ] Now-playing reader for RDS — XML reader with retry logic, artist polling, file change detection
+- [ ] Lecture detector — Track classification (blacklist > whitelist > starts-with-R), current/next track analysis
+- [ ] RDS config UI — Modal message editor with 64-char limit, duration, day/hour scheduling, live treeview
+
+## Phase H: Future / Long-Term
 
 - [ ] Hosted web interface — Browser-based remote control and monitoring
-- [ ] Ad inserter/scheduler system — Intelligent ad scheduling, MP3 concatenation, play logging, CSV/PDF reports, config & stats UI
-- [ ] RDS engine — RDS message rotation via TCP socket, lecture detection, now-playing XML reader, message config UI
 - [ ] Advanced auto playlist builder — Rule-based automatic playlist generation

@@ -193,6 +193,15 @@ signalFlow/
 - Gear icon (`⚙`) in header bar opens the modal; click-outside or `×` button to close
 - Reusable `.settings-*` CSS classes for consistent settings panels across features
 
+## Silence Detection Settings (DONE)
+
+- `SilenceSettings.tsx` modal dialog with threshold and duration inputs
+- Enabled/Disabled status indicator (green text when active, gray when off)
+- "Disable" danger button to quickly zero out both fields
+- Loads current values from `get_config` IPC, saves via `set_silence_detection`
+- Settings gear icon refactored into dropdown menu: "Crossfade" and "Silence Detection" items
+- Click-outside dismisses the dropdown; each item opens its respective settings modal
+
 ## Next Steps
 
-- [ ] Silence detection settings
+- [ ] Auto-intro config

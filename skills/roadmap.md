@@ -144,10 +144,10 @@
 - Gear icon in header bar opens settings modal; loads current value from `get_config`, saves via `set_crossfade`
 - Preview/test crossfade behavior — deferred
 
-### Silence Detection Settings
-- Configure silence threshold (dB)
-- Configure minimum silence duration before auto-skip
-- Enable/disable toggle
+### Silence Detection Settings (DONE)
+- Configure silence threshold (RMS amplitude 0–1) and skip-after duration (seconds) via modal dialog
+- Enabled/Disabled status indicator, "Disable" button to quickly turn off
+- Accessible from settings gear dropdown in header bar
 
 ### Auto-Intro Configuration
 - Set intros folder path via folder picker

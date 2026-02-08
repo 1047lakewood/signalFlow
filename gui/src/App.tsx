@@ -5,6 +5,7 @@ import type { PlaylistInfo, TrackInfo } from "./types";
 import PlaylistView from "./PlaylistView";
 import TransportBar from "./TransportBar";
 import CrossfadeSettings from "./CrossfadeSettings";
+import SilenceSettings from "./SilenceSettings";
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "ogg", "aac", "m4a"];
 
@@ -16,6 +17,9 @@ function App() {
   const [renamingTab, setRenamingTab] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [showCrossfadeSettings, setShowCrossfadeSettings] = useState(false);
+  const [showSilenceSettings, setShowSilenceSettings] = useState(false);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const settingsMenuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   const loadPlaylists = useCallback(async () => {
@@ -64,6 +68,17 @@ function App() {
       renameInputRef.current.select();
     }
   }, [renamingTab]);
+
+  useEffect(() => {
+    if (!showSettingsMenu) return;
+    const handleClick = (e: MouseEvent) => {
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(e.target as Node)) {
+        setShowSettingsMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showSettingsMenu]);
 
   const handlePlaylistSelect = async (name: string) => {
     setSelectedPlaylist(name);
@@ -231,13 +246,25 @@ function App() {
             +
           </button>
         </div>
-        <button
-          className="header-settings-btn"
-          onClick={() => setShowCrossfadeSettings(true)}
-          title="Crossfade settings"
-        >
-          {"\u2699"}
-        </button>
+        <div className="settings-menu-wrapper" ref={settingsMenuRef}>
+          <button
+            className="header-settings-btn"
+            onClick={() => setShowSettingsMenu((v) => !v)}
+            title="Settings"
+          >
+            {"\u2699"}
+          </button>
+          {showSettingsMenu && (
+            <div className="settings-dropdown">
+              <button className="settings-dropdown-item" onClick={() => { setShowCrossfadeSettings(true); setShowSettingsMenu(false); }}>
+                Crossfade
+              </button>
+              <button className="settings-dropdown-item" onClick={() => { setShowSilenceSettings(true); setShowSettingsMenu(false); }}>
+                Silence Detection
+              </button>
+            </div>
+          )}
+        </div>
       </header>
       <main className="main">
         {selectedPlaylist ? (
@@ -258,6 +285,9 @@ function App() {
       <TransportBar onTrackChange={loadTracks} />
       {showCrossfadeSettings && (
         <CrossfadeSettings onClose={() => setShowCrossfadeSettings(false)} />
+      )}
+      {showSilenceSettings && (
+        <SilenceSettings onClose={() => setShowSilenceSettings(false)} />
       )}
     </div>
   );
