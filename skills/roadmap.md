@@ -102,10 +102,11 @@
 - Auto-loads active playlist on mount, playlist tab switching in header
 - Right-click context menu for track operations — deferred to later
 
-### Playlist Tabs
+### Playlist Tabs (DONE)
 - Tabbed interface for multiple playlists
-- Add, close, rename tabs
-- Tab switching sets active playlist context
+- `+` button to add new playlists, `×` button to close, double-click to rename inline
+- Tab switching calls `set_active_playlist` to sync backend context
+- Auto-selects next tab when closing the currently active one
 
 ### Transport Controls
 - Play, Stop, Skip Next buttons

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { PlaylistInfo, TrackInfo } from "./types";
 import PlaylistView from "./PlaylistView";
@@ -8,6 +8,9 @@ function App() {
   const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
   const [tracks, setTracks] = useState<TrackInfo[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number | null>(null);
+  const [renamingTab, setRenamingTab] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   const loadPlaylists = useCallback(async () => {
     try {
@@ -49,8 +52,79 @@ function App() {
     loadTracks();
   }, [loadTracks]);
 
-  const handlePlaylistSelect = (name: string) => {
+  useEffect(() => {
+    if (renamingTab && renameInputRef.current) {
+      renameInputRef.current.focus();
+      renameInputRef.current.select();
+    }
+  }, [renamingTab]);
+
+  const handlePlaylistSelect = async (name: string) => {
     setSelectedPlaylist(name);
+    try {
+      await invoke("set_active_playlist", { name });
+    } catch (e) {
+      console.error("Failed to set active playlist:", e);
+    }
+  };
+
+  const handleAddPlaylist = async () => {
+    const name = prompt("New playlist name:");
+    if (!name || !name.trim()) return;
+    try {
+      await invoke("create_playlist", { name: name.trim() });
+      setSelectedPlaylist(name.trim());
+      await loadPlaylists();
+    } catch (e) {
+      console.error("Failed to create playlist:", e);
+    }
+  };
+
+  const handleClosePlaylist = async (name: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await invoke("delete_playlist", { name });
+      if (selectedPlaylist === name) {
+        const remaining = playlists.filter((p) => p.name !== name);
+        setSelectedPlaylist(remaining[0]?.name ?? null);
+      }
+      await loadPlaylists();
+    } catch (e) {
+      console.error("Failed to delete playlist:", e);
+    }
+  };
+
+  const handleRenameStart = (name: string) => {
+    setRenamingTab(name);
+    setRenameValue(name);
+  };
+
+  const handleRenameCommit = async () => {
+    if (!renamingTab) return;
+    const newName = renameValue.trim();
+    if (!newName || newName === renamingTab) {
+      setRenamingTab(null);
+      return;
+    }
+    try {
+      await invoke("rename_playlist", { oldName: renamingTab, newName });
+      if (selectedPlaylist === renamingTab) {
+        setSelectedPlaylist(newName);
+      }
+      setRenamingTab(null);
+      await loadPlaylists();
+    } catch (e) {
+      console.error("Failed to rename playlist:", e);
+      setRenamingTab(null);
+    }
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleRenameCommit();
+    } else if (e.key === "Escape") {
+      setRenamingTab(null);
+    }
   };
 
   return (
@@ -67,11 +141,40 @@ function App() {
                   : "playlist-tab"
               }
               onClick={() => handlePlaylistSelect(pl.name)}
+              onDoubleClick={() => handleRenameStart(pl.name)}
             >
-              {pl.name}
-              <span className="track-count">{pl.track_count}</span>
+              {renamingTab === pl.name ? (
+                <input
+                  ref={renameInputRef}
+                  className="rename-input"
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onBlur={handleRenameCommit}
+                  onKeyDown={handleRenameKeyDown}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <>
+                  {pl.name}
+                  <span className="track-count">{pl.track_count}</span>
+                  <span
+                    className="tab-close"
+                    onClick={(e) => handleClosePlaylist(pl.name, e)}
+                    title="Close playlist"
+                  >
+                    {"\u00D7"}
+                  </span>
+                </>
+              )}
             </button>
           ))}
+          <button
+            className="playlist-tab add-tab"
+            onClick={handleAddPlaylist}
+            title="Add playlist"
+          >
+            +
+          </button>
         </div>
       </header>
       <main className="main">

@@ -1,5 +1,16 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Playlist Tabs
+- Added `+` button to create new playlists (prompts for name, calls `create_playlist` IPC)
+- Added `×` close button on each tab to delete playlists (calls `delete_playlist` IPC)
+- Close button hidden by default, appears on tab hover, highlights red on hover
+- Double-click a tab to rename inline — input field with Enter to commit, Escape to cancel, blur to commit
+- Tab click now also calls `set_active_playlist` to sync backend state
+- Add-tab button uses dashed border style to distinguish from playlist tabs
+- Rename input styled with highlight border, auto-focused and text-selected on activation
+- Auto-selects another tab when closing the currently selected playlist
+- 123 unit tests passing (no new tests — frontend-only changes)
+
 ## 2026-02-08 — Main Playlist View
 - Created `gui/src/types.ts` — TypeScript interfaces matching all IPC response types (PlaylistInfo, TrackInfo, StatusResponse, ScheduleEventInfo, ConfigResponse)
 - Created `gui/src/PlaylistView.tsx` — track table component with columns: #, Status, Artist, Title, Duration

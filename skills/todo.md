@@ -33,7 +33,7 @@
 - [x] Tauri project scaffolding — Initialize Tauri + React/TypeScript frontend
 - [x] IPC bridge — Rust ↔ JS command layer exposing all core engine functions
 - [x] Main playlist view — Track list with columns (artist, title, duration, status)
-- [ ] Playlist tabs — Multiple playlist tabs with add/close/rename
+- [x] Playlist tabs — Multiple playlist tabs with add/close/rename
 - [ ] Transport controls — Play, Stop, Skip, Seek bar, elapsed/remaining display
 - [ ] Drag-and-drop reordering — Reorder tracks within and between playlists
 - [ ] File browser / Add tracks — Dialog or drag-drop to add audio files to playlist

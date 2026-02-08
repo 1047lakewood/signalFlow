@@ -106,7 +106,14 @@ signalFlow/
 - Playlist tabs in header for quick switching between playlists (preview for Playlist Tabs feature)
 - Empty state messaging for no playlists and empty playlists
 
+## Playlist Tabs (DONE)
+
+- `+` button creates new playlists via `create_playlist` IPC (browser `prompt()` for name)
+- `×` close button on each tab deletes playlists via `delete_playlist` IPC (hidden until hover)
+- Double-click tab to rename inline — commits on Enter/blur, cancels on Escape, calls `rename_playlist` IPC
+- Tab click calls `set_active_playlist` to sync backend active context
+- Auto-selects next available tab when closing the currently selected playlist
+
 ## Next Steps
 
-- [ ] Playlist tabs — full tab management (add/close/rename)
 - [ ] Transport controls — Play, Stop, Skip buttons

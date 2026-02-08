@@ -89,6 +89,45 @@ body {
   border-radius: 8px;
 }
 
+.tab-close {
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-secondary);
+  opacity: 0;
+  margin-left: 2px;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.playlist-tab:hover .tab-close {
+  opacity: 1;
+}
+
+.tab-close:hover {
+  color: var(--highlight);
+}
+
+.playlist-tab.add-tab {
+  font-size: 16px;
+  color: var(--text-secondary);
+  padding: 5px 10px;
+  border-style: dashed;
+}
+
+.playlist-tab.add-tab:hover {
+  color: var(--text-primary);
+}
+
+.rename-input {
+  background: var(--bg-primary);
+  border: 1px solid var(--highlight);
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  width: 100px;
+  outline: none;
+}
+
 /* ── Main content ──────────────────────────────────────────────────── */
 
 .main {
