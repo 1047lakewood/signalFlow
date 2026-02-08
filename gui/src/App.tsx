@@ -6,6 +6,7 @@ import PlaylistView from "./PlaylistView";
 import TransportBar from "./TransportBar";
 import CrossfadeSettings from "./CrossfadeSettings";
 import SilenceSettings from "./SilenceSettings";
+import IntroSettings from "./IntroSettings";
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "ogg", "aac", "m4a"];
 
@@ -18,6 +19,7 @@ function App() {
   const [renameValue, setRenameValue] = useState("");
   const [showCrossfadeSettings, setShowCrossfadeSettings] = useState(false);
   const [showSilenceSettings, setShowSilenceSettings] = useState(false);
+  const [showIntroSettings, setShowIntroSettings] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -262,6 +264,9 @@ function App() {
               <button className="settings-dropdown-item" onClick={() => { setShowSilenceSettings(true); setShowSettingsMenu(false); }}>
                 Silence Detection
               </button>
+              <button className="settings-dropdown-item" onClick={() => { setShowIntroSettings(true); setShowSettingsMenu(false); }}>
+                Auto-Intro
+              </button>
             </div>
           )}
         </div>
@@ -288,6 +293,9 @@ function App() {
       )}
       {showSilenceSettings && (
         <SilenceSettings onClose={() => setShowSilenceSettings(false)} />
+      )}
+      {showIntroSettings && (
+        <IntroSettings onClose={() => setShowIntroSettings(false)} />
       )}
     </div>
   );

@@ -658,6 +658,25 @@ body {
   cursor: default;
 }
 
+.settings-input-path {
+  width: 240px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.settings-btn-browse {
+  border-color: var(--text-secondary);
+  font-size: 11px;
+  padding: 6px 12px;
+  flex-shrink: 0;
+}
+
+.settings-btn-browse:hover {
+  background: var(--bg-row-hover);
+  border-color: var(--text-primary);
+}
+
 /* ── Header settings button ──────────────────────────────────────── */
 
 .header-settings-btn {

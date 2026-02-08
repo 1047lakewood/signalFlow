@@ -42,7 +42,7 @@
 - [x] Auto-intro dot indicator — Visual dot on tracks that have a matching intro file
 - [x] Crossfade settings panel — Configure fade duration and curve type
 - [x] Silence detection settings — Configure threshold and skip duration
-- [ ] Auto-intro config — Set intros folder path, enable/disable
+- [x] Auto-intro config — Set intros folder path, enable/disable
 - [ ] Track metadata editor — Inline or dialog editing of artist, title, etc.
 - [ ] Schedule side pane — Editable schedule list in a side panel
 - [ ] Log pane — Playback events and system logs underneath the schedule pane

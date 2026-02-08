@@ -45,6 +45,8 @@ export interface ConfigResponse {
   silence_threshold: number;
   silence_duration_secs: number;
   intros_folder: string | null;
+  recurring_intro_interval_secs: number;
+  recurring_intro_duck_volume: number;
   conflict_policy: string;
   now_playing_path: string | null;
 }

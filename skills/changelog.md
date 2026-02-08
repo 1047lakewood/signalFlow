@@ -1,5 +1,19 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Auto-Intro Config (GUI)
+- Created `IntroSettings.tsx` — modal dialog for configuring auto-intro system
+- Browse button opens native directory picker via `@tauri-apps/plugin-dialog` to select intros folder
+- Read-only path display showing current intros folder, with placeholder when no folder selected
+- Enabled/Disabled status indicator (green/gray) computed from folder presence
+- Recurring intro interval input (seconds, 0 = disabled) with dynamic hint text
+- Duck volume input (0–1) for main track volume during recurring intro overlay
+- "Disable" button (red) clears intros folder and resets recurring settings
+- Saves via `set_intros_folder` and `set_recurring_intro` IPC commands with "Saved!" feedback
+- Added "Auto-Intro" item to settings dropdown menu in header
+- Added `.settings-input-path` and `.settings-btn-browse` CSS classes
+- Updated TypeScript `ConfigResponse` to include `recurring_intro_interval_secs` and `recurring_intro_duck_volume`
+- 129 unit tests passing (no new tests — frontend-only changes over existing IPC commands)
+
 ## 2026-02-08 — Silence Detection Settings (GUI)
 - Created `SilenceSettings.tsx` — modal dialog for configuring silence detection threshold and skip duration
 - Numeric input for silence threshold (RMS amplitude 0–1, step 0.005) with hint text

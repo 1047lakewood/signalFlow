@@ -202,6 +202,19 @@ signalFlow/
 - Settings gear icon refactored into dropdown menu: "Crossfade" and "Silence Detection" items
 - Click-outside dismisses the dropdown; each item opens its respective settings modal
 
+## Auto-Intro Config (DONE)
+
+- `IntroSettings.tsx` modal dialog with three configuration sections:
+  1. **Intros folder** — read-only path input + "Browse" button (native directory picker via `@tauri-apps/plugin-dialog`)
+  2. **Recurring interval** — seconds input (0 = disabled), dynamic hint shows interval description
+  3. **Duck volume** — 0–1 input, controls main track volume during recurring intro overlay
+- Enabled/Disabled status indicator based on whether a folder is configured
+- "Disable" danger button clears folder and resets recurring settings to defaults
+- Saves via `set_intros_folder` and `set_recurring_intro` IPC commands
+- Added as "Auto-Intro" item in the settings dropdown menu (alongside Crossfade and Silence Detection)
+- `.settings-input-path` CSS for wider path display with text overflow
+- `.settings-btn-browse` CSS for browse button styling
+
 ## Next Steps
 
-- [ ] Auto-intro config
+- [ ] Track metadata editor
