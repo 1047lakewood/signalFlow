@@ -1,5 +1,25 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Transport Controls (GUI)
+- Added `Player` + `PlaybackState` to Tauri `AppState` for runtime audio playback
+- Player lazily initialized on first play command — audio output stays alive across tracks
+- `PlaybackState` tracks is_playing, is_paused, elapsed time (via `Instant` + pause accounting), track duration
+- 6 new IPC commands: `transport_play`, `transport_stop`, `transport_pause`, `transport_skip`, `transport_seek`, `transport_status`
+- `transport_play(track_index?)` — plays current or specified track from active playlist, stops any prior playback
+- `transport_stop` — stops playback, resets state
+- `transport_pause` — toggles pause/resume with accurate elapsed time tracking
+- `transport_skip` — advances to next track, plays it (or stops at end of playlist)
+- `transport_seek(position_secs)` — seeks to position, resets timing to match
+- `transport_status` — returns `TransportState` (is_playing, is_paused, elapsed_secs, duration_secs, track_index, track_artist, track_title), also detects when sink empties (track ended naturally)
+- Created `TransportBar.tsx` — Play/Pause toggle, Stop, Skip buttons + seek slider + elapsed/remaining time + track info
+- Seek bar uses CSS custom property (`--progress`) for filled track visualization
+- Polls `transport_status` every 500ms for real-time elapsed display
+- Drag-to-seek on the slider with mousedown/mouseup handling
+- `TransportBar` accepts `onTrackChange` callback to refresh playlist view on play/stop/skip
+- Added `TransportState` TypeScript interface to `types.ts`
+- Transport bar pinned to bottom of window with dark theme matching existing UI
+- 123 unit tests passing (no new tests — IPC layer is thin wiring over tested core library)
+
 ## 2026-02-08 — Playlist Tabs
 - Added `+` button to create new playlists (prompts for name, calls `create_playlist` IPC)
 - Added `×` close button on each tab to delete playlists (calls `delete_playlist` IPC)

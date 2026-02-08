@@ -1,14 +1,74 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use signal_flow::engine::Engine;
+use signal_flow::player::Player;
 use signal_flow::scheduler::{ConflictPolicy, ScheduleMode, Priority, parse_time};
 use serde::Serialize;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use tauri::State;
 
 struct AppState {
     engine: Mutex<Engine>,
+    player: Mutex<Option<Player>>,
+    playback: Arc<Mutex<PlaybackState>>,
+}
+
+/// Tracks the state of the currently playing track.
+struct PlaybackState {
+    is_playing: bool,
+    is_paused: bool,
+    track_index: Option<usize>,
+    playlist_name: Option<String>,
+    track_duration: Duration,
+    /// When playback started (or last resumed).
+    start_time: Option<Instant>,
+    /// Total time spent paused so far.
+    total_paused: Duration,
+    /// When the current pause started (if paused).
+    pause_start: Option<Instant>,
+}
+
+impl PlaybackState {
+    fn new() -> Self {
+        PlaybackState {
+            is_playing: false,
+            is_paused: false,
+            track_index: None,
+            playlist_name: None,
+            track_duration: Duration::ZERO,
+            start_time: None,
+            total_paused: Duration::ZERO,
+            pause_start: None,
+        }
+    }
+
+    fn elapsed(&self) -> Duration {
+        match self.start_time {
+            Some(start) => {
+                let raw = start.elapsed();
+                let paused = if let Some(ps) = self.pause_start {
+                    self.total_paused + ps.elapsed()
+                } else {
+                    self.total_paused
+                };
+                raw.saturating_sub(paused)
+            }
+            None => Duration::ZERO,
+        }
+    }
+
+    fn reset(&mut self) {
+        self.is_playing = false;
+        self.is_paused = false;
+        self.track_index = None;
+        self.playlist_name = None;
+        self.track_duration = Duration::ZERO;
+        self.start_time = None;
+        self.total_paused = Duration::ZERO;
+        self.pause_start = None;
+    }
 }
 
 // ── Response types ──────────────────────────────────────────────────────────
@@ -67,6 +127,17 @@ struct ConfigResponse {
     intros_folder: Option<String>,
     conflict_policy: String,
     now_playing_path: Option<String>,
+}
+
+#[derive(Serialize)]
+struct TransportState {
+    is_playing: bool,
+    is_paused: bool,
+    elapsed_secs: f64,
+    duration_secs: f64,
+    track_index: Option<usize>,
+    track_artist: Option<String>,
+    track_title: Option<String>,
 }
 
 // ── Status ──────────────────────────────────────────────────────────────────
@@ -247,6 +318,228 @@ fn edit_track_metadata(
     Ok(())
 }
 
+// ── Transport controls ─────────────────────────────────────────────────────
+
+/// Ensure the Player is initialized, returning a reference to it.
+fn ensure_player(player_lock: &Mutex<Option<Player>>) -> Result<(), String> {
+    let mut opt = player_lock.lock().unwrap();
+    if opt.is_none() {
+        *opt = Some(Player::new()?);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn transport_play(
+    state: State<AppState>,
+    track_index: Option<usize>,
+) -> Result<(), String> {
+    ensure_player(&state.player)?;
+
+    let mut engine = state.engine.lock().unwrap();
+    let pl = engine
+        .active_playlist_mut()
+        .ok_or_else(|| "No active playlist".to_string())?;
+
+    let idx = track_index.unwrap_or_else(|| pl.current_index.unwrap_or(0));
+    if idx >= pl.tracks.len() {
+        return Err(format!(
+            "Track index {} out of range ({} tracks)",
+            idx,
+            pl.tracks.len()
+        ));
+    }
+
+    let track_path = pl.tracks[idx].path.clone();
+    let track_duration = pl.tracks[idx].duration;
+    let playlist_name = pl.name.clone();
+    pl.current_index = Some(idx);
+    engine.save().ok(); // best-effort persist
+
+    // Play the file
+    let player_guard = state.player.lock().unwrap();
+    let player = player_guard.as_ref().unwrap();
+    player.stop(); // stop any current playback
+    player.play_file(&track_path)?;
+
+    // Update playback state
+    let mut pb = state.playback.lock().unwrap();
+    pb.is_playing = true;
+    pb.is_paused = false;
+    pb.track_index = Some(idx);
+    pb.playlist_name = Some(playlist_name);
+    pb.track_duration = track_duration;
+    pb.start_time = Some(Instant::now());
+    pb.total_paused = Duration::ZERO;
+    pb.pause_start = None;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn transport_stop(state: State<AppState>) -> Result<(), String> {
+    let player_guard = state.player.lock().unwrap();
+    if let Some(player) = player_guard.as_ref() {
+        player.stop();
+    }
+
+    let mut pb = state.playback.lock().unwrap();
+    pb.reset();
+
+    Ok(())
+}
+
+#[tauri::command]
+fn transport_pause(state: State<AppState>) -> Result<(), String> {
+    let player_guard = state.player.lock().unwrap();
+    let player = player_guard.as_ref().ok_or("No audio player")?;
+
+    let mut pb = state.playback.lock().unwrap();
+    if !pb.is_playing {
+        return Err("Nothing is playing".to_string());
+    }
+
+    if pb.is_paused {
+        // Resume
+        player.resume();
+        pb.is_paused = false;
+        if let Some(ps) = pb.pause_start.take() {
+            pb.total_paused += ps.elapsed();
+        }
+    } else {
+        // Pause
+        player.pause();
+        pb.is_paused = true;
+        pb.pause_start = Some(Instant::now());
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+fn transport_skip(state: State<AppState>) -> Result<(), String> {
+    // Stop current playback
+    {
+        let player_guard = state.player.lock().unwrap();
+        if let Some(player) = player_guard.as_ref() {
+            player.stop();
+        }
+    }
+
+    // Advance index
+    let next_idx;
+    let track_path;
+    let track_duration;
+    let playlist_name;
+    {
+        let mut engine = state.engine.lock().unwrap();
+        let pl = engine
+            .active_playlist_mut()
+            .ok_or_else(|| "No active playlist".to_string())?;
+
+        let current = pl.current_index.unwrap_or(0);
+        next_idx = current + 1;
+        if next_idx >= pl.tracks.len() {
+            // End of playlist
+            pl.current_index = None;
+            engine.save().ok();
+            let mut pb = state.playback.lock().unwrap();
+            pb.reset();
+            return Ok(());
+        }
+
+        track_path = pl.tracks[next_idx].path.clone();
+        track_duration = pl.tracks[next_idx].duration;
+        playlist_name = pl.name.clone();
+        pl.current_index = Some(next_idx);
+        engine.save().ok();
+    }
+
+    // Play next track
+    ensure_player(&state.player)?;
+    let player_guard = state.player.lock().unwrap();
+    let player = player_guard.as_ref().unwrap();
+    player.play_file(&track_path)?;
+
+    let mut pb = state.playback.lock().unwrap();
+    pb.is_playing = true;
+    pb.is_paused = false;
+    pb.track_index = Some(next_idx);
+    pb.playlist_name = Some(playlist_name);
+    pb.track_duration = track_duration;
+    pb.start_time = Some(Instant::now());
+    pb.total_paused = Duration::ZERO;
+    pb.pause_start = None;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn transport_seek(state: State<AppState>, position_secs: f64) -> Result<(), String> {
+    let player_guard = state.player.lock().unwrap();
+    let player = player_guard.as_ref().ok_or("No audio player")?;
+
+    let pb = state.playback.lock().unwrap();
+    if !pb.is_playing {
+        return Err("Nothing is playing".to_string());
+    }
+    drop(pb);
+
+    let seek_pos = Duration::from_secs_f64(position_secs.max(0.0));
+    player.try_seek(seek_pos)?;
+
+    // Reset timing to reflect the seek position
+    let mut pb = state.playback.lock().unwrap();
+    pb.start_time = Some(Instant::now() - seek_pos);
+    pb.total_paused = Duration::ZERO;
+    pb.pause_start = if pb.is_paused { Some(Instant::now()) } else { None };
+
+    Ok(())
+}
+
+#[tauri::command]
+fn transport_status(state: State<AppState>) -> TransportState {
+    let pb = state.playback.lock().unwrap();
+
+    // Check if the sink has finished playing (track ended naturally)
+    let actually_playing = if pb.is_playing && !pb.is_paused {
+        let player_guard = state.player.lock().unwrap();
+        if let Some(player) = player_guard.as_ref() {
+            !player.is_empty()
+        } else {
+            false
+        }
+    } else {
+        pb.is_playing
+    };
+
+    let elapsed = pb.elapsed();
+    let (artist, title) = if let (Some(idx), Some(ref pl_name)) = (pb.track_index, &pb.playlist_name) {
+        let engine = state.engine.lock().unwrap();
+        if let Some(pl) = engine.find_playlist(pl_name) {
+            if let Some(track) = pl.tracks.get(idx) {
+                (Some(track.artist.clone()), Some(track.title.clone()))
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        }
+    } else {
+        (None, None)
+    };
+
+    TransportState {
+        is_playing: actually_playing,
+        is_paused: pb.is_paused,
+        elapsed_secs: elapsed.as_secs_f64(),
+        duration_secs: pb.track_duration.as_secs_f64(),
+        track_index: pb.track_index,
+        track_artist: artist,
+        track_title: title,
+    }
+}
+
 // ── Schedule ────────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -383,10 +676,13 @@ fn set_nowplaying_path(state: State<AppState>, path: Option<String>) -> Result<(
 
 fn main() {
     let engine = Engine::load();
+    let playback = Arc::new(Mutex::new(PlaybackState::new()));
 
     tauri::Builder::default()
         .manage(AppState {
             engine: Mutex::new(engine),
+            player: Mutex::new(None),
+            playback,
         })
         .invoke_handler(tauri::generate_handler![
             // Status
@@ -403,6 +699,13 @@ fn main() {
             remove_tracks,
             reorder_track,
             edit_track_metadata,
+            // Transport
+            transport_play,
+            transport_stop,
+            transport_pause,
+            transport_skip,
+            transport_seek,
+            transport_status,
             // Schedule
             get_schedule,
             add_schedule_event,

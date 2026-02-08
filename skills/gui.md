@@ -114,6 +114,29 @@ signalFlow/
 - Tab click calls `set_active_playlist` to sync backend active context
 - Auto-selects next available tab when closing the currently selected playlist
 
+## Transport Controls (DONE)
+
+- `Player` stored in `AppState` behind `Mutex<Option<Player>>`, lazily initialized on first play
+- `PlaybackState` struct tracks: is_playing, is_paused, track_index, playlist_name, track_duration, start_time (Instant), total_paused (Duration), pause_start
+- `PlaybackState::elapsed()` calculates accurate elapsed time accounting for pauses
+- 6 IPC commands: `transport_play`, `transport_stop`, `transport_pause`, `transport_skip`, `transport_seek`, `transport_status`
+- `TransportState` response: is_playing, is_paused, elapsed_secs, duration_secs, track_index, track_artist, track_title
+- `transport_status` detects when rodio sink empties (track ended naturally)
+- `TransportBar.tsx` component: Play/Pause toggle, Stop, Skip buttons, seek slider with filled progress, elapsed/remaining time, current track artist/title
+- Polls every 500ms, seek via drag on range input
+- Pinned to bottom of `.app` layout
+
+### IPC Commands (Transport)
+
+| Command | Args | Returns | Status |
+|---------|------|---------|--------|
+| `transport_play` | `track_index?` | `()` | DONE |
+| `transport_stop` | none | `()` | DONE |
+| `transport_pause` | none | `()` | DONE |
+| `transport_skip` | none | `()` | DONE |
+| `transport_seek` | `position_secs` | `()` | DONE |
+| `transport_status` | none | `TransportState` | DONE |
+
 ## Next Steps
 
-- [ ] Transport controls — Play, Stop, Skip buttons
+- [ ] Drag-and-drop reordering — Reorder tracks within and between playlists

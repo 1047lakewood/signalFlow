@@ -241,3 +241,132 @@ body {
   font-size: 14px;
   margin-left: 2px;
 }
+
+/* ── Transport bar ────────────────────────────────────────────────── */
+
+.transport-bar {
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--accent);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.transport-track-info {
+  min-width: 180px;
+  max-width: 240px;
+  overflow: hidden;
+}
+
+.transport-track-name {
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.transport-no-track {
+  color: var(--text-secondary);
+}
+
+.transport-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.transport-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 14px;
+  width: 32px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.transport-btn:hover {
+  background: var(--bg-row-hover);
+  border-color: var(--text-secondary);
+}
+
+.transport-btn-play {
+  color: var(--highlight);
+  border-color: var(--highlight);
+}
+
+.transport-btn-play:hover {
+  background: rgba(233, 69, 96, 0.15);
+}
+
+.transport-seek {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.transport-time {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.transport-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--highlight) 0%,
+    var(--highlight) var(--progress, 0%),
+    var(--border) var(--progress, 0%),
+    var(--border) 100%
+  );
+  outline: none;
+  cursor: pointer;
+}
+
+.transport-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--highlight);
+  cursor: pointer;
+  border: none;
+}
+
+.transport-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--highlight);
+  cursor: pointer;
+  border: none;
+}
+
+.transport-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.3);
+}
+
+.transport-slider::-moz-range-thumb:hover {
+  transform: scale(1.3);
+}

@@ -48,3 +48,13 @@ export interface ConfigResponse {
   conflict_policy: string;
   now_playing_path: string | null;
 }
+
+export interface TransportState {
+  is_playing: boolean;
+  is_paused: boolean;
+  elapsed_secs: number;
+  duration_secs: number;
+  track_index: number | null;
+  track_artist: string | null;
+  track_title: string | null;
+}

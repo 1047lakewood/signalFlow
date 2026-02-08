@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { PlaylistInfo, TrackInfo } from "./types";
 import PlaylistView from "./PlaylistView";
+import TransportBar from "./TransportBar";
 
 function App() {
   const [playlists, setPlaylists] = useState<PlaylistInfo[]>([]);
@@ -190,6 +191,7 @@ function App() {
           </div>
         )}
       </main>
+      <TransportBar onTrackChange={loadTracks} />
     </div>
   );
 }
