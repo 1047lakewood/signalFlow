@@ -38,8 +38,9 @@ signalFlow/
 
 - `AppState` wraps `Engine` in `Mutex` for thread-safe IPC access
 - `Engine::load()` called at startup to restore persisted state
-- Initial IPC command: `get_status` — returns engine summary string
+- Full IPC command layer exposing all core engine functions (see IPC Commands table)
 - Tauri v2 with capabilities-based permissions (`core:default`)
+- All commands return structured serde-serializable JSON (not formatted strings)
 
 ## Frontend (DONE)
 
@@ -55,14 +56,46 @@ signalFlow/
 - Build: `cd src-tauri && cargo tauri build`
 - Frontend only: `cd gui && npm run dev`
 
-## IPC Commands
+## IPC Commands (DONE)
 
-| Command      | Args | Returns  | Status |
-|-------------|------|----------|--------|
-| `get_status` | none | `String` | DONE   |
+| Command | Args | Returns | Status |
+|---------|------|---------|--------|
+| **Status** | | | |
+| `get_status` | none | `StatusResponse` (JSON) | DONE |
+| **Playlist CRUD** | | | |
+| `get_playlists` | none | `Vec<PlaylistInfo>` | DONE |
+| `create_playlist` | `name` | `u32` (id) | DONE |
+| `delete_playlist` | `name` | `()` | DONE |
+| `rename_playlist` | `old_name, new_name` | `()` | DONE |
+| `set_active_playlist` | `name` | `u32` (id) | DONE |
+| **Track Operations** | | | |
+| `get_playlist_tracks` | `name` | `Vec<TrackInfo>` | DONE |
+| `add_track` | `playlist, path` | `usize` (index) | DONE |
+| `remove_tracks` | `playlist, indices[]` | `()` | DONE |
+| `reorder_track` | `playlist, from, to` | `()` | DONE |
+| `edit_track_metadata` | `playlist, track_index, artist?, title?` | `()` | DONE |
+| **Schedule** | | | |
+| `get_schedule` | none | `Vec<ScheduleEventInfo>` | DONE |
+| `add_schedule_event` | `time, mode, file, priority?, label?, days?` | `u32` (id) | DONE |
+| `remove_schedule_event` | `id` | `()` | DONE |
+| `toggle_schedule_event` | `id` | `bool` (new state) | DONE |
+| **Config** | | | |
+| `get_config` | none | `ConfigResponse` | DONE |
+| `set_crossfade` | `secs` | `()` | DONE |
+| `set_silence_detection` | `threshold, duration_secs` | `()` | DONE |
+| `set_intros_folder` | `path?` (None=disable) | `()` | DONE |
+| `set_conflict_policy` | `policy` | `()` | DONE |
+| `set_nowplaying_path` | `path?` (None=disable) | `()` | DONE |
+
+### Response Types
+
+- **StatusResponse**: playlist_count, active_playlist, schedule_event_count, crossfade_secs, conflict_policy, silence_threshold, silence_duration_secs, intros_folder, now_playing_path
+- **PlaylistInfo**: id, name, track_count, is_active, current_index
+- **TrackInfo**: index, path, title, artist, duration_secs, duration_display, played_duration_secs, has_intro
+- **ScheduleEventInfo**: id, time, mode, file, priority, enabled, label, days
+- **ConfigResponse**: crossfade_secs, silence_threshold, silence_duration_secs, intros_folder, conflict_policy, now_playing_path
 
 ## Next Steps
 
-- [ ] IPC bridge — expose all core engine functions as Tauri commands
 - [ ] Main playlist view — track list with columns
 - [ ] Transport controls — Play, Stop, Skip buttons

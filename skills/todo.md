@@ -31,7 +31,7 @@
 ## Phase E: GUI (Tauri)
 
 - [x] Tauri project scaffolding — Initialize Tauri + React/TypeScript frontend
-- [ ] IPC bridge — Rust ↔ JS command layer exposing all core engine functions
+- [x] IPC bridge — Rust ↔ JS command layer exposing all core engine functions
 - [ ] Main playlist view — Track list with columns (artist, title, duration, status)
 - [ ] Playlist tabs — Multiple playlist tabs with add/close/rename
 - [ ] Transport controls — Play, Stop, Skip, Seek bar, elapsed/remaining display
@@ -52,5 +52,6 @@
 ## Phase F: Future / Long-Term
 
 - [ ] Hosted web interface — Browser-based remote control and monitoring
-- [ ] Ad scheduler — Spot scheduling with rotation, frequency caps, reporting
+- [ ] Ad inserter/scheduler system — Intelligent ad scheduling, MP3 concatenation, play logging, CSV/PDF reports, config & stats UI
+- [ ] RDS engine — RDS message rotation via TCP socket, lecture detection, now-playing XML reader, message config UI
 - [ ] Advanced auto playlist builder — Rule-based automatic playlist generation

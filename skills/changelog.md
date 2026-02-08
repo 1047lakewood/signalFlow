@@ -1,5 +1,16 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — IPC Bridge
+- Created 20 Tauri IPC commands exposing all core engine functions to the frontend
+- Structured JSON response types: `StatusResponse`, `PlaylistInfo`, `TrackInfo`, `ScheduleEventInfo`, `ConfigResponse`
+- **Playlist CRUD:** `get_playlists`, `create_playlist`, `delete_playlist`, `rename_playlist`, `set_active_playlist`
+- **Track operations:** `get_playlist_tracks`, `add_track`, `remove_tracks` (batch, descending removal), `reorder_track`, `edit_track_metadata`
+- **Schedule:** `get_schedule` (sorted by time), `add_schedule_event`, `remove_schedule_event`, `toggle_schedule_event`
+- **Config:** `get_config`, `set_crossfade`, `set_silence_detection`, `set_intros_folder` (validates directory), `set_conflict_policy`, `set_nowplaying_path`
+- All mutation commands persist state via `Engine::save()` after changes
+- Upgraded `get_status` from plain string to structured `StatusResponse` JSON
+- 123 unit tests passing (no new tests — IPC layer is thin wiring over tested core library)
+
 ## 2026-02-08 — Tauri Project Scaffolding
 - Converted to Cargo workspace: root `[workspace]` with `members = ["src-tauri"]`
 - Created `src-tauri/` — Tauri v2 backend binary (`signalflow-gui` crate)

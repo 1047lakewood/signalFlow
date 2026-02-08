@@ -83,10 +83,15 @@
 - Tauri v2 backend with `AppState` (Mutex<Engine>), initial `get_status` IPC command
 - Dark-first CSS theme, dev server on port 1420, Tauri capabilities configured
 
-### IPC Bridge
-- Define Tauri commands exposing all core engine functions to the frontend
-- Playlist CRUD, transport controls, scheduler, config read/write
-- Event system for engine → frontend updates (track change, position, levels)
+### IPC Bridge (DONE)
+- 20 Tauri commands exposing all core engine functions to the frontend
+- Structured JSON response types: StatusResponse, PlaylistInfo, TrackInfo, ScheduleEventInfo, ConfigResponse
+- Playlist CRUD: get_playlists, create_playlist, delete_playlist, rename_playlist, set_active_playlist
+- Track operations: get_playlist_tracks, add_track, remove_tracks, reorder_track, edit_track_metadata
+- Schedule: get_schedule, add_schedule_event, remove_schedule_event, toggle_schedule_event
+- Config: get_config, set_crossfade, set_silence_detection, set_intros_folder, set_conflict_policy, set_nowplaying_path
+- All commands persist state via Engine::save() after mutations
+- Event system for engine → frontend updates (track change, position, levels) — deferred to transport controls
 
 ### Main Playlist View
 - Track list table with columns: artist, title, duration, status
@@ -167,8 +172,22 @@
 - Browser-based remote control and monitoring dashboard
 - Accessible over LAN or internet
 
-### Ad Scheduler
-- Dedicated ad/spot scheduling system with rotation, frequency caps, and reporting
+### Ad Inserter / Scheduler System
+- **AdSchedulerHandler**: Intelligent hourly ad scheduling with lecture detection, track boundary awareness, and safety-margin fallbacks
+- **AdInserterService**: MP3 concatenation (pydub-style), RadioBoss URL triggering (schedule + instant modes), XML polling confirmation
+- **AdPlayLogger**: Compact JSON play statistics (per-ad, per-date, per-hour), failure tracking (last 50), date-filtered queries
+- **AdReportGenerator**: CSV and PDF verified-play reports with hourly/daily breakdowns, multi-ad matrix reports
+- **Ad Config UI**: Modal editor for ad CRUD, enable/disable, MP3 file picker, day/hour scheduling, station ID prepend option
+- **Ad Statistics UI**: Play calendar with dot indicators, sortable treeview, date filtering, export/report generation, failure viewer
+- Reference spec: `skills/specs/ad-inserter-spec.md`
+
+### RDS Engine (Radio Data System)
+- **AutoRDSHandler**: RDS message rotation engine with TCP socket protocol (DPSTEXT commands), keepalive resends, configurable rotation timing
+- **Message filtering**: Enable/disable, lecture detection (whitelist > blacklist > starts-with-R rule), placeholder availability ({artist}, {title}), day/hour scheduling
+- **NowPlayingReader**: Robust XML reader with anti-caching (open+read+fromstring), retry logic, artist polling (wait_for_artist), file change detection
+- **LectureDetector**: Track classification (blacklist > whitelist > starts-with-R), current/next track analysis, shared cross-station lists
+- **RDS Config UI**: Modal message editor with 64-char limit, duration (1-60s), day/hour scheduling, live treeview updates, per-station state
+- Reference spec: `skills/specs/rds-engine-spec.md`
 
 ### Advanced Auto Playlist Builder
 - Rule-based automatic playlist generation (genre, tempo, artist separation, dayparting, etc.)
