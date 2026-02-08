@@ -1,5 +1,19 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Tauri Project Scaffolding
+- Converted to Cargo workspace: root `[workspace]` with `members = ["src-tauri"]`
+- Created `src-tauri/` — Tauri v2 backend binary (`signalflow-gui` crate)
+- `AppState` wraps `Engine` in `Mutex<Engine>` for thread-safe IPC access
+- Initial IPC command: `get_status` — returns engine summary (playlists, active, schedule, crossfade, conflict policy)
+- Tauri v2 capabilities: `core:default` permissions for main window
+- Created `gui/` — React 19 + TypeScript + Vite 6 frontend
+- Dark-first CSS theme with custom properties (`--bg-primary: #1a1a2e`, `--highlight: #e94560`)
+- `App.tsx` calls `invoke("get_status")` on mount to display engine status
+- Vite dev server on port 1420, build output to `gui/dist/`
+- Placeholder ICO icon in `src-tauri/icons/`
+- Created `skills/gui.md` design doc
+- 123 unit tests passing (no new tests — scaffolding only)
+
 ## 2026-02-07 — Now-Playing XML Export
 - Created `src/now_playing.rs` — `NowPlaying` struct, `PlaybackState` enum, XML generation
 - `NowPlaying::from_engine(engine, elapsed)` — builds snapshot from engine state with optional elapsed time

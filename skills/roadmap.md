@@ -77,10 +77,11 @@
 
 ## Phase E: GUI (Tauri)
 
-### Tauri Project Scaffolding
-- Initialize Tauri app with React + TypeScript frontend
-- Configure build pipeline, dev server, and Tauri config
-- Set up project structure: components, hooks, state management
+### Tauri Project Scaffolding (DONE)
+- Cargo workspace with `src-tauri/` member depending on core `signal_flow` library
+- React 19 + TypeScript + Vite 6 frontend in `gui/`
+- Tauri v2 backend with `AppState` (Mutex<Engine>), initial `get_status` IPC command
+- Dark-first CSS theme, dev server on port 1420, Tauri capabilities configured
 
 ### IPC Bridge
 - Define Tauri commands exposing all core engine functions to the frontend

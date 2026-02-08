@@ -30,7 +30,7 @@
 
 ## Phase E: GUI (Tauri)
 
-- [ ] Tauri project scaffolding — Initialize Tauri + React/TypeScript frontend
+- [x] Tauri project scaffolding — Initialize Tauri + React/TypeScript frontend
 - [ ] IPC bridge — Rust ↔ JS command layer exposing all core engine functions
 - [ ] Main playlist view — Track list with columns (artist, title, duration, status)
 - [ ] Playlist tabs — Multiple playlist tabs with add/close/rename
