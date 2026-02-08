@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import type { PlaylistInfo, TrackInfo } from "./types";
 import PlaylistView from "./PlaylistView";
 import TransportBar from "./TransportBar";
+
+const AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "ogg", "aac", "m4a"];
 
 function App() {
   const [playlists, setPlaylists] = useState<PlaylistInfo[]>([]);
@@ -138,6 +141,45 @@ function App() {
     }
   }, [selectedPlaylist, loadTracks]);
 
+  const handleAddFiles = useCallback(async () => {
+    if (!selectedPlaylist) return;
+    try {
+      const selected = await open({
+        multiple: true,
+        filters: [{
+          name: "Audio Files",
+          extensions: AUDIO_EXTENSIONS,
+        }],
+      });
+      if (!selected) return;
+      // open() returns string | string[] | null
+      const paths = Array.isArray(selected) ? selected : [selected];
+      if (paths.length === 0) return;
+      await invoke("add_tracks", { playlist: selectedPlaylist, paths });
+      await loadTracks();
+      await loadPlaylists(); // refresh track counts
+    } catch (e) {
+      console.error("Failed to add files:", e);
+    }
+  }, [selectedPlaylist, loadTracks, loadPlaylists]);
+
+  const handleFileDrop = useCallback(async (paths: string[]) => {
+    if (!selectedPlaylist || paths.length === 0) return;
+    // Filter to audio files only
+    const audioPaths = paths.filter((p) => {
+      const ext = p.split(".").pop()?.toLowerCase() ?? "";
+      return AUDIO_EXTENSIONS.includes(ext);
+    });
+    if (audioPaths.length === 0) return;
+    try {
+      await invoke("add_tracks", { playlist: selectedPlaylist, paths: audioPaths });
+      await loadTracks();
+      await loadPlaylists();
+    } catch (e) {
+      console.error("Failed to add dropped files:", e);
+    }
+  }, [selectedPlaylist, loadTracks, loadPlaylists]);
+
   return (
     <div className="app">
       <header className="header">
@@ -195,6 +237,8 @@ function App() {
             currentIndex={currentIndex}
             playlistName={selectedPlaylist}
             onReorder={handleReorder}
+            onAddFiles={handleAddFiles}
+            onFileDrop={handleFileDrop}
           />
         ) : (
           <div className="no-playlist">

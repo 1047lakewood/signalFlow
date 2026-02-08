@@ -147,6 +147,25 @@ signalFlow/
 - Track list refreshes after successful reorder
 - Grab cursor on rows (`cursor: grab` / `cursor: grabbing` on active drag)
 
+## File Browser / Add Tracks (DONE)
+
+- Native file dialog via `@tauri-apps/plugin-dialog` (`open()` with audio file filter)
+- Supported audio extensions: mp3, wav, flac, ogg, aac, m4a
+- "Add Files" button shown below the track table and in the empty playlist CTA
+- New `add_tracks` IPC command for batch file addition (accepts `Vec<String>` paths)
+- OS drag-and-drop via Tauri `tauri://drag-drop`, `tauri://drag-enter`, `tauri://drag-leave` events
+- Drop zone visual feedback: dashed highlight outline + overlay text on file hover
+- Audio extension filtering on dropped files (non-audio files silently ignored)
+- Empty playlist state shows centered "Add Files" button + "or drag audio files here" hint
+- `tauri-plugin-dialog` registered in Tauri backend, `dialog:default` + `dialog:allow-open` capabilities added
+- `SendPlayer` wrapper added to make `Player` compatible with Tauri's `Send + Sync` state requirement
+
+### IPC Commands (File Add)
+
+| Command | Args | Returns | Status |
+|---------|------|---------|--------|
+| `add_tracks` | `playlist, paths[]` | `usize` (count added) | DONE |
+
 ## Next Steps
 
-- [ ] File browser / Add tracks — Dialog or drag-drop to add audio files to playlist
+- [ ] Now-playing display — Current track info, progress bar, album art if available

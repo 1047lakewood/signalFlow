@@ -118,9 +118,11 @@
 - Reorder tracks within a playlist via drag-and-drop
 - Move/copy tracks between playlist tabs
 
-### File Browser / Add Tracks
-- Native file dialog to add audio files
-- Drag-and-drop files from OS file explorer into playlist
+### File Browser / Add Tracks (DONE)
+- Native file dialog via `@tauri-apps/plugin-dialog` (filtered to mp3/wav/flac/ogg/aac/m4a)
+- Drag-and-drop files from OS file explorer into playlist (Tauri drag-drop events)
+- "Add Files" button in playlist toolbar and empty playlist CTA
+- Batch `add_tracks` IPC command for adding multiple files at once
 
 ### Now-Playing Display
 - Current track artist, title, duration

@@ -1,5 +1,19 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — File Browser / Add Tracks (GUI)
+- Added `@tauri-apps/plugin-dialog` (JS) and `tauri-plugin-dialog` (Rust) for native file picker
+- Dialog plugin registered in Tauri builder, `dialog:default` + `dialog:allow-open` capabilities added
+- "Add Files" button opens native file dialog filtered to audio files (mp3, wav, flac, ogg, aac, m4a)
+- New `add_tracks` IPC command — batch adds multiple file paths to a playlist in one call
+- OS drag-and-drop support via Tauri `tauri://drag-drop`, `tauri://drag-enter`, `tauri://drag-leave` events
+- Drop zone visual feedback: dashed highlight outline on `.playlist-view` / `.playlist-empty`, overlay text during hover
+- Dropped files filtered by audio extension (non-audio files silently skipped)
+- Empty playlist state shows "Add Files" CTA button + "or drag audio files here" hint
+- `PlaylistView` accepts `onAddFiles` and `onFileDrop` callbacks, "+" toolbar button at bottom of track list
+- Added `SendPlayer` wrapper with `unsafe impl Send/Sync` for `Player` to satisfy Tauri's `State<T: Send + Sync>` requirement
+- Fixed Rust 2024 edition `ref` binding compatibility in `transport_status`
+- 123 unit tests passing (no new tests — frontend-only changes + thin IPC wiring over tested core methods)
+
 ## 2026-02-08 — Drag-and-Drop Reordering (GUI)
 - Added HTML5 drag-and-drop to `PlaylistView.tsx` for reordering tracks within a playlist
 - Drag state tracked via `dragIndex` and `dropTarget` — visual feedback with opacity and drop indicator line

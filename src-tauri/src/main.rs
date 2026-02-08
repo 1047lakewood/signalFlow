@@ -9,9 +9,15 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::State;
 
+/// Wrapper to make Player Send+Sync for Tauri state.
+/// Safety: Player is only ever accessed behind a Mutex, ensuring exclusive access.
+struct SendPlayer(Option<Player>);
+unsafe impl Send for SendPlayer {}
+unsafe impl Sync for SendPlayer {}
+
 struct AppState {
     engine: Mutex<Engine>,
-    player: Mutex<Option<Player>>,
+    player: Mutex<SendPlayer>,
     playback: Arc<Mutex<PlaybackState>>,
 }
 
@@ -263,6 +269,23 @@ fn add_track(state: State<AppState>, playlist: String, path: String) -> Result<u
 }
 
 #[tauri::command]
+fn add_tracks(state: State<AppState>, playlist: String, paths: Vec<String>) -> Result<usize, String> {
+    let mut engine = state.engine.lock().unwrap();
+    let pl = engine
+        .find_playlist_mut(&playlist)
+        .ok_or_else(|| format!("Playlist '{}' not found", playlist))?;
+    let mut count = 0;
+    for path in &paths {
+        match pl.add_track(std::path::Path::new(path)) {
+            Ok(_) => count += 1,
+            Err(e) => eprintln!("Failed to add '{}': {}", path, e),
+        }
+    }
+    engine.save()?;
+    Ok(count)
+}
+
+#[tauri::command]
 fn remove_tracks(
     state: State<AppState>,
     playlist: String,
@@ -321,10 +344,10 @@ fn edit_track_metadata(
 // ── Transport controls ─────────────────────────────────────────────────────
 
 /// Ensure the Player is initialized, returning a reference to it.
-fn ensure_player(player_lock: &Mutex<Option<Player>>) -> Result<(), String> {
-    let mut opt = player_lock.lock().unwrap();
-    if opt.is_none() {
-        *opt = Some(Player::new()?);
+fn ensure_player(player_lock: &Mutex<SendPlayer>) -> Result<(), String> {
+    let mut sp = player_lock.lock().unwrap();
+    if sp.0.is_none() {
+        sp.0 = Some(Player::new()?);
     }
     Ok(())
 }
@@ -358,7 +381,7 @@ fn transport_play(
 
     // Play the file
     let player_guard = state.player.lock().unwrap();
-    let player = player_guard.as_ref().unwrap();
+    let player = player_guard.0.as_ref().unwrap();
     player.stop(); // stop any current playback
     player.play_file(&track_path)?;
 
@@ -379,7 +402,7 @@ fn transport_play(
 #[tauri::command]
 fn transport_stop(state: State<AppState>) -> Result<(), String> {
     let player_guard = state.player.lock().unwrap();
-    if let Some(player) = player_guard.as_ref() {
+    if let Some(player) = player_guard.0.as_ref() {
         player.stop();
     }
 
@@ -392,7 +415,7 @@ fn transport_stop(state: State<AppState>) -> Result<(), String> {
 #[tauri::command]
 fn transport_pause(state: State<AppState>) -> Result<(), String> {
     let player_guard = state.player.lock().unwrap();
-    let player = player_guard.as_ref().ok_or("No audio player")?;
+    let player = player_guard.0.as_ref().ok_or("No audio player")?;
 
     let mut pb = state.playback.lock().unwrap();
     if !pb.is_playing {
@@ -421,7 +444,7 @@ fn transport_skip(state: State<AppState>) -> Result<(), String> {
     // Stop current playback
     {
         let player_guard = state.player.lock().unwrap();
-        if let Some(player) = player_guard.as_ref() {
+        if let Some(player) = player_guard.0.as_ref() {
             player.stop();
         }
     }
@@ -458,7 +481,7 @@ fn transport_skip(state: State<AppState>) -> Result<(), String> {
     // Play next track
     ensure_player(&state.player)?;
     let player_guard = state.player.lock().unwrap();
-    let player = player_guard.as_ref().unwrap();
+    let player = player_guard.0.as_ref().unwrap();
     player.play_file(&track_path)?;
 
     let mut pb = state.playback.lock().unwrap();
@@ -477,7 +500,7 @@ fn transport_skip(state: State<AppState>) -> Result<(), String> {
 #[tauri::command]
 fn transport_seek(state: State<AppState>, position_secs: f64) -> Result<(), String> {
     let player_guard = state.player.lock().unwrap();
-    let player = player_guard.as_ref().ok_or("No audio player")?;
+    let player = player_guard.0.as_ref().ok_or("No audio player")?;
 
     let pb = state.playback.lock().unwrap();
     if !pb.is_playing {
@@ -504,7 +527,7 @@ fn transport_status(state: State<AppState>) -> TransportState {
     // Check if the sink has finished playing (track ended naturally)
     let actually_playing = if pb.is_playing && !pb.is_paused {
         let player_guard = state.player.lock().unwrap();
-        if let Some(player) = player_guard.as_ref() {
+        if let Some(player) = player_guard.0.as_ref() {
             !player.is_empty()
         } else {
             false
@@ -514,7 +537,7 @@ fn transport_status(state: State<AppState>) -> TransportState {
     };
 
     let elapsed = pb.elapsed();
-    let (artist, title) = if let (Some(idx), Some(ref pl_name)) = (pb.track_index, &pb.playlist_name) {
+    let (artist, title) = if let (Some(idx), Some(pl_name)) = (pb.track_index, &pb.playlist_name) {
         let engine = state.engine.lock().unwrap();
         if let Some(pl) = engine.find_playlist(pl_name) {
             if let Some(track) = pl.tracks.get(idx) {
@@ -679,9 +702,10 @@ fn main() {
     let playback = Arc::new(Mutex::new(PlaybackState::new()));
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppState {
             engine: Mutex::new(engine),
-            player: Mutex::new(None),
+            player: Mutex::new(SendPlayer(None)),
             playback,
         })
         .invoke_handler(tauri::generate_handler![
@@ -696,6 +720,7 @@ fn main() {
             // Track operations
             get_playlist_tracks,
             add_track,
+            add_tracks,
             remove_tracks,
             reorder_track,
             edit_track_metadata,

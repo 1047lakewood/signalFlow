@@ -36,7 +36,7 @@
 - [x] Playlist tabs — Multiple playlist tabs with add/close/rename
 - [x] Transport controls — Play, Stop, Skip, Seek bar, elapsed/remaining display
 - [x] Drag-and-drop reordering — Reorder tracks within and between playlists
-- [ ] File browser / Add tracks — Dialog or drag-drop to add audio files to playlist
+- [x] File browser / Add tracks — Dialog or drag-drop to add audio files to playlist
 - [ ] Now-playing display — Current track info, progress bar, album art if available
 - [ ] Auto-intro dot indicator — Visual dot on tracks that have a matching intro file
 - [ ] Crossfade settings panel — Configure fade duration and curve type

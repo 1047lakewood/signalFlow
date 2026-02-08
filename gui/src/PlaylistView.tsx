@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { TrackInfo } from "./types";
 
 interface PlaylistViewProps {
@@ -6,11 +6,54 @@ interface PlaylistViewProps {
   currentIndex: number | null;
   playlistName: string;
   onReorder: (fromIndex: number, toIndex: number) => void;
+  onAddFiles: () => void;
+  onFileDrop: (paths: string[]) => void;
 }
 
-function PlaylistView({ tracks, currentIndex, playlistName, onReorder }: PlaylistViewProps) {
+function PlaylistView({ tracks, currentIndex, playlistName, onReorder, onAddFiles, onFileDrop }: PlaylistViewProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
+  const [isDroppingFiles, setIsDroppingFiles] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Listen for Tauri file drop events
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+
+    async function setupDropListener() {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+
+        const unlistenDrop = await listen<{ paths: string[] }>("tauri://drag-drop", (event) => {
+          setIsDroppingFiles(false);
+          if (event.payload.paths && event.payload.paths.length > 0) {
+            onFileDrop(event.payload.paths);
+          }
+        });
+
+        const unlistenHover = await listen("tauri://drag-enter", () => {
+          setIsDroppingFiles(true);
+        });
+
+        const unlistenLeave = await listen("tauri://drag-leave", () => {
+          setIsDroppingFiles(false);
+        });
+
+        unlisten = () => {
+          unlistenDrop();
+          unlistenHover();
+          unlistenLeave();
+        };
+      } catch (e) {
+        console.error("Failed to setup drop listener:", e);
+      }
+    }
+
+    setupDropListener();
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [onFileDrop]);
 
   const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
     setDragIndex(index);
@@ -51,14 +94,31 @@ function PlaylistView({ tracks, currentIndex, playlistName, onReorder }: Playlis
 
   if (tracks.length === 0) {
     return (
-      <div className="playlist-empty">
-        <p>Playlist "{playlistName}" is empty</p>
+      <div
+        ref={containerRef}
+        className={`playlist-empty${isDroppingFiles ? " drop-zone-active" : ""}`}
+      >
+        <div className="empty-content">
+          <p>Playlist "{playlistName}" is empty</p>
+          <button className="add-files-btn" onClick={onAddFiles}>
+            Add Files
+          </button>
+          <p className="drop-hint">or drag audio files here</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="playlist-view">
+    <div
+      ref={containerRef}
+      className={`playlist-view${isDroppingFiles ? " drop-zone-active" : ""}`}
+    >
+      {isDroppingFiles && (
+        <div className="drop-overlay">
+          <span>Drop audio files to add to playlist</span>
+        </div>
+      )}
       <table className="track-table">
         <thead>
           <tr>
@@ -102,6 +162,11 @@ function PlaylistView({ tracks, currentIndex, playlistName, onReorder }: Playlis
           })}
         </tbody>
       </table>
+      <div className="playlist-toolbar">
+        <button className="add-files-btn" onClick={onAddFiles}>
+          + Add Files
+        </button>
+      </div>
     </div>
   );
 }
