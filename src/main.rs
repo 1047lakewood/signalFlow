@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 use signal_flow::engine::Engine;
+use signal_flow::now_playing::NowPlaying;
 use signal_flow::player::{play_playlist, PlaybackResult, Player, SilenceConfig};
 use signal_flow::scheduler::{self, ConflictPolicy, Priority, ScheduleMode};
 use std::path::PathBuf;
@@ -53,6 +54,11 @@ enum Commands {
     Insert {
         /// Audio file to queue as next track
         file: PathBuf,
+    },
+    /// Write now-playing info to an XML file
+    NowPlaying {
+        /// Output XML file path (overrides config if provided)
+        file: Option<PathBuf>,
     },
     /// Track operations (metadata editing)
     Track {
@@ -158,6 +164,11 @@ enum ConfigCmd {
         #[command(subcommand)]
         action: IntrosCmd,
     },
+    /// Configure now-playing XML export path
+    NowPlaying {
+        #[command(subcommand)]
+        action: NowPlayingConfigCmd,
+    },
     /// Set conflict resolution policy (schedule-wins or manual-wins)
     Conflict {
         /// Policy: "schedule-wins" (default) or "manual-wins"
@@ -165,6 +176,17 @@ enum ConfigCmd {
     },
     /// Show current configuration
     Show,
+}
+
+#[derive(Subcommand)]
+enum NowPlayingConfigCmd {
+    /// Set the default XML output path
+    Set {
+        /// File path for XML output
+        path: String,
+    },
+    /// Disable now-playing XML export
+    Off,
 }
 
 #[derive(Subcommand)]
@@ -500,6 +522,26 @@ fn main() {
                 }
             }
         }
+        Commands::NowPlaying { file } => {
+            let output_path = file
+                .or_else(|| engine.now_playing_path.as_ref().map(PathBuf::from));
+            match output_path {
+                Some(path) => {
+                    let np = NowPlaying::from_engine(&engine, None);
+                    match np.write_xml(&path) {
+                        Ok(()) => println!("Now-playing XML written to: {}", path.display()),
+                        Err(e) => {
+                            eprintln!("Error: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                None => {
+                    eprintln!("Error: no output path. Provide a file argument or set one with 'config nowplaying set <path>'");
+                    std::process::exit(1);
+                }
+            }
+        }
         Commands::Track { action } => match action {
             TrackCmd::Edit {
                 playlist,
@@ -595,6 +637,18 @@ fn main() {
                     println!("Auto-intros disabled.");
                 }
             },
+            ConfigCmd::NowPlaying { action } => match action {
+                NowPlayingConfigCmd::Set { path } => {
+                    engine.now_playing_path = Some(path.clone());
+                    engine.save().expect("Failed to save state");
+                    println!("Now-playing XML path set to: {}", path);
+                }
+                NowPlayingConfigCmd::Off => {
+                    engine.now_playing_path = None;
+                    engine.save().expect("Failed to save state");
+                    println!("Now-playing XML export disabled.");
+                }
+            },
             ConfigCmd::Conflict { policy } => {
                 match ConflictPolicy::from_str_loose(&policy) {
                     Ok(p) => {
@@ -623,6 +677,10 @@ fn main() {
                     None => println!("Auto-intros: off"),
                 }
                 println!("Conflict policy: {}", engine.conflict_policy);
+                match &engine.now_playing_path {
+                    Some(path) => println!("Now-playing XML: {}", path),
+                    None => println!("Now-playing XML: off"),
+                }
             }
         },
         Commands::Schedule { action } => match action {

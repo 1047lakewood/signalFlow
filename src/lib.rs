@@ -5,6 +5,7 @@
 
 pub mod auto_intro;
 pub mod engine;
+pub mod now_playing;
 pub mod player;
 pub mod playlist;
 pub mod scheduler;

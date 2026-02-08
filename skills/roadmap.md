@@ -67,10 +67,12 @@
 - CLI: `track edit <playlist> <track_num> [--artist <val>] [--title <val>]`
 - Uses `Track::write_tags()` → lofty `Accessor::set_artist/set_title` + `TagExt::save_to_path`
 
-### Now-Playing XML Export
+### Now-Playing XML Export (DONE)
 - Output an XML file with current track info, next track info, and playback state
-- Fields: artist, title, duration, elapsed, remaining, playlist name
-- File updates in real-time as playback progresses
+- Fields: artist, title, duration, elapsed, remaining, playlist name, state (playing/stopped)
+- CLI: `nowplaying [file]` — snapshot export; `config nowplaying set <path>` / `off`
+- `NowPlaying::from_engine()` + `to_xml()` + `write_xml()`
+- XML escaping for special characters, remaining clamps to zero
 - Useful for stream overlays, web widgets, and external integrations
 
 ## Phase E: GUI (Tauri)

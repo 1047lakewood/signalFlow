@@ -28,6 +28,9 @@ pub struct Engine {
     /// How to resolve conflicts between manual playback and scheduled events.
     #[serde(default)]
     pub conflict_policy: ConflictPolicy,
+    /// Path for now-playing XML export (None = disabled).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub now_playing_path: Option<String>,
 }
 
 impl Engine {
@@ -42,6 +45,7 @@ impl Engine {
             intros_folder: None,
             schedule: Schedule::new(),
             conflict_policy: ConflictPolicy::default(),
+            now_playing_path: None,
         }
     }
 

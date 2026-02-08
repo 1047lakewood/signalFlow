@@ -1,5 +1,20 @@
 # signalFlow — Changelog
 
+## 2026-02-07 — Now-Playing XML Export
+- Created `src/now_playing.rs` — `NowPlaying` struct, `PlaybackState` enum, XML generation
+- `NowPlaying::from_engine(engine, elapsed)` — builds snapshot from engine state with optional elapsed time
+- `NowPlaying::to_xml()` — renders XML with `<nowplaying>`, `<state>`, `<playlist>`, `<current>` (artist, title, duration, elapsed, remaining), `<next>` (artist, title, duration)
+- `NowPlaying::write_xml(path)` — writes XML to a file
+- XML escaping for special characters (&, <, >, ", ')
+- `PlaybackState` enum: Stopped, Playing (with Display impl)
+- Remaining time clamps to zero when elapsed exceeds duration
+- Added `Engine.now_playing_path: Option<String>` — persisted config, `#[serde(default)]`
+- CLI: `nowplaying [file]` — writes XML snapshot to file (uses config path if no argument)
+- CLI: `config nowplaying set <path>` — set default XML output path
+- CLI: `config nowplaying off` — disable XML export
+- CLI: `config show` now displays now-playing XML path
+- 123 unit tests passing (+11 new now_playing tests)
+
 ## 2026-02-07 — Track Metadata Editing
 - Added `Track::write_tags(artist, title)` — edits in-memory fields and persists to audio file tags via lofty
 - Gets or creates the primary tag on the file, sets artist/title via `Accessor` trait, saves with `WriteOptions::default()`
