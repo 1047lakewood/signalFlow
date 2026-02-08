@@ -1,5 +1,5 @@
 use crate::playlist::Playlist;
-use crate::scheduler::Schedule;
+use crate::scheduler::{ConflictPolicy, Schedule};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -25,6 +25,9 @@ pub struct Engine {
     /// Scheduled events (timed triggers for overlay, stop, insert).
     #[serde(default)]
     pub schedule: Schedule,
+    /// How to resolve conflicts between manual playback and scheduled events.
+    #[serde(default)]
+    pub conflict_policy: ConflictPolicy,
 }
 
 impl Engine {
@@ -38,6 +41,7 @@ impl Engine {
             silence_duration_secs: 0.0,
             intros_folder: None,
             schedule: Schedule::new(),
+            conflict_policy: ConflictPolicy::default(),
         }
     }
 
@@ -410,6 +414,28 @@ mod tests {
         let json = r#"{"playlists":[],"active_playlist_id":null,"next_id":1}"#;
         let engine: Engine = serde_json::from_str(json).unwrap();
         assert!(engine.intros_folder.is_none());
+    }
+
+    #[test]
+    fn conflict_policy_defaults_to_schedule_wins() {
+        let engine = Engine::new();
+        assert_eq!(engine.conflict_policy, ConflictPolicy::ScheduleWins);
+    }
+
+    #[test]
+    fn conflict_policy_survives_serialization() {
+        let mut engine = Engine::new();
+        engine.conflict_policy = ConflictPolicy::ManualWins;
+        let json = serde_json::to_string(&engine).unwrap();
+        let loaded: Engine = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.conflict_policy, ConflictPolicy::ManualWins);
+    }
+
+    #[test]
+    fn conflict_policy_defaults_when_missing_from_json() {
+        let json = r#"{"playlists":[],"active_playlist_id":null,"next_id":1}"#;
+        let engine: Engine = serde_json::from_str(json).unwrap();
+        assert_eq!(engine.conflict_policy, ConflictPolicy::ScheduleWins);
     }
 
     #[test]

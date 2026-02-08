@@ -78,14 +78,38 @@ signalflow schedule toggle 2
 - Validates file existence before attempting insertion
 - In the current CLI architecture (separate processes), establishes the API that the scheduler monitoring loop will use to queue tracks during live playback
 
+## Conflict Resolution (DONE)
+
+### ConflictPolicy (enum, persisted on Engine)
+- `ScheduleWins` (default) — all scheduled events fire regardless of manual playback
+- `ManualWins` — only priority 7+ events fire when the operator is manually playing; lower-priority events are suppressed
+
+### Time Conflict Resolution
+- `Schedule::resolve_time_conflicts(events)` — when multiple events fire at the same time, one winner per mode (overlay, stop, insert). Highest priority wins within each mode. Disabled events excluded.
+- Execution order: Stop first (most disruptive), then Insert, then Overlay
+
+### Manual Playback Filtering
+- `Schedule::filter_for_manual_playback(events, policy)` — filters events based on the active conflict policy
+- `ConflictPolicy::manual_override_threshold()` — returns the minimum priority for events to fire during manual activity (LOW=1 for schedule-wins, 7 for manual-wins)
+
+### Time Window Queries
+- `Schedule::events_at_time(time, tolerance_secs)` — returns enabled events within ±tolerance of the given time
+
+### CLI
+```
+config conflict schedule-wins   # scheduled events always fire (default)
+config conflict manual-wins     # only high-priority events fire during manual play
+config show                     # displays conflict policy
+status                          # displays conflict policy
+```
+
 ## Not Yet Built
 
 - Real-time schedule monitoring loop
-- Conflict resolution logic
 
 ## Tests
 
-25 unit tests (19 scheduler + 1 overlay + 1 stop mode + 1 stop mode rejects missing file + 3 insert mode):
+43 unit tests (37 scheduler + 1 overlay + 1 stop mode + 1 stop mode rejects missing file + 3 insert mode):
 - 3 time parsing (HH:MM, HH:MM:SS, invalid)
 - 4 mode tests (from_str × 4, display × 3)
 - 2 CRUD (add+find, remove)
@@ -99,3 +123,8 @@ signalflow schedule toggle 2
 - 1 defaults from JSON
 - 1 play_stop_mode_rejects_missing_file
 - 3 insert mode (insert at beginning, insert after current, no active playlist)
+- 5 conflict policy (default, from_str, display, serialization roundtrip, manual_override thresholds ×2)
+- 5 time conflict resolution (single, same mode priority, different modes coexist, disabled excluded, empty)
+- 2 manual playback filter (schedule-wins passes all, manual-wins filters low)
+- 2 events_at_time (exact match, with tolerance)
+- 3 engine conflict_policy (default, serialization, missing from JSON)

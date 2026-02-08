@@ -21,7 +21,7 @@
 - [x] Overlay mode — Play sound on top of current audio
 - [x] Stop mode — Kill current audio, play scheduled item
 - [x] Insert mode — Queue scheduled item as next track
-- [ ] Conflict resolution — Define behavior when manual play conflicts with schedule
+- [x] Conflict resolution — Define behavior when manual play conflicts with schedule
 
 ## Phase D: Data & Integration
 

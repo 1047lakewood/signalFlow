@@ -1,5 +1,17 @@
 # signalFlow — Changelog
 
+## 2026-02-07 — Conflict Resolution
+- Added `ConflictPolicy` enum: `ScheduleWins` (default, all events fire) and `ManualWins` (only priority 7+ events fire during manual playback)
+- `ConflictPolicy::from_str_loose()` — parse from string (schedule-wins, manual-wins, schedule, manual)
+- `ConflictPolicy::manual_override_threshold()` — returns minimum priority for events to fire during manual activity
+- Added `Schedule::resolve_time_conflicts(events)` — resolves same-time events, one winner per mode (highest priority wins)
+- Added `Schedule::filter_for_manual_playback(events, policy)` — filters events based on conflict policy
+- Added `Schedule::events_at_time(time, tolerance_secs)` — query events within a time window
+- Added `Engine.conflict_policy: ConflictPolicy` — persisted config, `#[serde(default)]` for backward compat
+- CLI: `config conflict <policy>` — set conflict resolution policy
+- CLI: `config show` and `status` now display conflict policy
+- 106 unit tests passing (+18 new: 12 scheduler conflict tests, 3 engine conflict_policy tests, 2 events_at_time, 1 filter test)
+
 ## 2026-02-07 — Insert Mode (Queue Next)
 - Added `Engine::insert_next_track(path)` — creates a Track from a file and inserts it after `current_index` in the active playlist (or at position 0 if no current track)
 - CLI: `insert <file>` — inserts an audio file as the next track in the active playlist

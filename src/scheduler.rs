@@ -3,6 +3,56 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::PathBuf;
 
+/// Policy for resolving conflicts between manual playback and scheduled events.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ConflictPolicy {
+    /// Scheduled events always fire, even if the operator is manually playing something.
+    /// HIGH priority events interrupt; NORMAL/LOW events queue or overlay as configured.
+    ScheduleWins,
+    /// Manual playback takes precedence. Only HIGH priority (7+) scheduled events
+    /// will still fire during manual activity. NORMAL and LOW events are skipped.
+    ManualWins,
+}
+
+impl Default for ConflictPolicy {
+    fn default() -> Self {
+        ConflictPolicy::ScheduleWins
+    }
+}
+
+impl fmt::Display for ConflictPolicy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConflictPolicy::ScheduleWins => write!(f, "schedule-wins"),
+            ConflictPolicy::ManualWins => write!(f, "manual-wins"),
+        }
+    }
+}
+
+impl ConflictPolicy {
+    /// Parse a policy from a string (case-insensitive, accepts hyphens or underscores).
+    pub fn from_str_loose(s: &str) -> Result<Self, String> {
+        match s.to_lowercase().replace('_', "-").as_str() {
+            "schedule-wins" | "schedule" => Ok(ConflictPolicy::ScheduleWins),
+            "manual-wins" | "manual" => Ok(ConflictPolicy::ManualWins),
+            _ => Err(format!(
+                "Unknown conflict policy '{}'. Expected: schedule-wins, manual-wins",
+                s
+            )),
+        }
+    }
+
+    /// The minimum priority level required for a scheduled event to fire
+    /// when manual playback is active under this policy.
+    pub fn manual_override_threshold(&self) -> Priority {
+        match self {
+            ConflictPolicy::ScheduleWins => Priority::LOW, // all events fire
+            ConflictPolicy::ManualWins => Priority(7),      // only high-priority events fire
+        }
+    }
+}
+
 /// How a scheduled event interacts with current playback.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -195,6 +245,73 @@ impl Schedule {
 
     pub fn is_empty(&self) -> bool {
         self.events.is_empty()
+    }
+
+    /// Given events that fire at the same time, resolve conflicts.
+    /// For each mode, only the highest-priority event wins.
+    /// Returns the winning events (one per mode, at most).
+    pub fn resolve_time_conflicts<'a>(events: &[&'a ScheduleEvent]) -> Vec<&'a ScheduleEvent> {
+        let mut best_overlay: Option<&ScheduleEvent> = None;
+        let mut best_stop: Option<&ScheduleEvent> = None;
+        let mut best_insert: Option<&ScheduleEvent> = None;
+
+        for &event in events {
+            if !event.enabled {
+                continue;
+            }
+            let slot = match event.mode {
+                ScheduleMode::Overlay => &mut best_overlay,
+                ScheduleMode::Stop => &mut best_stop,
+                ScheduleMode::Insert => &mut best_insert,
+            };
+            match slot {
+                Some(current) if event.priority > current.priority => *slot = Some(event),
+                None => *slot = Some(event),
+                _ => {}
+            }
+        }
+
+        let mut winners = Vec::new();
+        // Stop fires first (most disruptive), then insert, then overlay
+        if let Some(e) = best_stop {
+            winners.push(e);
+        }
+        if let Some(e) = best_insert {
+            winners.push(e);
+        }
+        if let Some(e) = best_overlay {
+            winners.push(e);
+        }
+        winners
+    }
+
+    /// Filter events for when manual playback is active.
+    /// Under the given policy, only events meeting the priority threshold are returned.
+    pub fn filter_for_manual_playback<'a>(
+        events: &[&'a ScheduleEvent],
+        policy: ConflictPolicy,
+    ) -> Vec<&'a ScheduleEvent> {
+        let threshold = policy.manual_override_threshold();
+        events
+            .iter()
+            .filter(|e| e.enabled && e.priority >= threshold)
+            .copied()
+            .collect()
+    }
+
+    /// Get events that should fire at a given time, considering a tolerance window (in seconds).
+    /// Returns enabled events whose time falls within [time - tolerance, time + tolerance].
+    pub fn events_at_time(&self, time: NaiveTime, tolerance_secs: i64) -> Vec<&ScheduleEvent> {
+        self.events
+            .iter()
+            .filter(|e| {
+                if !e.enabled {
+                    return false;
+                }
+                let diff = (e.time - time).num_seconds().abs();
+                diff <= tolerance_secs
+            })
+            .collect()
     }
 }
 
@@ -422,5 +539,194 @@ mod tests {
         let json = r#"{"events":[],"next_id":1}"#;
         let sched: Schedule = serde_json::from_str(json).unwrap();
         assert_eq!(sched.len(), 0);
+    }
+
+    // --- Conflict Policy tests ---
+
+    #[test]
+    fn conflict_policy_default_is_schedule_wins() {
+        assert_eq!(ConflictPolicy::default(), ConflictPolicy::ScheduleWins);
+    }
+
+    #[test]
+    fn conflict_policy_from_str() {
+        assert_eq!(
+            ConflictPolicy::from_str_loose("schedule-wins").unwrap(),
+            ConflictPolicy::ScheduleWins
+        );
+        assert_eq!(
+            ConflictPolicy::from_str_loose("manual-wins").unwrap(),
+            ConflictPolicy::ManualWins
+        );
+        assert_eq!(
+            ConflictPolicy::from_str_loose("schedule").unwrap(),
+            ConflictPolicy::ScheduleWins
+        );
+        assert_eq!(
+            ConflictPolicy::from_str_loose("MANUAL").unwrap(),
+            ConflictPolicy::ManualWins
+        );
+        assert!(ConflictPolicy::from_str_loose("bogus").is_err());
+    }
+
+    #[test]
+    fn conflict_policy_display() {
+        assert_eq!(format!("{}", ConflictPolicy::ScheduleWins), "schedule-wins");
+        assert_eq!(format!("{}", ConflictPolicy::ManualWins), "manual-wins");
+    }
+
+    #[test]
+    fn conflict_policy_serialization_roundtrip() {
+        let policy = ConflictPolicy::ManualWins;
+        let json = serde_json::to_string(&policy).unwrap();
+        let loaded: ConflictPolicy = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded, ConflictPolicy::ManualWins);
+    }
+
+    #[test]
+    fn manual_override_threshold_schedule_wins() {
+        let policy = ConflictPolicy::ScheduleWins;
+        // All events should fire — threshold is LOW (1)
+        assert_eq!(policy.manual_override_threshold(), Priority::LOW);
+    }
+
+    #[test]
+    fn manual_override_threshold_manual_wins() {
+        let policy = ConflictPolicy::ManualWins;
+        // Only priority 7+ events fire during manual playback
+        assert_eq!(policy.manual_override_threshold(), Priority(7));
+    }
+
+    // --- Time conflict resolution tests ---
+
+    fn make_event(id: u32, mode: ScheduleMode, priority: u8) -> ScheduleEvent {
+        ScheduleEvent {
+            id,
+            time: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+            mode,
+            file: format!("event_{}.mp3", id).into(),
+            priority: Priority(priority),
+            enabled: true,
+            label: None,
+            days: vec![],
+        }
+    }
+
+    #[test]
+    fn resolve_time_conflicts_single_event() {
+        let e1 = make_event(1, ScheduleMode::Stop, 5);
+        let events: Vec<&ScheduleEvent> = vec![&e1];
+        let winners = Schedule::resolve_time_conflicts(&events);
+        assert_eq!(winners.len(), 1);
+        assert_eq!(winners[0].id, 1);
+    }
+
+    #[test]
+    fn resolve_time_conflicts_same_mode_higher_priority_wins() {
+        let e1 = make_event(1, ScheduleMode::Stop, 3);
+        let e2 = make_event(2, ScheduleMode::Stop, 9);
+        let events: Vec<&ScheduleEvent> = vec![&e1, &e2];
+        let winners = Schedule::resolve_time_conflicts(&events);
+        assert_eq!(winners.len(), 1);
+        assert_eq!(winners[0].id, 2);
+    }
+
+    #[test]
+    fn resolve_time_conflicts_different_modes_coexist() {
+        let e1 = make_event(1, ScheduleMode::Stop, 9);
+        let e2 = make_event(2, ScheduleMode::Insert, 5);
+        let e3 = make_event(3, ScheduleMode::Overlay, 5);
+        let events: Vec<&ScheduleEvent> = vec![&e1, &e2, &e3];
+        let winners = Schedule::resolve_time_conflicts(&events);
+        assert_eq!(winners.len(), 3);
+        // Order: stop, insert, overlay
+        assert_eq!(winners[0].mode, ScheduleMode::Stop);
+        assert_eq!(winners[1].mode, ScheduleMode::Insert);
+        assert_eq!(winners[2].mode, ScheduleMode::Overlay);
+    }
+
+    #[test]
+    fn resolve_time_conflicts_disabled_events_excluded() {
+        let e1 = make_event(1, ScheduleMode::Stop, 9);
+        let mut e2 = make_event(2, ScheduleMode::Stop, 5);
+        e2.enabled = false;
+        let events: Vec<&ScheduleEvent> = vec![&e1, &e2];
+        let winners = Schedule::resolve_time_conflicts(&events);
+        assert_eq!(winners.len(), 1);
+        assert_eq!(winners[0].id, 1);
+    }
+
+    #[test]
+    fn resolve_time_conflicts_empty_input() {
+        let events: Vec<&ScheduleEvent> = vec![];
+        let winners = Schedule::resolve_time_conflicts(&events);
+        assert!(winners.is_empty());
+    }
+
+    // --- Manual playback filter tests ---
+
+    #[test]
+    fn filter_for_manual_schedule_wins_passes_all() {
+        let e1 = make_event(1, ScheduleMode::Stop, 1);
+        let e2 = make_event(2, ScheduleMode::Overlay, 5);
+        let events: Vec<&ScheduleEvent> = vec![&e1, &e2];
+        let filtered = Schedule::filter_for_manual_playback(&events, ConflictPolicy::ScheduleWins);
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn filter_for_manual_manual_wins_filters_low_priority() {
+        let e1 = make_event(1, ScheduleMode::Stop, 5); // below threshold (7)
+        let e2 = make_event(2, ScheduleMode::Stop, 9); // above threshold
+        let e3 = make_event(3, ScheduleMode::Overlay, 7); // at threshold
+        let events: Vec<&ScheduleEvent> = vec![&e1, &e2, &e3];
+        let filtered = Schedule::filter_for_manual_playback(&events, ConflictPolicy::ManualWins);
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.iter().all(|e| e.priority >= Priority(7)));
+    }
+
+    // --- events_at_time tests ---
+
+    #[test]
+    fn events_at_time_exact_match() {
+        let mut sched = Schedule::new();
+        sched.add_event(
+            NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+            ScheduleMode::Stop,
+            "noon.mp3".into(),
+            Priority::NORMAL,
+            None,
+            vec![],
+        );
+        sched.add_event(
+            NaiveTime::from_hms_opt(18, 0, 0).unwrap(),
+            ScheduleMode::Overlay,
+            "evening.mp3".into(),
+            Priority::NORMAL,
+            None,
+            vec![],
+        );
+        let at_noon = sched.events_at_time(NaiveTime::from_hms_opt(12, 0, 0).unwrap(), 0);
+        assert_eq!(at_noon.len(), 1);
+        assert_eq!(at_noon[0].file, PathBuf::from("noon.mp3"));
+    }
+
+    #[test]
+    fn events_at_time_with_tolerance() {
+        let mut sched = Schedule::new();
+        sched.add_event(
+            NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+            ScheduleMode::Stop,
+            "noon.mp3".into(),
+            Priority::NORMAL,
+            None,
+            vec![],
+        );
+        // Query at 12:00:02 with 5-second tolerance should find it
+        let found = sched.events_at_time(NaiveTime::from_hms_opt(12, 0, 2).unwrap(), 5);
+        assert_eq!(found.len(), 1);
+        // Query at 12:00:10 with 5-second tolerance should miss it
+        let missed = sched.events_at_time(NaiveTime::from_hms_opt(12, 0, 10).unwrap(), 5);
+        assert!(missed.is_empty());
     }
 }

@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use signal_flow::engine::Engine;
 use signal_flow::player::{play_playlist, PlaybackResult, Player, SilenceConfig};
-use signal_flow::scheduler::{self, Priority, ScheduleMode};
+use signal_flow::scheduler::{self, ConflictPolicy, Priority, ScheduleMode};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -136,6 +136,11 @@ enum ConfigCmd {
         #[command(subcommand)]
         action: IntrosCmd,
     },
+    /// Set conflict resolution policy (schedule-wins or manual-wins)
+    Conflict {
+        /// Policy: "schedule-wins" (default) or "manual-wins"
+        policy: String,
+    },
     /// Show current configuration
     Show,
 }
@@ -219,7 +224,7 @@ fn main() {
                 .unwrap_or("off");
             let sched_count = engine.schedule.len();
             println!(
-                "Playlists: {} | Active: {} | Crossfade: {}s | Silence: {} | Intros: {} | Schedule: {} event(s)",
+                "Playlists: {} | Active: {} | Crossfade: {}s | Silence: {} | Intros: {} | Schedule: {} event(s) | Conflict: {}",
                 engine.playlists.len(),
                 engine
                     .active_playlist()
@@ -228,7 +233,8 @@ fn main() {
                 engine.crossfade_secs,
                 silence_status,
                 intros_status,
-                sched_count
+                sched_count,
+                engine.conflict_policy
             );
             if let Some(pl) = engine.active_playlist() {
                 if let Some(idx) = pl.current_index {
@@ -530,6 +536,19 @@ fn main() {
                     println!("Auto-intros disabled.");
                 }
             },
+            ConfigCmd::Conflict { policy } => {
+                match ConflictPolicy::from_str_loose(&policy) {
+                    Ok(p) => {
+                        engine.conflict_policy = p;
+                        engine.save().expect("Failed to save state");
+                        println!("Conflict policy set to: {}", p);
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
             ConfigCmd::Show => {
                 println!("Crossfade: {}s", engine.crossfade_secs);
                 if engine.silence_duration_secs > 0.0 {
@@ -544,6 +563,7 @@ fn main() {
                     Some(folder) => println!("Intros folder: {}", folder),
                     None => println!("Auto-intros: off"),
                 }
+                println!("Conflict policy: {}", engine.conflict_policy);
             }
         },
         Commands::Schedule { action } => match action {
