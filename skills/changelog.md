@@ -1,5 +1,12 @@
 # signalFlow — Changelog
 
+## 2026-02-07 — Stop Mode (Interrupt)
+- Added `Player::play_stop_mode(path)` — stops the default sink, plays file on a new independent sink, blocks until finished
+- CLI: `interrupt <file>` — stops current audio and plays the specified file (hard break / stop mode)
+- Validates file exists before playback attempt
+- Establishes the API for scheduler-driven stop mode when the real-time monitoring loop is built
+- 85 unit tests passing (+1 new: `play_stop_mode_rejects_missing_file`)
+
 ## 2026-02-06 — Overlay Mode
 - Added `Player::play_overlay(path)` — plays audio file on new independent sink, blocks until finished
 - CLI: `overlay <file>` — plays a sound on top of current audio

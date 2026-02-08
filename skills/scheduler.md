@@ -64,16 +64,22 @@ signalflow schedule toggle 2
 - Validates file existence before attempting playback
 - Works alongside `play` command running in another terminal — true overlay behavior
 
+## Stop Mode Execution (DONE)
+
+- `Player::play_stop_mode(path)` — stops the default sink (kills current audio), plays file on a new sink, blocks until finished
+- CLI: `interrupt <file>` — stops current audio and plays the specified file (hard break)
+- Validates file existence before attempting playback
+- In the current CLI architecture (separate processes), establishes the API that the scheduler monitoring loop will use to truly interrupt in-process playback
+
 ## Not Yet Built
 
-- Stop mode execution
 - Insert mode execution
 - Real-time schedule monitoring loop
 - Conflict resolution logic
 
 ## Tests
 
-20 unit tests (19 scheduler + 1 overlay):
+22 unit tests (19 scheduler + 1 overlay + 1 stop mode + 1 stop mode rejects missing file):
 - 3 time parsing (HH:MM, HH:MM:SS, invalid)
 - 4 mode tests (from_str × 4, display × 3)
 - 2 CRUD (add+find, remove)
@@ -85,3 +91,4 @@ signalflow schedule toggle 2
 - 2 days display
 - 1 priority ordering
 - 1 defaults from JSON
+- 1 play_stop_mode_rejects_missing_file

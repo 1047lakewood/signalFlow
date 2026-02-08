@@ -19,7 +19,7 @@
 
 - [x] Scheduler data model — Scheduled events with time, mode, file path, priority
 - [x] Overlay mode — Play sound on top of current audio
-- [ ] Stop mode — Kill current audio, play scheduled item
+- [x] Stop mode — Kill current audio, play scheduled item
 - [ ] Insert mode — Queue scheduled item as next track
 - [ ] Conflict resolution — Define behavior when manual play conflicts with schedule
 

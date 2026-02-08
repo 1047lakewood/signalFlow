@@ -44,6 +44,11 @@ enum Commands {
         /// Audio file to play as overlay
         file: PathBuf,
     },
+    /// Stop current audio and play a file (hard break)
+    Interrupt {
+        /// Audio file to play after stopping current audio
+        file: PathBuf,
+    },
     /// Engine configuration
     Config {
         #[command(subcommand)]
@@ -411,6 +416,27 @@ fn main() {
             println!("Overlay: {}", file.display());
             match player.play_overlay(&file) {
                 Ok(()) => println!("Overlay finished."),
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Commands::Interrupt { file } => {
+            if !file.exists() {
+                eprintln!("Error: file '{}' not found", file.display());
+                std::process::exit(1);
+            }
+            let player = match Player::new() {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
+            };
+            println!("Interrupt: stopping current audio, playing {}", file.display());
+            match player.play_stop_mode(&file) {
+                Ok(()) => println!("Interrupt finished."),
                 Err(e) => {
                     eprintln!("Error: {}", e);
                     std::process::exit(1);

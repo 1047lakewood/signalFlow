@@ -166,6 +166,17 @@ impl Player {
         }
         Ok(())
     }
+
+    /// Stop current audio, then play a file on a new sink (hard break).
+    /// Stops the default sink first, plays the file, and blocks until finished.
+    pub fn play_stop_mode(&self, path: &Path) -> Result<(), String> {
+        self.sink.stop();
+        let sink = self.play_file_new_sink(path)?;
+        while !sink.empty() {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        Ok(())
+    }
 }
 
 /// Returns true if crossfading should occur for this track transition.
@@ -474,6 +485,14 @@ mod tests {
     fn play_overlay_rejects_missing_file() {
         if let Ok(player) = Player::new() {
             let result = player.play_overlay(Path::new("nonexistent_overlay.mp3"));
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn play_stop_mode_rejects_missing_file() {
+        if let Ok(player) = Player::new() {
+            let result = player.play_stop_mode(Path::new("nonexistent_stop.mp3"));
             assert!(result.is_err());
         }
     }
