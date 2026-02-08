@@ -17,7 +17,7 @@ Automatically play an artist intro/jingle before tracks by a matching artist. Co
 ## Track Flag (DONE)
 - `Track.has_intro: bool` — set dynamically when intros_folder is configured
 - `#[serde(default)]` for backward compat
-- Used by future GUI for dot indicator
+- GUI displays blue dot (●) on tracks with `has_intro: true` in the status column
 
 ## Playback Integration (DONE)
 - `play_playlist()` accepts `intros_folder: Option<&Path>`

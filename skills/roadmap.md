@@ -129,9 +129,10 @@
 - Progress bar synced to playback position
 - Album art display if embedded metadata contains artwork
 
-### Auto-Intro Dot Indicator
-- Visual dot/icon on tracks that have a matching intro file in the intros folder
-- Driven by the `has_intro: bool` flag on track data
+### Auto-Intro Dot Indicator (DONE)
+- Blue dot (●) in status column on tracks that have a matching intro file in the intros folder
+- `get_playlist_tracks` IPC dynamically computes `has_intro` from engine's `intros_folder` config
+- `add_track`/`add_tracks` set the flag at insertion; `set_intros_folder` refreshes all tracks
 
 ### Crossfade Settings Panel
 - Configure fade duration (seconds)

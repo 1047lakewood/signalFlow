@@ -38,7 +38,7 @@
 - [x] Drag-and-drop reordering — Reorder tracks within and between playlists
 - [x] File browser / Add tracks — Dialog or drag-drop to add audio files to playlist
 - [x] Now-playing display — Current track info, progress bar (no album art)
-- [ ] Auto-intro dot indicator — Visual dot on tracks that have a matching intro file
+- [x] Auto-intro dot indicator — Visual dot on tracks that have a matching intro file
 - [ ] Crossfade settings panel — Configure fade duration and curve type
 - [ ] Silence detection settings — Configure threshold and skip duration
 - [ ] Auto-intro config — Set intros folder path, enable/disable

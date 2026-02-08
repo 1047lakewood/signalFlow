@@ -8,7 +8,20 @@
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd auto-intro system: play artist intros before matching tracks\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "WebSearch",
+      "WebFetch(domain:docs.rs)",
+      "WebFetch(domain:github.com)",
+      "Bash(node --version:*)",
+      "Bash(npm:*)",
+      "Bash(rustc:*)",
+      "Bash(cargo --version:*)",
+      "Bash(npx:*)",
+      "Bash(python3:*)",
+      "Bash(node:*)",
+      "Bash(git reset:*)",
+      "Bash(git rm:*)",
+      "Bash(cd:*)"
     ]
   }
 }

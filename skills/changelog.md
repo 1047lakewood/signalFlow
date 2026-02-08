@@ -1,5 +1,12 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Auto-Intro Dot Indicator (GUI)
+- `get_playlist_tracks` IPC now dynamically computes `has_intro` by checking each track's artist against the engine's configured `intros_folder` via `auto_intro::has_intro()`
+- `add_track` and `add_tracks` IPC commands set `has_intro` on newly added tracks at insertion time
+- `set_intros_folder` IPC refreshes `has_intro` flags on all tracks in all playlists when the intros folder changes or is disabled
+- Frontend rendering (blue ● dot in status column) and CSS (`.intro-dot`) were already in place from the Main Playlist View feature
+- 123 unit tests passing (no new tests — IPC-layer changes over tested core `auto_intro::has_intro()`)
+
 ## 2026-02-08 — Now-Playing Display (GUI)
 - Enhanced `TransportBar` into a full now-playing display with separate title (bold, 13px) and artist (11px, secondary color) lines
 - Added "Next up" panel showing the upcoming track's artist and title

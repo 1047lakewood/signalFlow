@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use signal_flow::auto_intro;
 use signal_flow::engine::Engine;
 use signal_flow::player::Player;
 use signal_flow::scheduler::{ConflictPolicy, ScheduleMode, Priority, parse_time};
@@ -239,6 +240,7 @@ fn set_active_playlist(state: State<AppState>, name: String) -> Result<u32, Stri
 #[tauri::command]
 fn get_playlist_tracks(state: State<AppState>, name: String) -> Result<Vec<TrackInfo>, String> {
     let engine = state.engine.lock().unwrap();
+    let intros_folder = engine.intros_folder.as_ref().map(std::path::Path::new);
     let pl = engine
         .find_playlist(&name)
         .ok_or_else(|| format!("Playlist '{}' not found", name))?;
@@ -246,15 +248,20 @@ fn get_playlist_tracks(state: State<AppState>, name: String) -> Result<Vec<Track
         .tracks
         .iter()
         .enumerate()
-        .map(|(i, t)| TrackInfo {
-            index: i,
-            path: t.path.to_string_lossy().to_string(),
-            title: t.title.clone(),
-            artist: t.artist.clone(),
-            duration_secs: t.duration.as_secs_f64(),
-            duration_display: t.duration_display(),
-            played_duration_secs: t.played_duration.map(|d| d.as_secs_f64()),
-            has_intro: t.has_intro,
+        .map(|(i, t)| {
+            let has_intro = intros_folder
+                .map(|folder| auto_intro::has_intro(folder, &t.artist))
+                .unwrap_or(false);
+            TrackInfo {
+                index: i,
+                path: t.path.to_string_lossy().to_string(),
+                title: t.title.clone(),
+                artist: t.artist.clone(),
+                duration_secs: t.duration.as_secs_f64(),
+                duration_display: t.duration_display(),
+                played_duration_secs: t.played_duration.map(|d| d.as_secs_f64()),
+                has_intro,
+            }
         })
         .collect())
 }
@@ -262,10 +269,14 @@ fn get_playlist_tracks(state: State<AppState>, name: String) -> Result<Vec<Track
 #[tauri::command]
 fn add_track(state: State<AppState>, playlist: String, path: String) -> Result<usize, String> {
     let mut engine = state.engine.lock().unwrap();
+    let intros_folder = engine.intros_folder.clone();
     let pl = engine
         .find_playlist_mut(&playlist)
         .ok_or_else(|| format!("Playlist '{}' not found", playlist))?;
     let idx = pl.add_track(std::path::Path::new(&path))?;
+    if let Some(ref folder) = intros_folder {
+        pl.tracks[idx].has_intro = auto_intro::has_intro(std::path::Path::new(folder), &pl.tracks[idx].artist);
+    }
     engine.save()?;
     Ok(idx)
 }
@@ -273,13 +284,19 @@ fn add_track(state: State<AppState>, playlist: String, path: String) -> Result<u
 #[tauri::command]
 fn add_tracks(state: State<AppState>, playlist: String, paths: Vec<String>) -> Result<usize, String> {
     let mut engine = state.engine.lock().unwrap();
+    let intros_folder = engine.intros_folder.clone();
     let pl = engine
         .find_playlist_mut(&playlist)
         .ok_or_else(|| format!("Playlist '{}' not found", playlist))?;
     let mut count = 0;
     for path in &paths {
         match pl.add_track(std::path::Path::new(path)) {
-            Ok(_) => count += 1,
+            Ok(idx) => {
+                if let Some(ref folder) = intros_folder {
+                    pl.tracks[idx].has_intro = auto_intro::has_intro(std::path::Path::new(folder), &pl.tracks[idx].artist);
+                }
+                count += 1;
+            }
             Err(e) => eprintln!("Failed to add '{}': {}", path, e),
         }
     }
@@ -683,7 +700,16 @@ fn set_intros_folder(state: State<AppState>, path: Option<String>) -> Result<(),
             return Err(format!("'{}' is not a valid directory", p));
         }
     }
-    engine.intros_folder = path;
+    engine.intros_folder = path.clone();
+    // Refresh has_intro flags on all tracks
+    for pl in &mut engine.playlists {
+        for track in &mut pl.tracks {
+            track.has_intro = match &path {
+                Some(folder) => auto_intro::has_intro(std::path::Path::new(folder), &track.artist),
+                None => false,
+            };
+        }
+    }
     engine.save()?;
     Ok(())
 }

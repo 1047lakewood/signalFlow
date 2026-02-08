@@ -176,6 +176,14 @@ signalFlow/
 - Backend fetches next track from `pl.tracks.get(idx + 1)` in `transport_status`
 - No album art (by design — radio automation doesn't need it)
 
+## Auto-Intro Dot Indicator (DONE)
+
+- Blue dot (●) shown in the status column for tracks whose artist has a matching intro file
+- `get_playlist_tracks` IPC dynamically computes `has_intro` by checking each track's artist against the engine's `intros_folder` via `auto_intro::has_intro()`
+- `add_track`/`add_tracks` IPC commands set `has_intro` on newly added tracks
+- `set_intros_folder` IPC refreshes `has_intro` on all tracks in all playlists when the folder changes
+- Frontend rendering already existed in `PlaylistView.tsx` (line 155) and `styles.css` (`.intro-dot`)
+
 ## Next Steps
 
-- [ ] Auto-intro dot indicator — Visual dot on tracks that have a matching intro file
+- [ ] Crossfade settings panel
