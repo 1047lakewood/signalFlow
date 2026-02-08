@@ -148,7 +148,7 @@ ON ANY ERROR: Fallback to INSTANT insertion to ensure ad plays this hour.
 
 ---
 
-## 2. AdInserterService - Internal Ad Playback
+## 2. AdInserterService - Internal Ad Playback (DONE)
 
 ### 2.1 Constants
 

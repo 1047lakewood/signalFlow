@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use signal_flow::ad_inserter::AdInserterService;
 use signal_flow::ad_scheduler::AdConfig;
 use signal_flow::engine::Engine;
 use signal_flow::now_playing::NowPlaying;
@@ -347,6 +348,10 @@ enum AdCmd {
         /// Ad number (1-based)
         num: usize,
     },
+    /// Manually trigger instant ad insertion (stops playback, plays ads)
+    InsertInstant,
+    /// Manually trigger scheduled ad insertion (queues ads as next tracks)
+    InsertScheduled,
 }
 
 #[derive(Subcommand)]
@@ -1246,6 +1251,53 @@ fn main() {
                             num,
                             engine.ads.len()
                         );
+                        std::process::exit(1);
+                    }
+                }
+            }
+            AdCmd::InsertInstant => {
+                let player = match Player::new() {
+                    Ok(p) => p,
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                };
+                println!("Running instant ad insertion...");
+                match AdInserterService::insert_instant(&player, &engine, false) {
+                    Ok(result) => {
+                        if result.station_id_played {
+                            println!("  Station ID: played");
+                        }
+                        for name in &result.ads_inserted {
+                            println!("  Played: {}", name);
+                        }
+                        println!("Instant insertion complete: {} ad(s) played.", result.ad_count);
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+            AdCmd::InsertScheduled => {
+                println!("Running scheduled ad insertion...");
+                match AdInserterService::insert_scheduled(&mut engine, false) {
+                    Ok(result) => {
+                        if result.station_id_played {
+                            println!("  Station ID: queued");
+                        }
+                        for name in &result.ads_inserted {
+                            println!("  Queued: {}", name);
+                        }
+                        println!(
+                            "Scheduled insertion complete: {} ad(s) queued as next tracks.",
+                            result.ad_count
+                        );
+                        engine.save().expect("Failed to save state");
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
                         std::process::exit(1);
                     }
                 }

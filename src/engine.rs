@@ -242,6 +242,14 @@ impl Engine {
         Ok(ad.enabled)
     }
 
+    /// Get the path of the currently playing track from the active playlist.
+    pub fn current_track_path(&self) -> Option<&Path> {
+        let pl = self.active_playlist()?;
+        let idx = pl.current_index?;
+        let track = pl.tracks.get(idx)?;
+        Some(&track.path)
+    }
+
     /// Get the current track's artist and title from the active playlist.
     pub fn current_track_info(&self) -> Option<(&str, &str)> {
         let pl = self.active_playlist()?;

@@ -3,6 +3,7 @@
 //! All audio, playlist, and scheduling logic lives here.
 //! The CLI and future Tauri GUI consume this crate.
 
+pub mod ad_inserter;
 pub mod ad_scheduler;
 pub mod auto_intro;
 pub mod engine;

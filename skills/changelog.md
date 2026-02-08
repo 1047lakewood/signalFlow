@@ -1,5 +1,21 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Ad Inserter Service
+- Created `src/ad_inserter.rs` — stateless ad insertion service with instant and scheduled modes
+- `AdInsertionResult` struct: ad_count, ads_inserted (names), station_id_played
+- `AdInserterService` — stateless struct with static methods taking engine/player as parameters
+- `collect_valid_ads(ads)` — filters ads by enabled, file exists, and current day/hour schedule
+- `collect_valid_ads_at(ads, day, hour)` — testable variant with explicit time parameters
+- `insert_instant(player, engine, is_hour_start)` — creates new sink, appends station ID (if applicable) + all valid ads, blocks until finished
+- `insert_scheduled(engine, is_hour_start)` — inserts valid ads as next tracks in active playlist via `insert_next_track()` in reverse order for correct playback sequence
+- `run_insertion(player, engine, mode, is_hour_start)` — dispatches to instant or scheduled based on `AdInsertionMode`
+- Station ID prepended at hour start when `station_id_enabled=true` and file exists
+- `append_to_sink(sink, path)` helper — decodes audio file and appends to rodio sink
+- Engine: added `current_track_path()` — returns path of currently playing track from active playlist
+- CLI: `ad insert-instant` — manually trigger instant ad insertion (creates Player, plays all valid ads)
+- CLI: `ad insert-scheduled` — manually trigger scheduled insertion (queues ads as next tracks, saves state)
+- 183 unit tests passing (+12 new: 4 collect_valid_ads tests, 4 insert_scheduled tests, 2 AdInsertionResult tests, 1 run_insertion dispatch, 1 station_id skip test)
+
 ## 2026-02-08 — Ad Scheduler Handler
 - Created `src/ad_scheduler.rs` — ad configuration data model, scheduling decision logic, and background handler
 - `AdConfig` struct: name, enabled, mp3_file, scheduled (bool), days (Vec<String>), hours (Vec<u8>)

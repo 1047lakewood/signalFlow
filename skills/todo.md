@@ -54,7 +54,7 @@
 ## Phase F: Ad Inserter / Scheduler System
 
 - [x] Ad scheduler handler — Intelligent hourly ad scheduling with lecture detection and track boundary awareness
-- [ ] Ad inserter service — Internal MP3 concatenation via rodio, queue-based insertion into active playlist
+- [x] Ad inserter service — Internal MP3 concatenation via rodio, queue-based insertion into active playlist
 - [ ] Ad play logger — JSON play statistics (per-ad, per-date, per-hour), failure tracking
 - [ ] Ad report generator — CSV and PDF verified-play reports with hourly/daily breakdowns
 - [ ] Ad config UI — Modal editor for ad CRUD, enable/disable, MP3 file picker, day/hour scheduling
@@ -81,6 +81,10 @@
 - [ ] File path column — Show the file path in a dedicated column
 - [ ] Find bar — Search rows by any text field; include a dedicated row-number jump input
 - [ ] Auto-advance playback — Automatically play the next track when the current one ends, respecting crossfade settings
+
+## Phase E3: Dev Experience
+
+- [ ] Graceful Vite shutdown — Ensure the Vite dev server releases port 1420 when the Tauri app closes (no orphan node.exe processes)
 
 ## Phase H: Future / Long-Term
 
