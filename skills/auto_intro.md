@@ -1,4 +1,4 @@
-# Auto-Intro System — Design Doc (DONE)
+# Auto-Intro System — Design Doc (DONE, incl. Recurring Overlay)
 
 ## Purpose
 Automatically play an artist intro/jingle before tracks by a matching artist. Common in radio automation — e.g., before "Adele - Hello.mp3", play "Adele.mp3" from the intros folder.
@@ -27,8 +27,26 @@ Automatically play an artist intro/jingle before tracks by a matching artist. Co
 - Consecutive tracks by the same artist: only play intro before the first one in the run
 - Note: crossfade-into-song (fade intro tail into track start) is not yet implemented
 
+## Recurring Intro Overlay (DONE)
+- While a track plays, re-play its artist intro every N seconds as an overlay
+- Main track volume is ducked (lowered) during the overlay, then restored
+- Timer resets when a new track starts — each track gets its own cycle
+- Only applies to the currently playing track; skips if no intro found
+- Config: `Engine.recurring_intro_interval_secs: f32` (0 = disabled, default 0)
+- Config: `Engine.recurring_intro_duck_volume: f32` (0.0–1.0, default 0.3)
+- Both fields `#[serde(default)]` for backward compat
+- `play_playlist()` accepts `RecurringIntroConfig` parameter
+- `maybe_play_recurring_intro()` helper checks timing, plays overlay, ducks volume
+- Integrated into both crossfade and sequential wait loops
+- CLI: `config intros recurring set <interval> [--duck <vol>]`
+- CLI: `config intros recurring off`
+- IPC: `set_recurring_intro(interval_secs, duck_volume)` Tauri command
+- IPC: `get_config` / `get_status` responses include recurring intro fields
+
 ## CLI (DONE)
 - `config intros set <path>` — set intros folder
 - `config intros off` — clear intros folder
-- `config show` — display intros folder setting
-- `play` — uses configured intros_folder automatically
+- `config intros recurring set <interval> [--duck <vol>]` — enable recurring overlay
+- `config intros recurring off` — disable recurring overlay
+- `config show` — display intros folder + recurring intro settings
+- `play` — uses configured intros_folder and recurring intro automatically

@@ -39,6 +39,10 @@
 - Before playing `Artist A - Song.mp3`, check Intros folder for `Artist A.mp3`
 - If found: play intro, then crossfade into song (or mix over intro tail)
 - Data structure must support a boolean "has_intro" flag for UI dot indicator
+- Recurring intro overlay (DONE): re-play artist intro every N seconds as overlay during track playback
+- Overlay mode (DONE): duck main track volume during intro, restore after
+- Timer resets per track (DONE); configurable interval and duck volume
+- CLI: `config intros recurring set <interval> [--duck <vol>]` / `config intros recurring off`
 
 ## Phase C: Scheduler
 

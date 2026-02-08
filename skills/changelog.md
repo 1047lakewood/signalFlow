@@ -1,5 +1,19 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Recurring Intro Overlay
+- Added `RecurringIntroConfig` struct in `player.rs` with `interval_secs` and `duck_volume` fields
+- `play_playlist()` now accepts `RecurringIntroConfig` parameter; checks elapsed time in both crossfade and sequential wait loops
+- `maybe_play_recurring_intro()` helper: finds intro, plays on overlay sink, ducks main sink volume during playback, restores after
+- Timer resets per track — each track gets its own recurring intro cycle
+- Added `Engine.recurring_intro_interval_secs` (f32, default 0 = disabled) and `Engine.recurring_intro_duck_volume` (f32, default 0.3)
+- Both fields `#[serde(default)]` for backward compat
+- CLI: `config intros recurring set <interval> [--duck <vol>]` — enable with configurable interval and duck volume
+- CLI: `config intros recurring off` — disable recurring intros
+- CLI: `config show` and `play` output display recurring intro settings when enabled
+- IPC: `set_recurring_intro(interval_secs, duck_volume)` Tauri command added
+- IPC: `get_config` and `get_status` responses include `recurring_intro_interval_secs` and `recurring_intro_duck_volume`
+- 129 unit tests passing (+6 new: 3 engine config tests, 3 RecurringIntroConfig tests)
+
 ## 2026-02-08 — Auto-Intro Dot Indicator (GUI)
 - `get_playlist_tracks` IPC now dynamically computes `has_intro` by checking each track's artist against the engine's configured `intros_folder` via `auto_intro::has_intro()`
 - `add_track` and `add_tracks` IPC commands set `has_intro` on newly added tracks at insertion time

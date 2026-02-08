@@ -6,6 +6,10 @@ use std::path::Path;
 
 const STATE_FILE: &str = "signalflow_state.json";
 
+fn default_duck_volume() -> f32 {
+    0.3
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Engine {
     pub playlists: Vec<Playlist>,
@@ -28,6 +32,13 @@ pub struct Engine {
     /// How to resolve conflicts between manual playback and scheduled events.
     #[serde(default)]
     pub conflict_policy: ConflictPolicy,
+    /// Interval in seconds for recurring intro overlays (0 = disabled).
+    /// When > 0, re-plays the artist intro every N seconds during track playback.
+    #[serde(default)]
+    pub recurring_intro_interval_secs: f32,
+    /// Volume level for main track during recurring intro overlay (0.0–1.0, default 0.3).
+    #[serde(default = "default_duck_volume")]
+    pub recurring_intro_duck_volume: f32,
     /// Path for now-playing XML export (None = disabled).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub now_playing_path: Option<String>,
@@ -43,6 +54,8 @@ impl Engine {
             silence_threshold: 0.01,
             silence_duration_secs: 0.0,
             intros_folder: None,
+            recurring_intro_interval_secs: 0.0,
+            recurring_intro_duck_volume: 0.3,
             schedule: Schedule::new(),
             conflict_policy: ConflictPolicy::default(),
             now_playing_path: None,
@@ -423,6 +436,32 @@ mod tests {
         // No active playlist set
         let result = engine.active_playlist_mut();
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn recurring_intro_defaults() {
+        let engine = Engine::new();
+        assert_eq!(engine.recurring_intro_interval_secs, 0.0);
+        assert_eq!(engine.recurring_intro_duck_volume, 0.3);
+    }
+
+    #[test]
+    fn recurring_intro_survives_serialization() {
+        let mut engine = Engine::new();
+        engine.recurring_intro_interval_secs = 900.0;
+        engine.recurring_intro_duck_volume = 0.2;
+        let json = serde_json::to_string(&engine).unwrap();
+        let loaded: Engine = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.recurring_intro_interval_secs, 900.0);
+        assert_eq!(loaded.recurring_intro_duck_volume, 0.2);
+    }
+
+    #[test]
+    fn recurring_intro_defaults_when_missing_from_json() {
+        let json = r#"{"playlists":[],"active_playlist_id":null,"next_id":1}"#;
+        let engine: Engine = serde_json::from_str(json).unwrap();
+        assert_eq!(engine.recurring_intro_interval_secs, 0.0);
+        assert_eq!(engine.recurring_intro_duck_volume, 0.3);
     }
 
     #[test]

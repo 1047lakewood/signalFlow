@@ -14,6 +14,7 @@
 - [x] Metadata enhancement — Calculated vs Played duration, filename fallback improvements
 - [x] Auto-Intro system — Check intros folder, play intro before matching artist tracks
 - [x] Auto-Intro dot indicator — `has_intro: bool` data flag implemented; GUI dot indicator deferred to Phase E
+- [x] Recurring intro overlay — Re-play artist intro every 15 min as overlay (duck volume), timer resets per track, no retroactive playback
 
 ## Phase C: Scheduler
 

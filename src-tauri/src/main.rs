@@ -90,6 +90,8 @@ struct StatusResponse {
     silence_threshold: f32,
     silence_duration_secs: f32,
     intros_folder: Option<String>,
+    recurring_intro_interval_secs: f32,
+    recurring_intro_duck_volume: f32,
     now_playing_path: Option<String>,
 }
 
@@ -132,6 +134,8 @@ struct ConfigResponse {
     silence_threshold: f32,
     silence_duration_secs: f32,
     intros_folder: Option<String>,
+    recurring_intro_interval_secs: f32,
+    recurring_intro_duck_volume: f32,
     conflict_policy: String,
     now_playing_path: Option<String>,
 }
@@ -163,6 +167,8 @@ fn get_status(state: State<AppState>) -> StatusResponse {
         silence_threshold: engine.silence_threshold,
         silence_duration_secs: engine.silence_duration_secs,
         intros_folder: engine.intros_folder.clone(),
+        recurring_intro_interval_secs: engine.recurring_intro_interval_secs,
+        recurring_intro_duck_volume: engine.recurring_intro_duck_volume,
         now_playing_path: engine.now_playing_path.clone(),
     }
 }
@@ -666,6 +672,8 @@ fn get_config(state: State<AppState>) -> ConfigResponse {
         silence_threshold: engine.silence_threshold,
         silence_duration_secs: engine.silence_duration_secs,
         intros_folder: engine.intros_folder.clone(),
+        recurring_intro_interval_secs: engine.recurring_intro_interval_secs,
+        recurring_intro_duck_volume: engine.recurring_intro_duck_volume,
         conflict_policy: engine.conflict_policy.to_string(),
         now_playing_path: engine.now_playing_path.clone(),
     }
@@ -710,6 +718,19 @@ fn set_intros_folder(state: State<AppState>, path: Option<String>) -> Result<(),
             };
         }
     }
+    engine.save()?;
+    Ok(())
+}
+
+#[tauri::command]
+fn set_recurring_intro(
+    state: State<AppState>,
+    interval_secs: f32,
+    duck_volume: f32,
+) -> Result<(), String> {
+    let mut engine = state.engine.lock().unwrap();
+    engine.recurring_intro_interval_secs = interval_secs;
+    engine.recurring_intro_duck_volume = duck_volume;
     engine.save()?;
     Ok(())
 }
@@ -777,6 +798,7 @@ fn main() {
             set_crossfade,
             set_silence_detection,
             set_intros_folder,
+            set_recurring_intro,
             set_conflict_policy,
             set_nowplaying_path,
         ])

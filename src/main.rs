@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use signal_flow::engine::Engine;
 use signal_flow::now_playing::NowPlaying;
-use signal_flow::player::{play_playlist, PlaybackResult, Player, SilenceConfig};
+use signal_flow::player::{play_playlist, PlaybackResult, Player, RecurringIntroConfig, SilenceConfig};
 use signal_flow::scheduler::{self, ConflictPolicy, Priority, ScheduleMode};
 use std::path::PathBuf;
 
@@ -211,6 +211,25 @@ enum IntrosCmd {
     },
     /// Disable auto-intros
     Off,
+    /// Configure recurring intro overlay
+    Recurring {
+        #[command(subcommand)]
+        action: RecurringIntroCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum RecurringIntroCmd {
+    /// Enable recurring intro overlay with interval
+    Set {
+        /// Interval in seconds between recurring intros (e.g., 900 for 15 min)
+        interval: f32,
+        /// Duck volume level (0.0–1.0, default 0.3)
+        #[arg(long, default_value = "0.3")]
+        duck: f32,
+    },
+    /// Disable recurring intro overlay
+    Off,
 }
 
 #[derive(Subcommand)]
@@ -368,6 +387,17 @@ fn main() {
             if intros_path.is_some() {
                 info_parts.push("auto-intros: on".to_string());
             }
+            let recurring_intro_cfg = RecurringIntroConfig {
+                interval_secs: engine.recurring_intro_interval_secs,
+                duck_volume: engine.recurring_intro_duck_volume,
+            };
+            if recurring_intro_cfg.enabled() {
+                info_parts.push(format!(
+                    "recurring intros: every {}s (duck: {:.0}%)",
+                    recurring_intro_cfg.interval_secs,
+                    recurring_intro_cfg.duck_volume * 100.0
+                ));
+            }
             if info_parts.is_empty() {
                 println!(
                     "Playing playlist '{}' from track {}...",
@@ -382,8 +412,9 @@ fn main() {
                     info_parts.join(", ")
                 );
             }
+
             let PlaybackResult { last_index, played_durations } =
-                play_playlist(&player, &tracks, start, crossfade_secs, silence_cfg, intros_path.as_deref());
+                play_playlist(&player, &tracks, start, crossfade_secs, silence_cfg, intros_path.as_deref(), recurring_intro_cfg);
 
             // Update current_index and played durations after playback
             if let Some(pl_mut) = engine.active_playlist_mut() {
@@ -636,6 +667,31 @@ fn main() {
                     engine.save().expect("Failed to save state");
                     println!("Auto-intros disabled.");
                 }
+                IntrosCmd::Recurring { action } => match action {
+                    RecurringIntroCmd::Set { interval, duck } => {
+                        if interval <= 0.0 {
+                            eprintln!("Error: interval must be > 0");
+                            std::process::exit(1);
+                        }
+                        if !(0.0..=1.0).contains(&duck) {
+                            eprintln!("Error: duck volume must be between 0.0 and 1.0");
+                            std::process::exit(1);
+                        }
+                        engine.recurring_intro_interval_secs = interval;
+                        engine.recurring_intro_duck_volume = duck;
+                        engine.save().expect("Failed to save state");
+                        println!(
+                            "Recurring intro overlay: every {}s (duck volume: {:.0}%)",
+                            interval,
+                            duck * 100.0
+                        );
+                    }
+                    RecurringIntroCmd::Off => {
+                        engine.recurring_intro_interval_secs = 0.0;
+                        engine.save().expect("Failed to save state");
+                        println!("Recurring intro overlay disabled.");
+                    }
+                },
             },
             ConfigCmd::NowPlaying { action } => match action {
                 NowPlayingConfigCmd::Set { path } => {
@@ -675,6 +731,15 @@ fn main() {
                 match &engine.intros_folder {
                     Some(folder) => println!("Intros folder: {}", folder),
                     None => println!("Auto-intros: off"),
+                }
+                if engine.recurring_intro_interval_secs > 0.0 {
+                    println!(
+                        "Recurring intro: every {}s (duck: {:.0}%)",
+                        engine.recurring_intro_interval_secs,
+                        engine.recurring_intro_duck_volume * 100.0
+                    );
+                } else {
+                    println!("Recurring intro: off");
                 }
                 println!("Conflict policy: {}", engine.conflict_policy);
                 match &engine.now_playing_path {

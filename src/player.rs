@@ -228,6 +228,35 @@ impl SilenceConfig {
     }
 }
 
+/// Configuration for recurring intro overlays during playback.
+#[derive(Clone, Copy)]
+pub struct RecurringIntroConfig {
+    /// Interval in seconds between recurring intro overlays (0 = disabled).
+    pub interval_secs: f32,
+    /// Volume level to duck the main track to during overlay (0.0–1.0).
+    pub duck_volume: f32,
+}
+
+impl RecurringIntroConfig {
+    /// Returns true if recurring intros are enabled.
+    pub fn enabled(&self) -> bool {
+        self.interval_secs > 0.0
+    }
+
+    /// Interval as a `Duration`.
+    pub fn interval(&self) -> Duration {
+        Duration::from_secs_f32(self.interval_secs.max(0.0))
+    }
+
+    /// Disabled recurring intro config.
+    pub fn disabled() -> Self {
+        RecurringIntroConfig {
+            interval_secs: 0.0,
+            duck_volume: 0.3,
+        }
+    }
+}
+
 /// Result of playing through a playlist.
 pub struct PlaybackResult {
     /// Index of the last track that was started.
@@ -249,6 +278,7 @@ pub fn play_playlist(
     crossfade_secs: f32,
     silence: SilenceConfig,
     intros_folder: Option<&Path>,
+    recurring_intro: RecurringIntroConfig,
 ) -> PlaybackResult {
     let crossfade_dur = Duration::from_secs_f32(crossfade_secs.max(0.0));
     let mut current = start_index;
@@ -257,6 +287,7 @@ pub fn play_playlist(
     let mut current_start_time: Option<Instant> = None;
     let mut played_durations: Vec<(usize, Duration)> = Vec::new();
     let mut last_intro_artist: Option<String> = None;
+    let mut last_recurring_intro_time: Option<Instant>;
 
     while current < tracks.len() {
         let track = &tracks[current];
@@ -310,6 +341,13 @@ pub fn play_playlist(
             }
         };
 
+        // Reset recurring intro timer for each new track
+        last_recurring_intro_time = if recurring_intro.enabled() && intros_folder.is_some() {
+            Some(Instant::now())
+        } else {
+            None
+        };
+
         let track_duration = track.duration;
         let next_index = current + 1;
         let do_crossfade =
@@ -331,6 +369,15 @@ pub fn play_playlist(
                     silence_skipped = true;
                     break;
                 }
+                // Check for recurring intro overlay
+                maybe_play_recurring_intro(
+                    player,
+                    &sink,
+                    &track.artist,
+                    intros_folder,
+                    &recurring_intro,
+                    &mut last_recurring_intro_time,
+                );
                 std::thread::sleep(Duration::from_millis(50));
             }
 
@@ -381,6 +428,15 @@ pub fn play_playlist(
                         sink.stop();
                         break;
                     }
+                    // Check for recurring intro overlay
+                    maybe_play_recurring_intro(
+                        player,
+                        &sink,
+                        &track.artist,
+                        intros_folder,
+                        &recurring_intro,
+                        &mut last_recurring_intro_time,
+                    );
                     std::thread::sleep(Duration::from_millis(100));
                 }
             }
@@ -397,6 +453,58 @@ pub fn play_playlist(
         last_index: current.saturating_sub(1),
         played_durations,
     }
+}
+
+/// Check if it's time to play a recurring intro overlay, and play it if so.
+/// Ducks the main sink volume during the intro, then restores it.
+fn maybe_play_recurring_intro(
+    player: &Player,
+    main_sink: &Sink,
+    artist: &str,
+    intros_folder: Option<&Path>,
+    config: &RecurringIntroConfig,
+    last_time: &mut Option<Instant>,
+) {
+    if !config.enabled() {
+        return;
+    }
+    let intros_dir = match intros_folder {
+        Some(d) => d,
+        None => return,
+    };
+    let last = match last_time {
+        Some(t) => *t,
+        None => return,
+    };
+    if last.elapsed() < config.interval() {
+        return;
+    }
+
+    // Time to play a recurring intro overlay
+    if let Some(intro_path) = crate::auto_intro::find_intro(intros_dir, artist) {
+        println!("  Recurring intro overlay for {}...", artist);
+        match player.play_file_new_sink(&intro_path) {
+            Ok(overlay_sink) => {
+                // Duck main track volume
+                let original_volume = 1.0_f32;
+                main_sink.set_volume(config.duck_volume);
+
+                // Wait for overlay to finish
+                while !overlay_sink.empty() {
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+
+                // Restore main track volume
+                main_sink.set_volume(original_volume);
+            }
+            Err(e) => {
+                eprintln!("  Recurring intro error: {} — skipping", e);
+            }
+        }
+    }
+
+    // Reset timer regardless of whether intro was found/played
+    *last_time = Some(Instant::now());
 }
 
 /// Start a track, optionally with silence monitoring.
@@ -495,6 +603,26 @@ mod tests {
             let result = player.play_stop_mode(Path::new("nonexistent_stop.mp3"));
             assert!(result.is_err());
         }
+    }
+
+    #[test]
+    fn recurring_intro_config_enabled() {
+        let cfg = RecurringIntroConfig { interval_secs: 900.0, duck_volume: 0.3 };
+        assert!(cfg.enabled());
+        assert_eq!(cfg.interval(), Duration::from_secs(900));
+    }
+
+    #[test]
+    fn recurring_intro_config_disabled_when_zero() {
+        let cfg = RecurringIntroConfig { interval_secs: 0.0, duck_volume: 0.3 };
+        assert!(!cfg.enabled());
+    }
+
+    #[test]
+    fn recurring_intro_config_disabled_constructor() {
+        let cfg = RecurringIntroConfig::disabled();
+        assert!(!cfg.enabled());
+        assert_eq!(cfg.duck_volume, 0.3);
     }
 
     #[test]
