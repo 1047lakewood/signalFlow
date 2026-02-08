@@ -75,20 +75,26 @@ function WaveformDisplay({ trackPath, elapsed, duration, isPlaying, onSeek }: Wa
     const centerY = height / 2;
     const maxBarHeight = height / 2 - 1;
 
+    // Read theme colors from CSS variables
+    const style = getComputedStyle(document.documentElement);
+    const highlightColor = style.getPropertyValue("--highlight").trim() || "#e94560";
+    const borderColor = style.getPropertyValue("--border").trim() || "#2a2a4a";
+    const textColor = style.getPropertyValue("--text-primary").trim() || "#ffffff";
+
     // Draw bars
     for (let i = 0; i < peaks.length; i++) {
       const x = (i / peaks.length) * width;
       const barH = Math.max(1, peaks[i] * maxBarHeight);
       const isPast = x < playheadX;
 
-      ctx.fillStyle = isPast ? "#e94560" : "#2a2a4a";
+      ctx.fillStyle = isPast ? highlightColor : borderColor;
       ctx.fillRect(x, centerY - barH, barWidth, barH);
       ctx.fillRect(x, centerY, barWidth, barH);
     }
 
     // Playhead line
     if (duration > 0 && (isPlaying || elapsed > 0)) {
-      ctx.strokeStyle = "#ffffff";
+      ctx.strokeStyle = textColor;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(playheadX, 0);

@@ -1,4 +1,5 @@
-:root {
+:root,
+[data-theme="dark"] {
   --bg-primary: #1a1a2e;
   --bg-secondary: #16213e;
   --bg-row-hover: #1e2a4a;
@@ -8,6 +9,22 @@
   --accent: #0f3460;
   --highlight: #e94560;
   --border: #2a2a4a;
+  --overlay-bg: rgba(0, 0, 0, 0.5);
+  --shadow: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] {
+  --bg-primary: #f0f0f5;
+  --bg-secondary: #ffffff;
+  --bg-row-hover: #e8e8f0;
+  --bg-row-current: #ede0f0;
+  --text-primary: #1a1a2e;
+  --text-secondary: #6a6a80;
+  --accent: #c0c8e0;
+  --highlight: #d63050;
+  --border: #d0d0e0;
+  --overlay-bg: rgba(0, 0, 0, 0.3);
+  --shadow: rgba(0, 0, 0, 0.15);
 }
 
 * {
@@ -566,7 +583,7 @@ body {
 .settings-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--overlay-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -579,7 +596,7 @@ body {
   border-radius: 8px;
   width: 360px;
   max-width: 90vw;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 32px var(--shadow);
 }
 
 .settings-window {
@@ -591,7 +608,7 @@ body {
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 32px var(--shadow);
 }
 
 .settings-window-body {
@@ -817,7 +834,29 @@ body {
   border-color: var(--text-secondary);
 }
 
-/* (Settings dropdown removed — replaced by centralized settings window) */
+/* ── Theme toggle button ──────────────────────────────────────────── */
+
+.header-theme-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.header-theme-btn:hover {
+  background: var(--bg-row-hover);
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
 
 /* ── Settings status / danger ────────────────────────────────────── */
 

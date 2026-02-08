@@ -10,6 +10,12 @@ import LogPane from "./LogPane";
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "ogg", "aac", "m4a"];
 
+function getInitialTheme(): "dark" | "light" {
+  const stored = localStorage.getItem("signalflow-theme");
+  if (stored === "light" || stored === "dark") return stored;
+  return "dark";
+}
+
 function App() {
   const [playlists, setPlaylists] = useState<PlaylistInfo[]>([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
@@ -19,7 +25,17 @@ function App() {
   const [renameValue, setRenameValue] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [showSchedulePane, setShowSchedulePane] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">(getInitialTheme);
   const renameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("signalflow-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((t) => (t === "dark" ? "light" : "dark"));
+  };
 
   const loadPlaylists = useCallback(async () => {
     try {
@@ -242,6 +258,13 @@ function App() {
           >
             {"\u23F0"}
           </button>
+        <button
+          className="header-theme-btn"
+          onClick={toggleTheme}
+          title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+        >
+          {theme === "dark" ? "\u2600" : "\uD83C\uDF19"}
+        </button>
         <button
           className="header-settings-btn"
           onClick={() => setShowSettings(true)}

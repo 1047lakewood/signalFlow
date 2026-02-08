@@ -49,7 +49,7 @@
 - [x] Level meter — Real-time audio level visualization
 - [x] Waveform display — Waveform overview for the currently playing track
 - [x] Settings config window — Centralized settings dialog for all engine configuration (crossfade, silence detection, intros, now-playing, conflict policy)
-- [ ] Theme / dark mode — Dark-first UI with optional light theme
+- [x] Theme / dark mode — Dark-first UI with optional light theme
 
 ## Phase F: Ad Inserter / Scheduler System
 

@@ -189,9 +189,12 @@
 - Save/cancel with immediate backend persistence via existing IPC commands
 - Accessible from a toolbar gear icon or menu
 
-### Theme / Dark Mode
+### Theme / Dark Mode (DONE)
 - Dark-first UI design suitable for studio environments
-- Optional light theme toggle
+- Light theme toggle via sun/moon button in header bar
+- CSS custom properties under `[data-theme="dark"]` (default) and `[data-theme="light"]`
+- Theme preference persisted to `localStorage`, restored on load
+- Canvas-based waveform reads theme colors from computed CSS variables
 
 ## Phase F: Future / Long-Term
 

@@ -1,5 +1,16 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Theme / Dark Mode (GUI)
+- Added light theme via `[data-theme="light"]` CSS custom properties alongside existing dark theme
+- Dark theme remains default; light theme uses studio-friendly muted colors (#f0f0f5 bg, #d63050 highlight)
+- Theme toggle button (sun/moon icon) added to header bar between schedule and settings buttons
+- Theme preference persisted to `localStorage` (`signalflow-theme` key), restored on app load
+- `document.documentElement` `data-theme` attribute drives all theme switching
+- Replaced hardcoded overlay/shadow rgba values with `--overlay-bg` and `--shadow` CSS variables
+- `WaveformDisplay.tsx` canvas rendering now reads `--highlight`, `--border`, `--text-primary` from computed styles instead of hardcoded hex colors
+- Added `.header-theme-btn` CSS class matching existing header button styles
+- 137 unit tests passing (no new tests — frontend-only CSS variable + state changes)
+
 ## 2026-02-08 — Settings Config Window (GUI)
 - Created `SettingsWindow.tsx` — centralized tabbed settings dialog replacing three separate modals
 - Tabbed sidebar navigation with 5 sections: Crossfade, Silence Detection, Auto-Intro, Now-Playing XML, Conflict Policy
