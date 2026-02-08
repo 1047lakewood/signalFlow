@@ -1,5 +1,20 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Settings Config Window (GUI)
+- Created `SettingsWindow.tsx` — centralized tabbed settings dialog replacing three separate modals
+- Tabbed sidebar navigation with 5 sections: Crossfade, Silence Detection, Auto-Intro, Now-Playing XML, Conflict Policy
+- Crossfade tab: fade duration (0–30s) and curve type selector (linear only)
+- Silence Detection tab: threshold (0–1), skip duration (0–300s), enable/disable status, Disable button
+- Auto-Intro tab: folder browser, recurring interval (0–3600s), duck volume (0–1), enable/disable status, Disable button
+- Now-Playing XML tab: file path browser (XML filter), enable/disable status, Disable button — previously had no GUI
+- Conflict Policy tab: schedule-wins / manual-wins select with dynamic hint text — previously had no GUI
+- Config loaded once on mount, shared across all tabs; Save button dispatches per-tab IPC commands
+- Gear icon (⚙) now directly opens the settings window instead of a dropdown menu
+- Deleted `CrossfadeSettings.tsx`, `SilenceSettings.tsx`, `IntroSettings.tsx` — consolidated into SettingsWindow
+- Removed settings dropdown menu code from App.tsx and its CSS (`.settings-menu-wrapper`, `.settings-dropdown`, `.settings-dropdown-item`)
+- Added CSS: `.settings-window` (560px wide), `.settings-window-body`, `.settings-tabs` (160px sidebar), `.settings-tab` (with active highlight), `.settings-content`
+- 137 unit tests passing (no new tests — frontend-only changes over existing IPC commands)
+
 ## 2026-02-08 — Waveform Display (GUI)
 - Created `src/waveform.rs` — `generate_peaks(path, num_peaks)` and `generate_peaks_default(path)` functions
 - Decodes audio file via rodio, collects all samples, computes max absolute amplitude per time bucket

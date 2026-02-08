@@ -48,7 +48,7 @@
 - [x] Log pane — Playback events and system logs underneath the schedule pane
 - [x] Level meter — Real-time audio level visualization
 - [x] Waveform display — Waveform overview for the currently playing track
-- [ ] Settings config window — Centralized settings dialog for all engine configuration (crossfade, silence detection, intros, now-playing, conflict policy)
+- [x] Settings config window — Centralized settings dialog for all engine configuration (crossfade, silence detection, intros, now-playing, conflict policy)
 - [ ] Theme / dark mode — Dark-first UI with optional light theme
 
 ## Phase F: Ad Inserter / Scheduler System

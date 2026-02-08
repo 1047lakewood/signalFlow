@@ -582,6 +582,68 @@ body {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
+.settings-window {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 560px;
+  max-width: 95vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.settings-window-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-tabs {
+  display: flex;
+  flex-direction: column;
+  width: 160px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg-primary);
+  padding: 4px 0;
+}
+
+.settings-tab {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 10px 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  border-left: 2px solid transparent;
+}
+
+.settings-tab:hover {
+  background: var(--bg-row-hover);
+  color: var(--text-primary);
+}
+
+.settings-tab.active {
+  color: var(--highlight);
+  border-left-color: var(--highlight);
+  background: var(--bg-secondary);
+  font-weight: 600;
+}
+
+.settings-content {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
 .settings-header {
   display: flex;
   align-items: center;
@@ -755,48 +817,7 @@ body {
   border-color: var(--text-secondary);
 }
 
-/* ── Settings dropdown menu ───────────────────────────────────────── */
-
-.settings-menu-wrapper {
-  position: relative;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-.settings-dropdown {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 4px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-  z-index: 50;
-  min-width: 160px;
-  overflow: hidden;
-}
-
-.settings-dropdown-item {
-  display: block;
-  width: 100%;
-  background: transparent;
-  border: none;
-  color: var(--text-primary);
-  font-size: 12px;
-  padding: 8px 14px;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.1s;
-}
-
-.settings-dropdown-item:hover {
-  background: var(--bg-row-hover);
-}
-
-.settings-dropdown-item + .settings-dropdown-item {
-  border-top: 1px solid var(--border);
-}
+/* (Settings dropdown removed — replaced by centralized settings window) */
 
 /* ── Settings status / danger ────────────────────────────────────── */
 
@@ -885,6 +906,7 @@ body {
   justify-content: center;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .header-schedule-btn:hover {

@@ -188,36 +188,21 @@ signalFlow/
 - `set_intros_folder` IPC refreshes `has_intro` on all tracks in all playlists when the folder changes
 - Frontend rendering already existed in `PlaylistView.tsx` (line 155) and `styles.css` (`.intro-dot`)
 
-## Crossfade Settings Panel (DONE)
+## Settings Config Window (DONE)
 
-- `CrossfadeSettings.tsx` modal dialog with fade duration input and curve type selector
-- Loads current crossfade value from `get_config` IPC on mount
-- Saves via `set_crossfade` IPC with "Saved!" confirmation feedback
-- Curve type dropdown: "Linear" only (disabled) — backend supports linear crossfading only
-- Gear icon (`⚙`) in header bar opens the modal; click-outside or `×` button to close
-- Reusable `.settings-*` CSS classes for consistent settings panels across features
-
-## Silence Detection Settings (DONE)
-
-- `SilenceSettings.tsx` modal dialog with threshold and duration inputs
-- Enabled/Disabled status indicator (green text when active, gray when off)
-- "Disable" danger button to quickly zero out both fields
-- Loads current values from `get_config` IPC, saves via `set_silence_detection`
-- Settings gear icon refactored into dropdown menu: "Crossfade" and "Silence Detection" items
-- Click-outside dismisses the dropdown; each item opens its respective settings modal
-
-## Auto-Intro Config (DONE)
-
-- `IntroSettings.tsx` modal dialog with three configuration sections:
-  1. **Intros folder** — read-only path input + "Browse" button (native directory picker via `@tauri-apps/plugin-dialog`)
-  2. **Recurring interval** — seconds input (0 = disabled), dynamic hint shows interval description
-  3. **Duck volume** — 0–1 input, controls main track volume during recurring intro overlay
-- Enabled/Disabled status indicator based on whether a folder is configured
-- "Disable" danger button clears folder and resets recurring settings to defaults
-- Saves via `set_intros_folder` and `set_recurring_intro` IPC commands
-- Added as "Auto-Intro" item in the settings dropdown menu (alongside Crossfade and Silence Detection)
-- `.settings-input-path` CSS for wider path display with text overflow
-- `.settings-btn-browse` CSS for browse button styling
+- `SettingsWindow.tsx` — centralized tabbed settings dialog replacing individual modals
+- Gear icon (`⚙`) in header opens the window directly (no dropdown menu)
+- Config loaded once on mount via `get_config` IPC, shared across all tabs
+- Tabbed sidebar (160px) with 5 sections:
+  1. **Crossfade** — fade duration (0–30s), curve type selector (linear only, disabled)
+  2. **Silence Detection** — threshold (0–1), skip duration (0–300s), enable/disable status, Disable button
+  3. **Auto-Intro** — folder browser (native directory picker), recurring interval (0–3600s), duck volume (0–1), enable/disable status, Disable button
+  4. **Now-Playing XML** — file path browser (XML filter), enable/disable status, Disable button
+  5. **Conflict Policy** — schedule-wins / manual-wins select with dynamic hint text
+- Per-tab Save button dispatches the relevant IPC command(s)
+- Disable buttons on applicable tabs zero out settings
+- CSS: `.settings-window` (560px), `.settings-window-body`, `.settings-tabs`, `.settings-tab` (active highlight with left border), `.settings-content`
+- Replaced: `CrossfadeSettings.tsx`, `SilenceSettings.tsx`, `IntroSettings.tsx` (deleted)
 
 ## Track Metadata Editor (DONE)
 

@@ -4,9 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { PlaylistInfo, TrackInfo } from "./types";
 import PlaylistView from "./PlaylistView";
 import TransportBar from "./TransportBar";
-import CrossfadeSettings from "./CrossfadeSettings";
-import SilenceSettings from "./SilenceSettings";
-import IntroSettings from "./IntroSettings";
+import SettingsWindow from "./SettingsWindow";
 import SchedulePane from "./SchedulePane";
 import LogPane from "./LogPane";
 
@@ -19,12 +17,8 @@ function App() {
   const [currentIndex, setCurrentIndex] = useState<number | null>(null);
   const [renamingTab, setRenamingTab] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const [showCrossfadeSettings, setShowCrossfadeSettings] = useState(false);
-  const [showSilenceSettings, setShowSilenceSettings] = useState(false);
-  const [showIntroSettings, setShowIntroSettings] = useState(false);
-  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showSchedulePane, setShowSchedulePane] = useState(false);
-  const settingsMenuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   const loadPlaylists = useCallback(async () => {
@@ -74,16 +68,6 @@ function App() {
     }
   }, [renamingTab]);
 
-  useEffect(() => {
-    if (!showSettingsMenu) return;
-    const handleClick = (e: MouseEvent) => {
-      if (settingsMenuRef.current && !settingsMenuRef.current.contains(e.target as Node)) {
-        setShowSettingsMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [showSettingsMenu]);
 
   const handlePlaylistSelect = async (name: string) => {
     setSelectedPlaylist(name);
@@ -258,28 +242,13 @@ function App() {
           >
             {"\u23F0"}
           </button>
-        <div className="settings-menu-wrapper" ref={settingsMenuRef}>
-          <button
-            className="header-settings-btn"
-            onClick={() => setShowSettingsMenu((v) => !v)}
-            title="Settings"
-          >
-            {"\u2699"}
-          </button>
-          {showSettingsMenu && (
-            <div className="settings-dropdown">
-              <button className="settings-dropdown-item" onClick={() => { setShowCrossfadeSettings(true); setShowSettingsMenu(false); }}>
-                Crossfade
-              </button>
-              <button className="settings-dropdown-item" onClick={() => { setShowSilenceSettings(true); setShowSettingsMenu(false); }}>
-                Silence Detection
-              </button>
-              <button className="settings-dropdown-item" onClick={() => { setShowIntroSettings(true); setShowSettingsMenu(false); }}>
-                Auto-Intro
-              </button>
-            </div>
-          )}
-        </div>
+        <button
+          className="header-settings-btn"
+          onClick={() => setShowSettings(true)}
+          title="Settings"
+        >
+          {"\u2699"}
+        </button>
       </header>
       <main className="main">
         <div className={`main-content ${showSchedulePane ? "with-schedule" : ""}`}>
@@ -309,14 +278,8 @@ function App() {
         </div>
       </main>
       <TransportBar onTrackChange={loadTracks} />
-      {showCrossfadeSettings && (
-        <CrossfadeSettings onClose={() => setShowCrossfadeSettings(false)} />
-      )}
-      {showSilenceSettings && (
-        <SilenceSettings onClose={() => setShowSilenceSettings(false)} />
-      )}
-      {showIntroSettings && (
-        <IntroSettings onClose={() => setShowIntroSettings(false)} />
+      {showSettings && (
+        <SettingsWindow onClose={() => setShowSettings(false)} />
       )}
     </div>
   );
