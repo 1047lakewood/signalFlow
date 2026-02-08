@@ -845,9 +845,9 @@ body {
   border-color: var(--highlight);
 }
 
-/* ── Schedule side pane ──────────────────────────────────────────── */
+/* ── Side pane (schedule + log) ──────────────────────────────────── */
 
-.schedule-pane {
+.side-pane {
   width: 320px;
   min-width: 280px;
   background: var(--bg-secondary);
@@ -855,6 +855,14 @@ body {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.schedule-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -1112,4 +1120,100 @@ body {
   background: rgba(244, 67, 54, 0.15);
   color: #f44336;
   border-color: #f44336;
+}
+
+/* ── Log pane ────────────────────────────────────────────────────── */
+
+.log-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 120px;
+  max-height: 50%;
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.log-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.log-pane-header h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.log-clear-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.log-clear-btn:hover {
+  background: var(--bg-row-hover);
+  color: var(--text-primary);
+}
+
+.log-list {
+  flex: 1;
+  overflow-y: auto;
+  font-size: 11px;
+  font-family: "Consolas", "Courier New", monospace;
+}
+
+.log-empty {
+  padding: 16px 12px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.log-entry {
+  padding: 2px 12px;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  border-bottom: 1px solid rgba(42, 42, 74, 0.4);
+}
+
+.log-entry:hover {
+  background: var(--bg-row-hover);
+}
+
+.log-timestamp {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.log-level {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-size: 9px;
+  padding: 0 4px;
+  border-radius: 2px;
+  text-transform: uppercase;
+}
+
+.log-level-info {
+  color: #4fc3f7;
+}
+
+.log-level-warn {
+  color: #ffb74d;
+}
+
+.log-level-error {
+  color: #f44336;
 }

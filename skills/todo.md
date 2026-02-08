@@ -45,7 +45,7 @@
 - [x] Auto-intro config — Set intros folder path, enable/disable
 - [x] Track metadata editor — Inline or dialog editing of artist, title, etc.
 - [x] Schedule side pane — Editable schedule list in a side panel
-- [ ] Log pane — Playback events and system logs underneath the schedule pane
+- [x] Log pane — Playback events and system logs underneath the schedule pane
 - [ ] Level meter — Real-time audio level visualization
 - [ ] Waveform display — Waveform overview for the currently playing track
 - [ ] Settings config window — Centralized settings dialog for all engine configuration (crossfade, silence detection, intros, now-playing, conflict policy)

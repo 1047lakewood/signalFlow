@@ -4,7 +4,9 @@ use signal_flow::auto_intro;
 use signal_flow::engine::Engine;
 use signal_flow::player::Player;
 use signal_flow::scheduler::{ConflictPolicy, ScheduleMode, Priority, parse_time};
+use chrono::Local;
 use serde::Serialize;
+use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -16,10 +18,44 @@ struct SendPlayer(Option<Player>);
 unsafe impl Send for SendPlayer {}
 unsafe impl Sync for SendPlayer {}
 
+const LOG_BUFFER_MAX: usize = 500;
+
+#[derive(Clone, Serialize)]
+struct LogEntry {
+    timestamp: String,
+    level: String,
+    message: String,
+}
+
+struct LogBuffer {
+    entries: VecDeque<LogEntry>,
+}
+
+impl LogBuffer {
+    fn new() -> Self {
+        LogBuffer {
+            entries: VecDeque::new(),
+        }
+    }
+
+    fn push(&mut self, level: &str, message: String) {
+        let timestamp = Local::now().format("%H:%M:%S").to_string();
+        self.entries.push_back(LogEntry {
+            timestamp,
+            level: level.to_string(),
+            message,
+        });
+        while self.entries.len() > LOG_BUFFER_MAX {
+            self.entries.pop_front();
+        }
+    }
+}
+
 struct AppState {
     engine: Mutex<Engine>,
     player: Mutex<SendPlayer>,
     playback: Arc<Mutex<PlaybackState>>,
+    logs: Mutex<LogBuffer>,
 }
 
 /// Tracks the state of the currently playing track.
@@ -400,6 +436,8 @@ fn transport_play(
 
     let track_path = pl.tracks[idx].path.clone();
     let track_duration = pl.tracks[idx].duration;
+    let track_artist = pl.tracks[idx].artist.clone();
+    let track_title = pl.tracks[idx].title.clone();
     let playlist_name = pl.name.clone();
     pl.current_index = Some(idx);
     engine.save().ok(); // best-effort persist
@@ -421,6 +459,9 @@ fn transport_play(
     pb.total_paused = Duration::ZERO;
     pb.pause_start = None;
 
+    // Log
+    state.logs.lock().unwrap().push("info", format!("Playing: {} — {}", track_artist, track_title));
+
     Ok(())
 }
 
@@ -433,6 +474,8 @@ fn transport_stop(state: State<AppState>) -> Result<(), String> {
 
     let mut pb = state.playback.lock().unwrap();
     pb.reset();
+
+    state.logs.lock().unwrap().push("info", "Playback stopped".to_string());
 
     Ok(())
 }
@@ -454,11 +497,13 @@ fn transport_pause(state: State<AppState>) -> Result<(), String> {
         if let Some(ps) = pb.pause_start.take() {
             pb.total_paused += ps.elapsed();
         }
+        state.logs.lock().unwrap().push("info", "Playback resumed".to_string());
     } else {
         // Pause
         player.pause();
         pb.is_paused = true;
         pb.pause_start = Some(Instant::now());
+        state.logs.lock().unwrap().push("info", "Playback paused".to_string());
     }
 
     Ok(())
@@ -493,6 +538,7 @@ fn transport_skip(state: State<AppState>) -> Result<(), String> {
             engine.save().ok();
             let mut pb = state.playback.lock().unwrap();
             pb.reset();
+            state.logs.lock().unwrap().push("info", "Reached end of playlist".to_string());
             return Ok(());
         }
 
@@ -518,6 +564,16 @@ fn transport_skip(state: State<AppState>) -> Result<(), String> {
     pb.start_time = Some(Instant::now());
     pb.total_paused = Duration::ZERO;
     pb.pause_start = None;
+
+    // Log skip
+    {
+        let engine = state.engine.lock().unwrap();
+        if let Some(pl) = engine.active_playlist() {
+            if let Some(track) = pl.tracks.get(next_idx) {
+                state.logs.lock().unwrap().push("info", format!("Skipped to: {} — {}", track.artist, track.title));
+            }
+        }
+    }
 
     Ok(())
 }
@@ -639,10 +695,12 @@ fn add_schedule_event(
         parsed_mode,
         PathBuf::from(&file),
         pri,
-        label,
+        label.clone(),
         days_vec,
     );
     engine.save()?;
+    let display = label.unwrap_or_else(|| file.clone());
+    state.logs.lock().unwrap().push("info", format!("Schedule event added: {} at {}", display, time));
     Ok(id)
 }
 
@@ -752,6 +810,20 @@ fn set_nowplaying_path(state: State<AppState>, path: Option<String>) -> Result<(
     Ok(())
 }
 
+// ── Logs ────────────────────────────────────────────────────────────────────
+
+#[tauri::command]
+fn get_logs(state: State<AppState>, since_index: Option<usize>) -> Vec<LogEntry> {
+    let logs = state.logs.lock().unwrap();
+    let start = since_index.unwrap_or(0);
+    logs.entries.iter().skip(start).cloned().collect()
+}
+
+#[tauri::command]
+fn clear_logs(state: State<AppState>) {
+    state.logs.lock().unwrap().entries.clear();
+}
+
 // ── App entry ───────────────────────────────────────────────────────────────
 
 fn main() {
@@ -764,6 +836,7 @@ fn main() {
             engine: Mutex::new(engine),
             player: Mutex::new(SendPlayer(None)),
             playback,
+            logs: Mutex::new(LogBuffer::new()),
         })
         .invoke_handler(tauri::generate_handler![
             // Status
@@ -793,6 +866,9 @@ fn main() {
             add_schedule_event,
             remove_schedule_event,
             toggle_schedule_event,
+            // Logs
+            get_logs,
+            clear_logs,
             // Config
             get_config,
             set_crossfade,

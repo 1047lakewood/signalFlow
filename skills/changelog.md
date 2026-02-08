@@ -1,5 +1,21 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Log Pane (GUI)
+- Created `LogPane.tsx` — scrollable log list displayed underneath the schedule pane in the right side panel
+- Refactored side pane layout: new `.side-pane` wrapper contains `SchedulePane` (top) + `LogPane` (bottom)
+- Added in-memory `LogBuffer` (ring buffer, 500 entries max) to Tauri `AppState` using `VecDeque<LogEntry>`
+- `LogEntry` struct with timestamp (HH:MM:SS via chrono), level (info/warn/error), message
+- Playback events logged from transport IPC commands: play (artist — title), stop, pause, resume, skip, end-of-playlist
+- Schedule events logged: event added (label/file + time)
+- `get_logs` IPC command retrieves all entries (supports optional `since_index` for incremental fetch)
+- `clear_logs` IPC command empties the buffer
+- Frontend polls every 1 second, auto-scrolls to bottom (disabled when user scrolls up)
+- "Clear" button in log header to empty the log display
+- Monospace font (Consolas), color-coded levels: info=blue, warn=orange, error=red
+- Added `chrono` dependency to `src-tauri/Cargo.toml` for timestamp formatting
+- Added `LogEntry` interface to `types.ts`
+- 129 unit tests passing (no new tests — frontend-only changes + thin IPC over in-memory buffer)
+
 ## 2026-02-08 — Schedule Side Pane (GUI)
 - Created `SchedulePane.tsx` — collapsible side panel displaying all scheduled events
 - Events listed by time with colored mode badges (overlay=blue, stop=red, insert=green), priority, days, and label/filename

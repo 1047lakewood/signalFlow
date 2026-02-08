@@ -51,6 +51,12 @@ export interface ConfigResponse {
   now_playing_path: string | null;
 }
 
+export interface LogEntry {
+  timestamp: string;
+  level: string;
+  message: string;
+}
+
 export interface TransportState {
   is_playing: boolean;
   is_paused: boolean;

@@ -86,6 +86,9 @@ signalFlow/
 | `set_intros_folder` | `path?` (None=disable) | `()` | DONE |
 | `set_conflict_policy` | `policy` | `()` | DONE |
 | `set_nowplaying_path` | `path?` (None=disable) | `()` | DONE |
+| **Logs** | | | |
+| `get_logs` | `since_index?` | `Vec<LogEntry>` | DONE |
+| `clear_logs` | none | `()` | DONE |
 
 ### Response Types
 
@@ -94,6 +97,7 @@ signalFlow/
 - **TrackInfo**: index, path, title, artist, duration_secs, duration_display, played_duration_secs, has_intro
 - **ScheduleEventInfo**: id, time, mode, file, priority, enabled, label, days
 - **ConfigResponse**: crossfade_secs, silence_threshold, silence_duration_secs, intros_folder, conflict_policy, now_playing_path
+- **LogEntry**: timestamp, level, message
 
 ## Main Playlist View (DONE)
 
@@ -245,6 +249,22 @@ signalFlow/
 - Add form calls `add_schedule_event` IPC with validation
 - Error display for failed adds
 
+## Log Pane (DONE)
+
+- `LogPane.tsx` component: scrollable log list displayed underneath the schedule pane in the right side panel
+- Side pane refactored: new `.side-pane` wrapper contains `SchedulePane` (top, flexible) + `LogPane` (bottom, 120px–50%)
+- In-memory `LogBuffer` (ring buffer, 500 entries max) in Tauri `AppState`
+- `LogEntry` struct: timestamp (HH:MM:SS via chrono), level (info/warn/error), message
+- Playback events logged: play (with artist/title), stop, pause, resume, skip, end-of-playlist
+- Schedule events logged: event added (with label/file and time)
+- `get_logs` IPC: retrieves all log entries (with optional `since_index` for incremental polling)
+- `clear_logs` IPC: empties the log buffer
+- Frontend polls `get_logs` every 1 second, auto-scrolls to bottom (unless user scrolled up)
+- "Clear" button in log header empties the log
+- Monospace font (`Consolas`), color-coded log levels: info=blue, warn=orange, error=red
+- `LogEntry` TypeScript interface added to `types.ts`
+
 ## Next Steps
 
-- [ ] Log pane
+- [ ] Level meter
+- [ ] Waveform display

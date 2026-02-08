@@ -8,6 +8,7 @@ import CrossfadeSettings from "./CrossfadeSettings";
 import SilenceSettings from "./SilenceSettings";
 import IntroSettings from "./IntroSettings";
 import SchedulePane from "./SchedulePane";
+import LogPane from "./LogPane";
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "ogg", "aac", "m4a"];
 
@@ -300,7 +301,10 @@ function App() {
             )}
           </div>
           {showSchedulePane && (
-            <SchedulePane onClose={() => setShowSchedulePane(false)} />
+            <div className="side-pane">
+              <SchedulePane onClose={() => setShowSchedulePane(false)} />
+              <LogPane />
+            </div>
           )}
         </div>
       </main>
