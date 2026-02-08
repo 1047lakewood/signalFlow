@@ -264,7 +264,24 @@ signalFlow/
 - Monospace font (`Consolas`), color-coded log levels: info=blue, warn=orange, error=red
 - `LogEntry` TypeScript interface added to `types.ts`
 
+## Level Meter (DONE)
+
+- `LevelMeter.tsx` component: horizontal bar showing real-time audio RMS level
+- RMS computed on the audio thread via `LevelSource<S>` wrapper (~50ms windows)
+- `LevelMonitor` shared atomic (f32 as `AtomicU32` bits) bridges audio thread → IPC
+- `get_audio_level` IPC returns raw f32 RMS; frontend converts to dB scale (-60dB..0dB → 0..100%)
+- Peak hold indicator: holds for ~1 second then decays gradually
+- Green→yellow→red gradient fill bar (80px wide)
+- Polls every 60ms when playing; stops on pause/stop
+- Positioned in transport bar between seek slider and "Next up" panel
+- `Player::play_file_with_level()` used by `transport_play` for level-monitored playback
+
+### IPC Commands (Level)
+
+| Command | Args | Returns | Status |
+|---------|------|---------|--------|
+| `get_audio_level` | none | `f32` (RMS) | DONE |
+
 ## Next Steps
 
-- [ ] Level meter
 - [ ] Waveform display

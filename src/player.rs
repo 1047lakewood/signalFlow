@@ -1,3 +1,4 @@
+use crate::level_monitor::{LevelMonitor, LevelSource};
 use crate::silence::{SilenceDetector, SilenceMonitor};
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
 use std::fs::File;
@@ -39,6 +40,19 @@ impl Player {
         let source = Decoder::new(BufReader::new(file))
             .map_err(|e| format!("Cannot decode '{}': {}", path.display(), e))?;
         self.sink.append(source);
+        self.sink.play();
+        Ok(())
+    }
+
+    /// Decode and append an audio file to the default sink with level monitoring.
+    /// The `LevelMonitor` is updated with the current RMS level as audio plays.
+    pub fn play_file_with_level(&self, path: &Path, monitor: LevelMonitor) -> Result<(), String> {
+        let file = File::open(path)
+            .map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
+        let source = Decoder::new(BufReader::new(file))
+            .map_err(|e| format!("Cannot decode '{}': {}", path.display(), e))?;
+        let wrapped = LevelSource::new(source.convert_samples::<f32>(), monitor);
+        self.sink.append(wrapped);
         self.sink.play();
         Ok(())
     }

@@ -1,5 +1,22 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Level Meter (GUI)
+- Created `src/level_monitor.rs` — `LevelMonitor` (shared `Arc<AtomicU32>` storing f32 RMS as bits) and `LevelSource<S>` source wrapper
+- `LevelSource` computes RMS over ~50ms windows, updates `LevelMonitor` atomically from the audio thread
+- `LevelMonitor` API: `level()` (get current RMS), `reset()` (zero on stop), `new()` (constructor)
+- Added `Player::play_file_with_level()` — wraps decoded source with `LevelSource` for level-monitored playback
+- `LevelMonitor` stored in Tauri `AppState`, used by `transport_play` (level-monitored) and reset on `transport_stop`
+- `get_audio_level` IPC command returns current f32 RMS level
+- Created `LevelMeter.tsx` — horizontal bar with dB-scaled fill and peak hold indicator
+- RMS → dB conversion (20*log10), mapped from -60dB..0dB to 0..100% width
+- Peak hold with ~1 second hold time, then gradual decay
+- Green→yellow→red gradient fill via CSS `linear-gradient`
+- Peak indicator as 2px white marker line
+- Polls `get_audio_level` every 60ms when playing, stops when paused/stopped
+- Level meter placed in transport bar between seek slider and "Next up" panel
+- CSS: `.level-meter` (80px fixed width), `.level-meter-track`, `.level-meter-fill`, `.level-meter-peak`
+- 135 unit tests passing (+6 new: monitor_starts_at_zero, monitor_reset_sets_zero, level_source_passes_samples_unchanged, level_source_measures_loud_audio, level_source_measures_silence, level_source_preserves_source_properties)
+
 ## 2026-02-08 — Log Pane (GUI)
 - Created `LogPane.tsx` — scrollable log list displayed underneath the schedule pane in the right side panel
 - Refactored side pane layout: new `.side-pane` wrapper contains `SchedulePane` (top) + `LogPane` (bottom)

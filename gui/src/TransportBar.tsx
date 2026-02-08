@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { TransportState } from "./types";
+import LevelMeter from "./LevelMeter";
 
 function formatTime(secs: number): string {
   const m = Math.floor(secs / 60);
@@ -163,6 +164,9 @@ function TransportBar({ onTrackChange }: TransportBarProps) {
         />
         <span className="transport-time">-{formatTime(remaining)}</span>
       </div>
+
+      {/* Level meter */}
+      <LevelMeter isPlaying={state.is_playing && !state.is_paused} />
 
       {/* Next up */}
       <div className="now-playing-next">

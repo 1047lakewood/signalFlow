@@ -2,6 +2,7 @@
 
 use signal_flow::auto_intro;
 use signal_flow::engine::Engine;
+use signal_flow::level_monitor::LevelMonitor;
 use signal_flow::player::Player;
 use signal_flow::scheduler::{ConflictPolicy, ScheduleMode, Priority, parse_time};
 use chrono::Local;
@@ -56,6 +57,7 @@ struct AppState {
     player: Mutex<SendPlayer>,
     playback: Arc<Mutex<PlaybackState>>,
     logs: Mutex<LogBuffer>,
+    level_monitor: LevelMonitor,
 }
 
 /// Tracks the state of the currently playing track.
@@ -442,11 +444,12 @@ fn transport_play(
     pl.current_index = Some(idx);
     engine.save().ok(); // best-effort persist
 
-    // Play the file
+    // Play the file with level monitoring
+    state.level_monitor.reset();
     let player_guard = state.player.lock().unwrap();
     let player = player_guard.0.as_ref().unwrap();
     player.stop(); // stop any current playback
-    player.play_file(&track_path)?;
+    player.play_file_with_level(&track_path, state.level_monitor.clone())?;
 
     // Update playback state
     let mut pb = state.playback.lock().unwrap();
@@ -471,6 +474,7 @@ fn transport_stop(state: State<AppState>) -> Result<(), String> {
     if let Some(player) = player_guard.0.as_ref() {
         player.stop();
     }
+    state.level_monitor.reset();
 
     let mut pb = state.playback.lock().unwrap();
     pb.reset();
@@ -652,6 +656,13 @@ fn transport_status(state: State<AppState>) -> TransportState {
     }
 }
 
+// ── Audio Level ─────────────────────────────────────────────────────────────
+
+#[tauri::command]
+fn get_audio_level(state: State<AppState>) -> f32 {
+    state.level_monitor.level()
+}
+
 // ── Schedule ────────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -829,6 +840,7 @@ fn clear_logs(state: State<AppState>) {
 fn main() {
     let engine = Engine::load();
     let playback = Arc::new(Mutex::new(PlaybackState::new()));
+    let level_monitor = LevelMonitor::new();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -837,6 +849,7 @@ fn main() {
             player: Mutex::new(SendPlayer(None)),
             playback,
             logs: Mutex::new(LogBuffer::new()),
+            level_monitor,
         })
         .invoke_handler(tauri::generate_handler![
             // Status
@@ -861,6 +874,7 @@ fn main() {
             transport_skip,
             transport_seek,
             transport_status,
+            get_audio_level,
             // Schedule
             get_schedule,
             add_schedule_event,
