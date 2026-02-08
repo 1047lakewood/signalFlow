@@ -215,6 +215,17 @@ signalFlow/
 - `.settings-input-path` CSS for wider path display with text overflow
 - `.settings-btn-browse` CSS for browse button styling
 
+## Track Metadata Editor (DONE)
+
+- Double-click on Artist or Title cell to enter inline edit mode
+- Input field appears with current value pre-selected
+- Enter commits the edit via `edit_track_metadata` IPC command (persists to file tags + engine state)
+- Escape or blur cancels if value unchanged, commits if changed
+- Dragging disabled while editing to prevent conflicts
+- `onTracksChanged` callback refreshes track list after successful edit
+- `.editable-cell` and `.cell-edit-input` CSS classes for edit styling
+- Uses existing `edit_track_metadata` IPC (playlist, trackIndex, artist?, title?)
+
 ## Next Steps
 
-- [ ] Track metadata editor
+- [ ] Schedule side pane

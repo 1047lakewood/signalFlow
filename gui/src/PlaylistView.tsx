@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { TrackInfo } from "./types";
 
 interface PlaylistViewProps {
@@ -8,12 +9,21 @@ interface PlaylistViewProps {
   onReorder: (fromIndex: number, toIndex: number) => void;
   onAddFiles: () => void;
   onFileDrop: (paths: string[]) => void;
+  onTracksChanged: () => void;
 }
 
-function PlaylistView({ tracks, currentIndex, playlistName, onReorder, onAddFiles, onFileDrop }: PlaylistViewProps) {
+interface EditingCell {
+  trackIndex: number;
+  field: "artist" | "title";
+}
+
+function PlaylistView({ tracks, currentIndex, playlistName, onReorder, onAddFiles, onFileDrop, onTracksChanged }: PlaylistViewProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
   const [isDroppingFiles, setIsDroppingFiles] = useState(false);
+  const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Listen for Tauri file drop events
@@ -54,6 +64,64 @@ function PlaylistView({ tracks, currentIndex, playlistName, onReorder, onAddFile
       if (unlisten) unlisten();
     };
   }, [onFileDrop]);
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (editingCell && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingCell]);
+
+  const handleStartEdit = useCallback((trackIndex: number, field: "artist" | "title", currentValue: string) => {
+    setEditingCell({ trackIndex, field });
+    setEditValue(currentValue);
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingCell(null);
+    setEditValue("");
+  }, []);
+
+  const handleCommitEdit = useCallback(async () => {
+    if (!editingCell) return;
+    const newValue = editValue.trim();
+    const track = tracks.find((t) => t.index === editingCell.trackIndex);
+    if (!track) {
+      handleCancelEdit();
+      return;
+    }
+    const oldValue = editingCell.field === "artist" ? track.artist : track.title;
+    if (!newValue || newValue === oldValue) {
+      handleCancelEdit();
+      return;
+    }
+    try {
+      const params: { playlist: string; trackIndex: number; artist?: string; title?: string } = {
+        playlist: playlistName,
+        trackIndex: editingCell.trackIndex,
+      };
+      if (editingCell.field === "artist") {
+        params.artist = newValue;
+      } else {
+        params.title = newValue;
+      }
+      await invoke("edit_track_metadata", params);
+      onTracksChanged();
+    } catch (e) {
+      console.error("Failed to edit track metadata:", e);
+    }
+    setEditingCell(null);
+    setEditValue("");
+  }, [editingCell, editValue, tracks, playlistName, onTracksChanged, handleCancelEdit]);
+
+  const handleEditKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleCommitEdit();
+    } else if (e.key === "Escape") {
+      handleCancelEdit();
+    }
+  }, [handleCommitEdit, handleCancelEdit]);
 
   const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
     setDragIndex(index);
@@ -134,6 +202,8 @@ function PlaylistView({ tracks, currentIndex, playlistName, onReorder, onAddFile
             const isCurrent = track.index === currentIndex;
             const isDragging = track.index === dragIndex;
             const isDropTarget = track.index === dropTarget && dropTarget !== dragIndex;
+            const isEditingArtist = editingCell?.trackIndex === track.index && editingCell?.field === "artist";
+            const isEditingTitle = editingCell?.trackIndex === track.index && editingCell?.field === "title";
             let className = "track-row";
             if (isCurrent) className += " current";
             if (isDragging) className += " dragging";
@@ -142,7 +212,7 @@ function PlaylistView({ tracks, currentIndex, playlistName, onReorder, onAddFile
               <tr
                 key={track.index}
                 className={className}
-                draggable
+                draggable={!editingCell}
                 onDragStart={(e) => handleDragStart(e, track.index)}
                 onDragEnd={handleDragEnd}
                 onDragOver={(e) => handleDragOver(e, track.index)}
@@ -154,8 +224,42 @@ function PlaylistView({ tracks, currentIndex, playlistName, onReorder, onAddFile
                   {isCurrent && <span className="playing-indicator">{"\u25B6"}</span>}
                   {track.has_intro && <span className="intro-dot" title="Has intro">{"\u2022"}</span>}
                 </td>
-                <td className="col-artist">{track.artist}</td>
-                <td className="col-title">{track.title}</td>
+                <td
+                  className="col-artist editable-cell"
+                  onDoubleClick={() => handleStartEdit(track.index, "artist", track.artist)}
+                >
+                  {isEditingArtist ? (
+                    <input
+                      ref={editInputRef}
+                      className="cell-edit-input"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={handleCommitEdit}
+                      onKeyDown={handleEditKeyDown}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    track.artist
+                  )}
+                </td>
+                <td
+                  className="col-title editable-cell"
+                  onDoubleClick={() => handleStartEdit(track.index, "title", track.title)}
+                >
+                  {isEditingTitle ? (
+                    <input
+                      ref={editInputRef}
+                      className="cell-edit-input"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={handleCommitEdit}
+                      onKeyDown={handleEditKeyDown}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    track.title
+                  )}
+                </td>
                 <td className="col-duration">{track.duration_display}</td>
               </tr>
             );

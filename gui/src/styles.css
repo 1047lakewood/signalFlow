@@ -778,3 +778,25 @@ body {
   opacity: 0.5;
   cursor: default;
 }
+
+/* ── Inline cell editing ─────────────────────────────────────────── */
+
+.editable-cell {
+  cursor: default;
+}
+
+.editable-cell:hover {
+  cursor: text;
+}
+
+.cell-edit-input {
+  background: var(--bg-primary);
+  border: 1px solid var(--highlight);
+  border-radius: 2px;
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 1px 4px;
+  width: 100%;
+  outline: none;
+  font-family: inherit;
+}

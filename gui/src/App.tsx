@@ -280,6 +280,7 @@ function App() {
             onReorder={handleReorder}
             onAddFiles={handleAddFiles}
             onFileDrop={handleFileDrop}
+            onTracksChanged={loadTracks}
           />
         ) : (
           <div className="no-playlist">

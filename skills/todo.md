@@ -43,7 +43,7 @@
 - [x] Crossfade settings panel — Configure fade duration and curve type
 - [x] Silence detection settings — Configure threshold and skip duration
 - [x] Auto-intro config — Set intros folder path, enable/disable
-- [ ] Track metadata editor — Inline or dialog editing of artist, title, etc.
+- [x] Track metadata editor — Inline or dialog editing of artist, title, etc.
 - [ ] Schedule side pane — Editable schedule list in a side panel
 - [ ] Log pane — Playback events and system logs underneath the schedule pane
 - [ ] Level meter — Real-time audio level visualization

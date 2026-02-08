@@ -1,5 +1,15 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Track Metadata Editor (GUI)
+- Double-click Artist or Title cell in playlist view to inline edit
+- Input field replaces cell text with current value pre-selected, highlight border
+- Enter commits edit via `edit_track_metadata` IPC (persists to audio file tags + engine state)
+- Escape cancels edit; blur commits if value changed, cancels if unchanged
+- Dragging disabled on rows while editing to prevent conflicts
+- Added `onTracksChanged` prop to `PlaylistView` — refreshes track list after edit
+- Added `.editable-cell` (cursor: text on hover) and `.cell-edit-input` CSS classes
+- 129 unit tests passing (no new tests — frontend-only changes over existing `edit_track_metadata` IPC)
+
 ## 2026-02-08 — Auto-Intro Config (GUI)
 - Created `IntroSettings.tsx` — modal dialog for configuring auto-intro system
 - Browse button opens native directory picker via `@tauri-apps/plugin-dialog` to select intros folder
