@@ -137,6 +137,16 @@ signalFlow/
 | `transport_seek` | `position_secs` | `()` | DONE |
 | `transport_status` | none | `TransportState` | DONE |
 
+## Drag-and-Drop Reordering (DONE)
+
+- HTML5 native drag-and-drop on `<tr>` rows in `PlaylistView`
+- `draggable` attribute on each track row
+- Drag state: `dragIndex` (source) and `dropTarget` (hover target) tracked in component state
+- Visual feedback: dragged row fades (opacity 0.4), drop target shows highlight top border
+- On drop: calls `onReorder(fromIndex, toIndex)` callback → `App.tsx` invokes `reorder_track` IPC → `Playlist::reorder(from, to)` in core
+- Track list refreshes after successful reorder
+- Grab cursor on rows (`cursor: grab` / `cursor: grabbing` on active drag)
+
 ## Next Steps
 
-- [ ] Drag-and-drop reordering — Reorder tracks within and between playlists
+- [ ] File browser / Add tracks — Dialog or drag-drop to add audio files to playlist

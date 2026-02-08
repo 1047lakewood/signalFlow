@@ -187,6 +187,11 @@ body {
 
 .track-row {
   transition: background 0.1s;
+  cursor: grab;
+}
+
+.track-row:active {
+  cursor: grabbing;
 }
 
 .track-row:hover {
@@ -199,6 +204,14 @@ body {
 
 .track-row.current td {
   color: var(--highlight);
+}
+
+.track-row.dragging {
+  opacity: 0.4;
+}
+
+.track-row.drop-target {
+  border-top: 2px solid var(--highlight);
 }
 
 /* ── Column widths ─────────────────────────────────────────────────── */

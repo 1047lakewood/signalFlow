@@ -1,5 +1,13 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Drag-and-Drop Reordering (GUI)
+- Added HTML5 drag-and-drop to `PlaylistView.tsx` for reordering tracks within a playlist
+- Drag state tracked via `dragIndex` and `dropTarget` — visual feedback with opacity and drop indicator line
+- `handleDragStart` sets drag data and adds `.dragging` class; `handleDrop` calls `onReorder` callback
+- `App.tsx` wires `onReorder` to `reorder_track` IPC command (0-based `from`/`to` indices), refreshes track list after reorder
+- CSS: `.track-row` gets `cursor: grab`, `.dragging` reduces opacity to 0.4, `.drop-target` shows `--highlight` top border
+- 123 unit tests passing (no new tests — frontend-only drag-and-drop wiring over tested `Playlist::reorder` core method)
+
 ## 2026-02-08 — Transport Controls (GUI)
 - Added `Player` + `PlaybackState` to Tauri `AppState` for runtime audio playback
 - Player lazily initialized on first play command — audio output stays alive across tracks

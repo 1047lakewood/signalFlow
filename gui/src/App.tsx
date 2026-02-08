@@ -128,6 +128,16 @@ function App() {
     }
   };
 
+  const handleReorder = useCallback(async (fromIndex: number, toIndex: number) => {
+    if (!selectedPlaylist) return;
+    try {
+      await invoke("reorder_track", { playlist: selectedPlaylist, from: fromIndex, to: toIndex });
+      await loadTracks();
+    } catch (e) {
+      console.error("Failed to reorder track:", e);
+    }
+  }, [selectedPlaylist, loadTracks]);
+
   return (
     <div className="app">
       <header className="header">
@@ -184,6 +194,7 @@ function App() {
             tracks={tracks}
             currentIndex={currentIndex}
             playlistName={selectedPlaylist}
+            onReorder={handleReorder}
           />
         ) : (
           <div className="no-playlist">
