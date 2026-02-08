@@ -1,3 +1,5 @@
+use crate::ad_scheduler::{AdConfig, AdInserterSettings};
+use crate::lecture_detector::LectureDetector;
 use crate::playlist::Playlist;
 use crate::scheduler::{ConflictPolicy, Schedule};
 use serde::{Deserialize, Serialize};
@@ -42,6 +44,15 @@ pub struct Engine {
     /// Path for now-playing XML export (None = disabled).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub now_playing_path: Option<String>,
+    /// Ad definitions for the ad scheduler/inserter system.
+    #[serde(default)]
+    pub ads: Vec<AdConfig>,
+    /// Ad inserter service settings (output path, station ID).
+    #[serde(default)]
+    pub ad_inserter: AdInserterSettings,
+    /// Lecture detector with blacklist/whitelist (shared between ad scheduler and RDS).
+    #[serde(default)]
+    pub lecture_detector: LectureDetector,
 }
 
 impl Engine {
@@ -59,6 +70,9 @@ impl Engine {
             schedule: Schedule::new(),
             conflict_policy: ConflictPolicy::default(),
             now_playing_path: None,
+            ads: Vec::new(),
+            ad_inserter: AdInserterSettings::default(),
+            lecture_detector: LectureDetector::new(),
         }
     }
 
@@ -188,6 +202,70 @@ impl Engine {
                 )
             })?;
         track.write_tags(new_artist, new_title)
+    }
+
+    // --- Ad management ---
+
+    /// Add a new ad configuration. Returns its index (0-based).
+    pub fn add_ad(&mut self, ad: AdConfig) -> usize {
+        self.ads.push(ad);
+        self.ads.len() - 1
+    }
+
+    /// Remove an ad by index (0-based). Returns the removed ad.
+    pub fn remove_ad(&mut self, index: usize) -> Result<AdConfig, String> {
+        if index >= self.ads.len() {
+            return Err(format!(
+                "Ad index {} out of range ({} ads)",
+                index,
+                self.ads.len()
+            ));
+        }
+        Ok(self.ads.remove(index))
+    }
+
+    /// Find an ad by name (case-insensitive).
+    pub fn find_ad(&self, name: &str) -> Option<(usize, &AdConfig)> {
+        self.ads
+            .iter()
+            .enumerate()
+            .find(|(_, a)| a.name.eq_ignore_ascii_case(name))
+    }
+
+    /// Toggle an ad's enabled state. Returns the new state.
+    pub fn toggle_ad(&mut self, index: usize) -> Result<bool, String> {
+        let len = self.ads.len();
+        let ad = self.ads.get_mut(index).ok_or_else(|| {
+            format!("Ad index {} out of range ({} ads)", index, len)
+        })?;
+        ad.enabled = !ad.enabled;
+        Ok(ad.enabled)
+    }
+
+    /// Get the current track's artist and title from the active playlist.
+    pub fn current_track_info(&self) -> Option<(&str, &str)> {
+        let pl = self.active_playlist()?;
+        let idx = pl.current_index?;
+        let track = pl.tracks.get(idx)?;
+        Some((&track.artist, &track.title))
+    }
+
+    /// Get the next track's artist from the active playlist.
+    pub fn next_track_artist(&self) -> Option<&str> {
+        let pl = self.active_playlist()?;
+        let idx = pl.current_index?;
+        let next = pl.tracks.get(idx + 1)?;
+        Some(&next.artist)
+    }
+
+    /// Check if there is a next track in the active playlist.
+    pub fn has_next_track(&self) -> bool {
+        self.active_playlist()
+            .and_then(|pl| {
+                pl.current_index
+                    .map(|idx| idx + 1 < pl.tracks.len())
+            })
+            .unwrap_or(false)
     }
 
     /// Paste (insert) tracks into a playlist at a position, or append.

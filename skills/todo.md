@@ -53,7 +53,7 @@
 
 ## Phase F: Ad Inserter / Scheduler System
 
-- [ ] Ad scheduler handler — Intelligent hourly ad scheduling with lecture detection and track boundary awareness
+- [x] Ad scheduler handler — Intelligent hourly ad scheduling with lecture detection and track boundary awareness
 - [ ] Ad inserter service — Internal MP3 concatenation via rodio, queue-based insertion into active playlist
 - [ ] Ad play logger — JSON play statistics (per-ad, per-date, per-hour), failure tracking
 - [ ] Ad report generator — CSV and PDF verified-play reports with hourly/daily breakdowns
@@ -66,6 +66,21 @@
 - [ ] RDS message filtering — Enable/disable, lecture detection, placeholder support ({artist}, {title}), day/hour scheduling
 - [ ] Lecture detector — Track classification (blacklist > whitelist > starts-with-R), current/next track analysis
 - [ ] RDS config UI — Modal message editor with 64-char limit, duration, day/hour scheduling, live treeview
+
+## Phase E2: GUI Playlist Interaction
+
+- [ ] Row selection — Click a row to highlight/select it visually
+- [ ] Play from selection — Double-click or press Play to start playback from the selected row
+- [ ] Pause/unpause — Add a Pause button; Play resumes from where it paused instead of restarting
+- [ ] Right-click context menu — Custom context menu on rows (suppress browser default)
+- [ ] Drag-to-reorder rows — Drag selected row(s) to a new position in the playlist
+- [ ] Cut/copy/paste via context menu — Right-click cut, copy, paste; paste inserts immediately after the selected row
+- [ ] Multi-select — Shift+click for range select, Ctrl+click for toggle individual rows
+- [ ] Resizable columns — Drag column header edges to resize column widths
+- [ ] Row number column — Display a sequential row number as the first column
+- [ ] File path column — Show the file path in a dedicated column
+- [ ] Find bar — Search rows by any text field; include a dedicated row-number jump input
+- [ ] Auto-advance playback — Automatically play the next track when the current one ends, respecting crossfade settings
 
 ## Phase H: Future / Long-Term
 

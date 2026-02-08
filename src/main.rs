@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use signal_flow::ad_scheduler::AdConfig;
 use signal_flow::engine::Engine;
 use signal_flow::now_playing::NowPlaying;
 use signal_flow::player::{play_playlist, PlaybackResult, Player, RecurringIntroConfig, SilenceConfig};
@@ -82,6 +83,11 @@ enum Commands {
         /// Number of peaks to generate (default 200)
         #[arg(short, long, default_value = "200")]
         peaks: usize,
+    },
+    /// Ad management (scheduler/inserter system)
+    Ad {
+        #[command(subcommand)]
+        action: AdCmd,
     },
 }
 
@@ -182,8 +188,74 @@ enum ConfigCmd {
         /// Policy: "schedule-wins" (default) or "manual-wins"
         policy: String,
     },
+    /// Configure ad inserter settings
+    AdInserter {
+        #[command(subcommand)]
+        action: AdInserterConfigCmd,
+    },
+    /// Configure lecture detector (blacklist/whitelist)
+    Lecture {
+        #[command(subcommand)]
+        action: LectureCmd,
+    },
     /// Show current configuration
     Show,
+}
+
+#[derive(Subcommand)]
+enum AdInserterConfigCmd {
+    /// Set the output MP3 path for concatenated ad rolls
+    Output {
+        /// File path for concatenated ad roll
+        path: String,
+    },
+    /// Configure station ID
+    StationId {
+        #[command(subcommand)]
+        action: StationIdCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum StationIdCmd {
+    /// Enable station ID with a file
+    Set {
+        /// Path to station ID audio file
+        file: PathBuf,
+    },
+    /// Disable station ID
+    Off,
+}
+
+#[derive(Subcommand)]
+enum LectureCmd {
+    /// Add an artist to the blacklist (never a lecture)
+    BlacklistAdd {
+        /// Artist name
+        artist: String,
+    },
+    /// Remove an artist from the blacklist
+    BlacklistRemove {
+        /// Artist name
+        artist: String,
+    },
+    /// Add an artist to the whitelist (always a lecture)
+    WhitelistAdd {
+        /// Artist name
+        artist: String,
+    },
+    /// Remove an artist from the whitelist
+    WhitelistRemove {
+        /// Artist name
+        artist: String,
+    },
+    /// Show current lecture detector lists
+    Show,
+    /// Test if an artist is classified as a lecture
+    Test {
+        /// Artist name to test
+        artist: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -241,6 +313,43 @@ enum RecurringIntroCmd {
 }
 
 #[derive(Subcommand)]
+enum AdCmd {
+    /// Add a new ad
+    Add {
+        /// Ad name
+        name: String,
+        /// MP3 file path
+        file: PathBuf,
+        /// Enable scheduling (day/hour restrictions)
+        #[arg(long)]
+        scheduled: bool,
+        /// Days of the week (e.g., "Monday,Wednesday,Friday")
+        #[arg(long)]
+        days: Option<String>,
+        /// Hours to play (e.g., "9,10,14,15")
+        #[arg(long)]
+        hours: Option<String>,
+    },
+    /// List all ads
+    List,
+    /// Remove an ad by number (1-based)
+    Remove {
+        /// Ad number (1-based)
+        num: usize,
+    },
+    /// Toggle an ad's enabled state
+    Toggle {
+        /// Ad number (1-based)
+        num: usize,
+    },
+    /// Show details of an ad
+    Show {
+        /// Ad number (1-based)
+        num: usize,
+    },
+}
+
+#[derive(Subcommand)]
 enum ScheduleCmd {
     /// Add a scheduled event
     Add {
@@ -294,8 +403,10 @@ fn main() {
                 .as_deref()
                 .unwrap_or("off");
             let sched_count = engine.schedule.len();
+            let ad_count = engine.ads.len();
+            let enabled_ads = engine.ads.iter().filter(|a| a.enabled).count();
             println!(
-                "Playlists: {} | Active: {} | Crossfade: {}s | Silence: {} | Intros: {} | Schedule: {} event(s) | Conflict: {}",
+                "Playlists: {} | Active: {} | Crossfade: {}s | Silence: {} | Intros: {} | Schedule: {} event(s) | Ads: {}/{} | Conflict: {}",
                 engine.playlists.len(),
                 engine
                     .active_playlist()
@@ -305,6 +416,8 @@ fn main() {
                 silence_status,
                 intros_status,
                 sched_count,
+                enabled_ads,
+                ad_count,
                 engine.conflict_policy
             );
             if let Some(pl) = engine.active_playlist() {
@@ -726,6 +839,86 @@ fn main() {
                     }
                 }
             }
+            ConfigCmd::AdInserter { action } => match action {
+                AdInserterConfigCmd::Output { path } => {
+                    engine.ad_inserter.output_mp3 = path.clone().into();
+                    engine.save().expect("Failed to save state");
+                    println!("Ad inserter output path set to: {}", path);
+                }
+                AdInserterConfigCmd::StationId { action } => match action {
+                    StationIdCmd::Set { file } => {
+                        if !file.exists() {
+                            eprintln!("Error: file '{}' not found", file.display());
+                            std::process::exit(1);
+                        }
+                        engine.ad_inserter.station_id_enabled = true;
+                        engine.ad_inserter.station_id_file = Some(file.clone());
+                        engine.save().expect("Failed to save state");
+                        println!("Station ID enabled: {}", file.display());
+                    }
+                    StationIdCmd::Off => {
+                        engine.ad_inserter.station_id_enabled = false;
+                        engine.save().expect("Failed to save state");
+                        println!("Station ID disabled.");
+                    }
+                },
+            },
+            ConfigCmd::Lecture { action } => match action {
+                LectureCmd::BlacklistAdd { artist } => {
+                    engine.lecture_detector.add_blacklist(&artist);
+                    engine.save().expect("Failed to save state");
+                    println!("Added '{}' to lecture blacklist (never a lecture)", artist);
+                }
+                LectureCmd::BlacklistRemove { artist } => {
+                    if engine.lecture_detector.remove_blacklist(&artist) {
+                        engine.save().expect("Failed to save state");
+                        println!("Removed '{}' from lecture blacklist", artist);
+                    } else {
+                        eprintln!("'{}' not found in blacklist", artist);
+                        std::process::exit(1);
+                    }
+                }
+                LectureCmd::WhitelistAdd { artist } => {
+                    engine.lecture_detector.add_whitelist(&artist);
+                    engine.save().expect("Failed to save state");
+                    println!("Added '{}' to lecture whitelist (always a lecture)", artist);
+                }
+                LectureCmd::WhitelistRemove { artist } => {
+                    if engine.lecture_detector.remove_whitelist(&artist) {
+                        engine.save().expect("Failed to save state");
+                        println!("Removed '{}' from lecture whitelist", artist);
+                    } else {
+                        eprintln!("'{}' not found in whitelist", artist);
+                        std::process::exit(1);
+                    }
+                }
+                LectureCmd::Show => {
+                    let ld = &engine.lecture_detector;
+                    println!("Lecture Detector:");
+                    if ld.blacklist.is_empty() {
+                        println!("  Blacklist: (empty)");
+                    } else {
+                        let mut items: Vec<_> = ld.blacklist.iter().collect();
+                        items.sort();
+                        println!("  Blacklist: {}", items.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "));
+                    }
+                    if ld.whitelist.is_empty() {
+                        println!("  Whitelist: (empty)");
+                    } else {
+                        let mut items: Vec<_> = ld.whitelist.iter().collect();
+                        items.sort();
+                        println!("  Whitelist: {}", items.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "));
+                    }
+                }
+                LectureCmd::Test { artist } => {
+                    let is_lecture = engine.lecture_detector.is_lecture(&artist);
+                    if is_lecture {
+                        println!("'{}' -> LECTURE", artist);
+                    } else {
+                        println!("'{}' -> MUSIC (not a lecture)", artist);
+                    }
+                }
+            },
             ConfigCmd::Show => {
                 println!("Crossfade: {}s", engine.crossfade_secs);
                 if engine.silence_duration_secs > 0.0 {
@@ -754,6 +947,27 @@ fn main() {
                     Some(path) => println!("Now-playing XML: {}", path),
                     None => println!("Now-playing XML: off"),
                 }
+                println!("Ads configured: {}", engine.ads.len());
+                println!("Ad output: {}", engine.ad_inserter.output_mp3.display());
+                if engine.ad_inserter.station_id_enabled {
+                    println!(
+                        "Station ID: {}",
+                        engine
+                            .ad_inserter
+                            .station_id_file
+                            .as_ref()
+                            .map(|p| p.display().to_string())
+                            .unwrap_or_else(|| "(not set)".into())
+                    );
+                } else {
+                    println!("Station ID: off");
+                }
+                let bl_count = engine.lecture_detector.blacklist.len();
+                let wl_count = engine.lecture_detector.whitelist.len();
+                println!(
+                    "Lecture detector: blacklist={}, whitelist={}",
+                    bl_count, wl_count
+                );
             }
         },
         Commands::Schedule { action } => match action {
@@ -904,6 +1118,139 @@ fn main() {
                 }
             }
         }
+        Commands::Ad { action } => match action {
+            AdCmd::Add {
+                name,
+                file,
+                scheduled,
+                days,
+                hours,
+            } => {
+                if !file.exists() {
+                    eprintln!("Error: file '{}' not found", file.display());
+                    std::process::exit(1);
+                }
+                let parsed_days: Vec<String> = match days {
+                    Some(d) => d.split(',').map(|s| s.trim().to_string()).collect(),
+                    None => vec![],
+                };
+                let parsed_hours: Vec<u8> = match hours {
+                    Some(h) => {
+                        let mut result = Vec::new();
+                        for part in h.split(',') {
+                            match part.trim().parse::<u8>() {
+                                Ok(v) if v <= 23 => result.push(v),
+                                _ => {
+                                    eprintln!("Error: invalid hour '{}'. Use 0-23", part.trim());
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+                        result
+                    }
+                    None => vec![],
+                };
+                let ad = AdConfig {
+                    name: name.clone(),
+                    enabled: true,
+                    mp3_file: file.clone(),
+                    scheduled,
+                    days: parsed_days,
+                    hours: parsed_hours,
+                };
+                let idx = engine.add_ad(ad);
+                engine.save().expect("Failed to save state");
+                println!(
+                    "Added ad #{}: '{}' -> {}",
+                    idx + 1,
+                    name,
+                    file.display()
+                );
+            }
+            AdCmd::List => {
+                if engine.ads.is_empty() {
+                    println!("No ads configured. Use 'ad add' to create one.");
+                    return;
+                }
+                println!(
+                    "{:<4} {:<8} {:<20} {:<30} {:<8} {:<10} {}",
+                    "#", "Status", "Name", "File", "Sched", "Days", "Hours"
+                );
+                println!("{}", "-".repeat(90));
+                for (i, ad) in engine.ads.iter().enumerate() {
+                    let status = if ad.enabled { "on" } else { "off" };
+                    let sched = if ad.scheduled { "yes" } else { "no" };
+                    println!(
+                        "{:<4} {:<8} {:<20} {:<30} {:<8} {:<10} {}",
+                        i + 1,
+                        status,
+                        truncate(&ad.name, 19),
+                        truncate(&ad.mp3_file.display().to_string(), 29),
+                        sched,
+                        truncate(&ad.days_display(), 9),
+                        ad.hours_display()
+                    );
+                }
+            }
+            AdCmd::Remove { num } => {
+                if num == 0 {
+                    eprintln!("Error: ad number must be >= 1");
+                    std::process::exit(1);
+                }
+                match engine.remove_ad(num - 1) {
+                    Ok(ad) => {
+                        engine.save().expect("Failed to save state");
+                        println!("Removed ad #{}: '{}'", num, ad.name);
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+            AdCmd::Toggle { num } => {
+                if num == 0 {
+                    eprintln!("Error: ad number must be >= 1");
+                    std::process::exit(1);
+                }
+                match engine.toggle_ad(num - 1) {
+                    Ok(enabled) => {
+                        engine.save().expect("Failed to save state");
+                        let status = if enabled { "enabled" } else { "disabled" };
+                        println!("Ad #{} {}", num, status);
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+            AdCmd::Show { num } => {
+                if num == 0 {
+                    eprintln!("Error: ad number must be >= 1");
+                    std::process::exit(1);
+                }
+                let idx = num - 1;
+                match engine.ads.get(idx) {
+                    Some(ad) => {
+                        println!("Ad #{}: {}", num, ad.name);
+                        println!("  Enabled:   {}", ad.enabled);
+                        println!("  File:      {}", ad.mp3_file.display());
+                        println!("  Scheduled: {}", ad.scheduled);
+                        println!("  Days:      {}", ad.days_display());
+                        println!("  Hours:     {}", ad.hours_display());
+                    }
+                    None => {
+                        eprintln!(
+                            "Error: ad #{} not found ({} ads total)",
+                            num,
+                            engine.ads.len()
+                        );
+                        std::process::exit(1);
+                    }
+                }
+            }
+        },
         Commands::Playlist { action } => match action {
             PlaylistCmd::Create { name } => {
                 if engine.find_playlist(&name).is_some() {

@@ -1,5 +1,39 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Ad Scheduler Handler
+- Created `src/ad_scheduler.rs` — ad configuration data model, scheduling decision logic, and background handler
+- `AdConfig` struct: name, enabled, mp3_file, scheduled (bool), days (Vec<String>), hours (Vec<u8>)
+- `AdConfig::is_scheduled_for(day, hour)` — schedule matching with day/hour filters
+- `AdConfig::is_valid_now(day, hour)` — checks enabled, file exists, and schedule match
+- `AdInserterSettings` struct: output_mp3 path, station_id_enabled, station_id_file
+- `AdInsertionMode` enum: Scheduled (wait for track boundary) vs Instant (interrupt immediately)
+- `SchedulerDecision` enum: InsertInstant, InsertScheduled, WaitForTrackBoundary, Skip
+- `decide_ad_insertion()` — pure decision function implementing the full lecture check flow (CHECK 0–3)
+  - CHECK 0: Skip if no next track (playlist ended)
+  - CHECK 1: Instant if < 3 min safety margin
+  - CHECK 2: Instant if current track extends past hour
+  - CHECK 3: Lecture-aware boundary detection (scheduled vs instant vs wait)
+- Time calculation helpers: `minutes_remaining_in_hour()`, `seconds_until_next_hour()`, `track_ends_this_hour()`, `minutes_remaining_after_track()`, `is_hour_start()`, `current_day_name()`, `current_hour()`
+- `AdSchedulerHandler` — background thread with hour boundary checks, track change detection (5s poll), dynamic sleep
+- Created `src/lecture_detector.rs` — `LectureDetector` with blacklist > whitelist > starts-with-'R' classification
+- `LectureDetector::is_lecture(artist)` — priority: empty=false, blacklist=false, whitelist=true, starts_with_r=true, else=false
+- `add_blacklist/remove_blacklist/add_whitelist/remove_whitelist` methods for list management
+- Engine: added `ads: Vec<AdConfig>`, `ad_inserter: AdInserterSettings`, `lecture_detector: LectureDetector` fields
+- Engine: added `add_ad()`, `remove_ad()`, `find_ad()`, `toggle_ad()`, `current_track_info()`, `next_track_artist()`, `has_next_track()` methods
+- CLI: `ad add <name> <file> [--scheduled] [--days "Mon,Fri"] [--hours "9,10,14"]` — add ad config
+- CLI: `ad list` — show all ads with status, schedule, and file info
+- CLI: `ad remove <num>` — remove ad by 1-based number
+- CLI: `ad toggle <num>` — enable/disable ad
+- CLI: `ad show <num>` — show ad details
+- CLI: `config ad-inserter output <path>` — set concatenated ad roll output path
+- CLI: `config ad-inserter station-id set <file>` / `off` — configure station ID
+- CLI: `config lecture blacklist-add/blacklist-remove/whitelist-add/whitelist-remove <artist>` — manage lecture lists
+- CLI: `config lecture show` — display blacklist/whitelist contents
+- CLI: `config lecture test <artist>` — test classification result
+- CLI: `config show` — now includes ads count, ad output path, station ID, lecture detector stats
+- CLI: `status` — now shows enabled/total ad counts
+- 171 unit tests passing (+34 new: 10 AdConfig, 2 AdInserterSettings, 4 time calc, 10 decision logic, 1 handler, 9 LectureDetector)
+
 ## 2026-02-08 — Theme / Dark Mode (GUI)
 - Added light theme via `[data-theme="light"]` CSS custom properties alongside existing dark theme
 - Dark theme remains default; light theme uses studio-friendly muted colors (#f0f0f5 bg, #d63050 highlight)
