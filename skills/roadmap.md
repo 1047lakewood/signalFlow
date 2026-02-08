@@ -61,9 +61,11 @@
 
 ## Phase D: Data & Integration
 
-### Track Metadata Editing
+### Track Metadata Editing (DONE)
 - Allow editing track metadata (artist, title, etc.) from within the app
 - Changes persist to the audio file's embedded tags (via lofty)
+- CLI: `track edit <playlist> <track_num> [--artist <val>] [--title <val>]`
+- Uses `Track::write_tags()` → lofty `Accessor::set_artist/set_title` + `TagExt::save_to_path`
 
 ### Now-Playing XML Export
 - Output an XML file with current track info, next track info, and playback state

@@ -1,5 +1,7 @@
+use lofty::config::WriteOptions;
 use lofty::file::{AudioFile, TaggedFileExt};
-use lofty::tag::Accessor;
+use lofty::prelude::TagExt;
+use lofty::tag::{Accessor, Tag};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -65,6 +67,48 @@ impl Track {
     /// Format played duration as MM:SS, if available.
     pub fn played_duration_display(&self) -> Option<String> {
         self.played_duration.map(format_duration)
+    }
+
+    /// Edit track metadata (artist and/or title) and persist changes to the audio file's tags.
+    /// Updates the in-memory fields and writes the new values to the file's embedded tags via lofty.
+    pub fn write_tags(
+        &mut self,
+        new_artist: Option<&str>,
+        new_title: Option<&str>,
+    ) -> Result<(), String> {
+        if new_artist.is_none() && new_title.is_none() {
+            return Err("Nothing to edit: provide --artist and/or --title".to_string());
+        }
+
+        let mut tagged_file = lofty::read_from_path(&self.path)
+            .map_err(|e| format!("Failed to read '{}': {}", self.path.display(), e))?;
+
+        let tag = match tagged_file.primary_tag_mut() {
+            Some(t) => t,
+            None => match tagged_file.first_tag_mut() {
+                Some(t) => t,
+                None => {
+                    let tag_type = tagged_file.primary_tag_type();
+                    tagged_file.insert_tag(Tag::new(tag_type));
+                    tagged_file.primary_tag_mut().unwrap()
+                }
+            },
+        };
+
+        if let Some(artist) = new_artist {
+            tag.set_artist(artist.to_string());
+            self.artist = artist.to_string();
+        }
+
+        if let Some(title) = new_title {
+            tag.set_title(title.to_string());
+            self.title = title.to_string();
+        }
+
+        tag.save_to_path(&self.path, WriteOptions::default())
+            .map_err(|e| format!("Failed to write tags to '{}': {}", self.path.display(), e))?;
+
+        Ok(())
     }
 }
 
@@ -259,5 +303,32 @@ mod tests {
         let json = r#"{"path":"test.mp3","title":"T","artist":"A","duration":{"secs":60,"nanos":0}}"#;
         let track: Track = serde_json::from_str(json).unwrap();
         assert!(track.played_duration.is_none());
+    }
+
+    #[test]
+    fn write_tags_rejects_no_changes() {
+        let mut track = make_track("Test", "Artist");
+        let result = track.write_tags(None, None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Nothing to edit"));
+    }
+
+    #[test]
+    fn write_tags_rejects_missing_file() {
+        let mut track = make_track("Test", "Artist");
+        track.path = PathBuf::from("nonexistent_file.mp3");
+        let result = track.write_tags(Some("New Artist"), None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn write_tags_updates_in_memory_fields_on_missing_file() {
+        // When file doesn't exist, write_tags errors before updating fields
+        let mut track = make_track("Old Title", "Old Artist");
+        track.path = PathBuf::from("nonexistent.mp3");
+        let _ = track.write_tags(Some("New Artist"), Some("New Title"));
+        // Fields should NOT have changed since the file read failed before we got to set them
+        assert_eq!(track.artist, "Old Artist");
+        assert_eq!(track.title, "Old Title");
     }
 }

@@ -146,6 +146,33 @@ impl Engine {
         Ok(insert_pos)
     }
 
+    /// Edit metadata (artist/title) for a track in a playlist. Writes changes to file tags.
+    /// `playlist_name` is case-insensitive. `track_index` is 0-based.
+    pub fn edit_track_metadata(
+        &mut self,
+        playlist_name: &str,
+        track_index: usize,
+        new_artist: Option<&str>,
+        new_title: Option<&str>,
+    ) -> Result<(), String> {
+        let pl = self
+            .find_playlist_mut(playlist_name)
+            .ok_or_else(|| format!("Playlist '{}' not found", playlist_name))?;
+        let track_count = pl.tracks.len();
+        let track = pl
+            .tracks
+            .get_mut(track_index)
+            .ok_or_else(|| {
+                format!(
+                    "Track index {} out of range (playlist '{}' has {} tracks)",
+                    track_index,
+                    playlist_name,
+                    track_count
+                )
+            })?;
+        track.write_tags(new_artist, new_title)
+    }
+
     /// Paste (insert) tracks into a playlist at a position, or append.
     pub fn paste_tracks(
         &mut self,
@@ -436,6 +463,36 @@ mod tests {
         let json = r#"{"playlists":[],"active_playlist_id":null,"next_id":1}"#;
         let engine: Engine = serde_json::from_str(json).unwrap();
         assert_eq!(engine.conflict_policy, ConflictPolicy::ScheduleWins);
+    }
+
+    #[test]
+    fn edit_track_metadata_bad_playlist_errors() {
+        let mut engine = Engine::new();
+        let result = engine.edit_track_metadata("Ghost", 0, Some("Artist"), None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn edit_track_metadata_bad_index_errors() {
+        let mut engine = Engine::new();
+        engine.create_playlist("Main".to_string());
+        let pl = engine.find_playlist_mut("Main").unwrap();
+        pl.tracks.push(make_track("A"));
+        let result = engine.edit_track_metadata("Main", 5, Some("Artist"), None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("out of range"));
+    }
+
+    #[test]
+    fn edit_track_metadata_no_changes_errors() {
+        let mut engine = Engine::new();
+        engine.create_playlist("Main".to_string());
+        let pl = engine.find_playlist_mut("Main").unwrap();
+        pl.tracks.push(make_track("A"));
+        let result = engine.edit_track_metadata("Main", 0, None, None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Nothing to edit"));
     }
 
     #[test]

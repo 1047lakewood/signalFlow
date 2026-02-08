@@ -54,6 +54,11 @@ enum Commands {
         /// Audio file to queue as next track
         file: PathBuf,
     },
+    /// Track operations (metadata editing)
+    Track {
+        #[command(subcommand)]
+        action: TrackCmd,
+    },
     /// Engine configuration
     Config {
         #[command(subcommand)]
@@ -116,6 +121,23 @@ enum PlaylistCmd {
         /// Insert at position in destination (1-based)
         #[arg(long)]
         at: Option<usize>,
+    },
+}
+
+#[derive(Subcommand)]
+enum TrackCmd {
+    /// Edit track metadata (artist, title) and persist to file tags
+    Edit {
+        /// Playlist name
+        playlist: String,
+        /// Track number (1-based)
+        track: usize,
+        /// New artist name
+        #[arg(long)]
+        artist: Option<String>,
+        /// New title
+        #[arg(long)]
+        title: Option<String>,
     },
 }
 
@@ -478,6 +500,43 @@ fn main() {
                 }
             }
         }
+        Commands::Track { action } => match action {
+            TrackCmd::Edit {
+                playlist,
+                track,
+                artist,
+                title,
+            } => {
+                if track == 0 {
+                    eprintln!("Error: track number must be >= 1");
+                    std::process::exit(1);
+                }
+                if artist.is_none() && title.is_none() {
+                    eprintln!("Error: provide --artist and/or --title to edit");
+                    std::process::exit(1);
+                }
+                match engine.edit_track_metadata(
+                    &playlist,
+                    track - 1,
+                    artist.as_deref(),
+                    title.as_deref(),
+                ) {
+                    Ok(()) => {
+                        let pl = engine.find_playlist(&playlist).unwrap();
+                        let t = &pl.tracks[track - 1];
+                        println!(
+                            "Updated track {} in '{}': {} — {}",
+                            track, playlist, t.artist, t.title
+                        );
+                        engine.save().expect("Failed to save state");
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+        },
         Commands::Config { action } => match action {
             ConfigCmd::Crossfade { seconds } => {
                 if seconds < 0.0 {

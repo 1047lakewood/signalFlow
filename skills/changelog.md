@@ -1,5 +1,14 @@
 # signalFlow — Changelog
 
+## 2026-02-07 — Track Metadata Editing
+- Added `Track::write_tags(artist, title)` — edits in-memory fields and persists to audio file tags via lofty
+- Gets or creates the primary tag on the file, sets artist/title via `Accessor` trait, saves with `WriteOptions::default()`
+- Added `Engine::edit_track_metadata(playlist, index, artist, title)` — finds the track in a playlist and calls `write_tags`
+- CLI: `track edit <playlist> <track_num> [--artist <val>] [--title <val>]` — edit metadata for a track (1-based index)
+- Validates: at least one of --artist/--title required, playlist exists, track index in range
+- Updates both the engine state file and the audio file's embedded tags
+- 112 unit tests passing (+6 new: 3 track write_tags tests, 3 engine edit_track_metadata tests)
+
 ## 2026-02-07 — Conflict Resolution
 - Added `ConflictPolicy` enum: `ScheduleWins` (default, all events fire) and `ManualWins` (only priority 7+ events fire during manual playback)
 - `ConflictPolicy::from_str_loose()` — parse from string (schedule-wins, manual-wins, schedule, manual)

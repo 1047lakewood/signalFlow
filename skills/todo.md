@@ -25,7 +25,7 @@
 
 ## Phase D: Data & Integration
 
-- [ ] Track metadata editing — Edit artist, title, etc. and persist to file tags
+- [x] Track metadata editing — Edit artist, title, etc. and persist to file tags
 - [ ] Now-Playing XML export — Output XML with current/next track info and playback state
 
 ## Phase E: GUI (Tauri)
