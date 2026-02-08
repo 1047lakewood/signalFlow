@@ -506,3 +506,179 @@ body {
   height: 100%;
   position: relative;
 }
+
+/* ── Settings panel overlay ──────────────────────────────────────── */
+
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.settings-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 360px;
+  max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-header h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.settings-close:hover {
+  color: var(--highlight);
+}
+
+.settings-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.settings-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-input {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 6px 10px;
+  width: 100px;
+  outline: none;
+}
+
+.settings-input:focus {
+  border-color: var(--highlight);
+}
+
+.settings-select {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 6px 10px;
+  width: 160px;
+  outline: none;
+}
+
+.settings-select:focus {
+  border-color: var(--highlight);
+}
+
+.settings-select:disabled {
+  opacity: 0.5;
+}
+
+.settings-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.settings-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.settings-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.settings-btn:hover {
+  background: var(--bg-row-hover);
+  border-color: var(--text-secondary);
+}
+
+.settings-btn-save {
+  border-color: var(--highlight);
+  color: var(--highlight);
+}
+
+.settings-btn-save:hover {
+  background: rgba(233, 69, 96, 0.15);
+}
+
+.settings-btn-save:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ── Header settings button ──────────────────────────────────────── */
+
+.header-settings-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.header-settings-btn:hover {
+  background: var(--bg-row-hover);
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}

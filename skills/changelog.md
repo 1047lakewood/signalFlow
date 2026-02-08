@@ -1,5 +1,15 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Crossfade Settings Panel (GUI)
+- Created `CrossfadeSettings.tsx` — modal dialog for configuring crossfade duration
+- Numeric input for fade duration (0–30 seconds, step 0.5), loads current value from `get_config` IPC on mount
+- Saves via existing `set_crossfade` IPC command with "Saved!" feedback
+- Curve type selector (dropdown with "Linear" only — backend supports linear only; disabled with "coming soon" hint)
+- Gear icon button (`⚙`) in the header bar opens the settings modal, click-outside or close button dismisses
+- Full dark-theme CSS: overlay backdrop, panel with header/body/footer, input/select/button styles matching existing design
+- Reusable `.settings-*` CSS classes ready for future settings panels (silence detection, auto-intro, etc.)
+- 129 unit tests passing (no new tests — frontend-only changes over existing `set_crossfade` IPC)
+
 ## 2026-02-08 — Recurring Intro Overlay
 - Added `RecurringIntroConfig` struct in `player.rs` with `interval_secs` and `duck_volume` fields
 - `play_playlist()` now accepts `RecurringIntroConfig` parameter; checks elapsed time in both crossfade and sequential wait loops

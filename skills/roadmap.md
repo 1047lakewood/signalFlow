@@ -138,10 +138,11 @@
 - `get_playlist_tracks` IPC dynamically computes `has_intro` from engine's `intros_folder` config
 - `add_track`/`add_tracks` set the flag at insertion; `set_intros_folder` refreshes all tracks
 
-### Crossfade Settings Panel
-- Configure fade duration (seconds)
-- Select crossfade curve type (linear, equal-power, etc.)
-- Preview/test crossfade behavior
+### Crossfade Settings Panel (DONE)
+- Configure fade duration (seconds) via modal dialog with numeric input
+- Curve type selector (Linear only — backend supports linear; dropdown disabled with "coming soon" hint)
+- Gear icon in header bar opens settings modal; loads current value from `get_config`, saves via `set_crossfade`
+- Preview/test crossfade behavior — deferred
 
 ### Silence Detection Settings
 - Configure silence threshold (dB)
@@ -173,6 +174,16 @@
 ### Waveform Display
 - Waveform overview for the currently playing track
 - Playhead position indicator synced to playback
+
+### Settings Config Window
+- Centralized settings dialog (modal or dedicated page) for all engine configuration
+- Sections: Crossfade, Silence Detection, Auto-Intro, Now-Playing Export, Conflict Policy
+- Each section mirrors the existing `set_*` IPC commands with appropriate input controls
+- Folder pickers for paths (intros folder, now-playing XML path)
+- Numeric inputs with validation for durations, thresholds, volumes
+- Dropdowns for enum choices (conflict policy, crossfade curve)
+- Save/cancel with immediate backend persistence via existing IPC commands
+- Accessible from a toolbar gear icon or menu
 
 ### Theme / Dark Mode
 - Dark-first UI design suitable for studio environments

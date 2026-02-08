@@ -40,7 +40,7 @@
 - [x] File browser / Add tracks — Dialog or drag-drop to add audio files to playlist
 - [x] Now-playing display — Current track info, progress bar (no album art)
 - [x] Auto-intro dot indicator — Visual dot on tracks that have a matching intro file
-- [ ] Crossfade settings panel — Configure fade duration and curve type
+- [x] Crossfade settings panel — Configure fade duration and curve type
 - [ ] Silence detection settings — Configure threshold and skip duration
 - [ ] Auto-intro config — Set intros folder path, enable/disable
 - [ ] Track metadata editor — Inline or dialog editing of artist, title, etc.
@@ -48,6 +48,7 @@
 - [ ] Log pane — Playback events and system logs underneath the schedule pane
 - [ ] Level meter — Real-time audio level visualization
 - [ ] Waveform display — Waveform overview for the currently playing track
+- [ ] Settings config window — Centralized settings dialog for all engine configuration (crossfade, silence detection, intros, now-playing, conflict policy)
 - [ ] Theme / dark mode — Dark-first UI with optional light theme
 
 ## Phase F: Future / Long-Term

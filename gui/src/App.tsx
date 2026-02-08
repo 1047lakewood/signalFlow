@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { PlaylistInfo, TrackInfo } from "./types";
 import PlaylistView from "./PlaylistView";
 import TransportBar from "./TransportBar";
+import CrossfadeSettings from "./CrossfadeSettings";
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "ogg", "aac", "m4a"];
 
@@ -14,6 +15,7 @@ function App() {
   const [currentIndex, setCurrentIndex] = useState<number | null>(null);
   const [renamingTab, setRenamingTab] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [showCrossfadeSettings, setShowCrossfadeSettings] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   const loadPlaylists = useCallback(async () => {
@@ -229,6 +231,13 @@ function App() {
             +
           </button>
         </div>
+        <button
+          className="header-settings-btn"
+          onClick={() => setShowCrossfadeSettings(true)}
+          title="Crossfade settings"
+        >
+          {"\u2699"}
+        </button>
       </header>
       <main className="main">
         {selectedPlaylist ? (
@@ -247,6 +256,9 @@ function App() {
         )}
       </main>
       <TransportBar onTrackChange={loadTracks} />
+      {showCrossfadeSettings && (
+        <CrossfadeSettings onClose={() => setShowCrossfadeSettings(false)} />
+      )}
     </div>
   );
 }

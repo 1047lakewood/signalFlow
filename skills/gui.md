@@ -184,6 +184,15 @@ signalFlow/
 - `set_intros_folder` IPC refreshes `has_intro` on all tracks in all playlists when the folder changes
 - Frontend rendering already existed in `PlaylistView.tsx` (line 155) and `styles.css` (`.intro-dot`)
 
+## Crossfade Settings Panel (DONE)
+
+- `CrossfadeSettings.tsx` modal dialog with fade duration input and curve type selector
+- Loads current crossfade value from `get_config` IPC on mount
+- Saves via `set_crossfade` IPC with "Saved!" confirmation feedback
+- Curve type dropdown: "Linear" only (disabled) — backend supports linear crossfading only
+- Gear icon (`⚙`) in header bar opens the modal; click-outside or `×` button to close
+- Reusable `.settings-*` CSS classes for consistent settings panels across features
+
 ## Next Steps
 
-- [ ] Crossfade settings panel
+- [ ] Silence detection settings
