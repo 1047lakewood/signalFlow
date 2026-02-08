@@ -71,15 +71,21 @@ signalflow schedule toggle 2
 - Validates file existence before attempting playback
 - In the current CLI architecture (separate processes), establishes the API that the scheduler monitoring loop will use to truly interrupt in-process playback
 
+## Insert Mode Execution (DONE)
+
+- `Engine::insert_next_track(path)` — creates a Track from the file path and inserts it after `current_index` in the active playlist (position 0 if no current track)
+- CLI: `insert <file>` — inserts a file as the next track in the active playlist
+- Validates file existence before attempting insertion
+- In the current CLI architecture (separate processes), establishes the API that the scheduler monitoring loop will use to queue tracks during live playback
+
 ## Not Yet Built
 
-- Insert mode execution
 - Real-time schedule monitoring loop
 - Conflict resolution logic
 
 ## Tests
 
-22 unit tests (19 scheduler + 1 overlay + 1 stop mode + 1 stop mode rejects missing file):
+25 unit tests (19 scheduler + 1 overlay + 1 stop mode + 1 stop mode rejects missing file + 3 insert mode):
 - 3 time parsing (HH:MM, HH:MM:SS, invalid)
 - 4 mode tests (from_str × 4, display × 3)
 - 2 CRUD (add+find, remove)
@@ -92,3 +98,4 @@ signalflow schedule toggle 2
 - 1 priority ordering
 - 1 defaults from JSON
 - 1 play_stop_mode_rejects_missing_file
+- 3 insert mode (insert at beginning, insert after current, no active playlist)

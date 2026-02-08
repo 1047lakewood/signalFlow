@@ -49,6 +49,11 @@ enum Commands {
         /// Audio file to play after stopping current audio
         file: PathBuf,
     },
+    /// Insert a file as the next track in the active playlist
+    Insert {
+        /// Audio file to queue as next track
+        file: PathBuf,
+    },
     /// Engine configuration
     Config {
         #[command(subcommand)]
@@ -437,6 +442,30 @@ fn main() {
             println!("Interrupt: stopping current audio, playing {}", file.display());
             match player.play_stop_mode(&file) {
                 Ok(()) => println!("Interrupt finished."),
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Commands::Insert { file } => {
+            if !file.exists() {
+                eprintln!("Error: file '{}' not found", file.display());
+                std::process::exit(1);
+            }
+            match engine.insert_next_track(&file) {
+                Ok(pos) => {
+                    let pl = engine.active_playlist().unwrap();
+                    let track = &pl.tracks[pos];
+                    println!(
+                        "Inserted as next track [{}] in '{}': {} — {}",
+                        pos + 1,
+                        pl.name,
+                        track.artist,
+                        track.title
+                    );
+                    engine.save().expect("Failed to save state");
+                }
                 Err(e) => {
                     eprintln!("Error: {}", e);
                     std::process::exit(1);

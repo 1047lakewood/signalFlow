@@ -1,5 +1,12 @@
 # signalFlow — Changelog
 
+## 2026-02-07 — Insert Mode (Queue Next)
+- Added `Engine::insert_next_track(path)` — creates a Track from a file and inserts it after `current_index` in the active playlist (or at position 0 if no current track)
+- CLI: `insert <file>` — inserts an audio file as the next track in the active playlist
+- Validates file exists before attempting insertion
+- Establishes the API for scheduler-driven insert mode when the real-time monitoring loop is built
+- 88 unit tests passing (+3 new: insert_next_track_at_beginning_when_no_current, insert_next_track_after_current_index, insert_next_track_no_active_playlist_errors)
+
 ## 2026-02-07 — Stop Mode (Interrupt)
 - Added `Player::play_stop_mode(path)` — stops the default sink, plays file on a new independent sink, blocks until finished
 - CLI: `interrupt <file>` — stops current audio and plays the specified file (hard break / stop mode)

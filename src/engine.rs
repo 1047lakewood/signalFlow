@@ -126,6 +126,22 @@ impl Engine {
         Ok(tracks)
     }
 
+    /// Insert a track as the next item in the active playlist (after current_index).
+    /// Used by the scheduler's Insert mode to queue a file as the next track.
+    /// Returns the insertion position (0-based) or an error.
+    pub fn insert_next_track(&mut self, path: &std::path::Path) -> Result<usize, String> {
+        let track = crate::track::Track::from_path(path)?;
+        let pl = self
+            .active_playlist_mut()
+            .ok_or_else(|| "No active playlist".to_string())?;
+        let insert_pos = match pl.current_index {
+            Some(i) => i + 1,
+            None => 0,
+        };
+        pl.insert_tracks(vec![track], Some(insert_pos))?;
+        Ok(insert_pos)
+    }
+
     /// Paste (insert) tracks into a playlist at a position, or append.
     pub fn paste_tracks(
         &mut self,
@@ -326,6 +342,52 @@ mod tests {
         assert_eq!(engine.find_playlist("Dest").unwrap().track_count(), 2);
         // Source unchanged
         assert_eq!(engine.find_playlist("Src").unwrap().track_count(), 2);
+    }
+
+    #[test]
+    fn insert_next_track_at_beginning_when_no_current() {
+        let mut engine = Engine::new();
+        engine.create_playlist("Main".to_string());
+        engine.set_active("Main").unwrap();
+        let pl = engine.active_playlist_mut().unwrap();
+        pl.tracks.push(make_track("A"));
+        pl.tracks.push(make_track("B"));
+        // current_index is None, so insert at position 0
+        let pl = engine.active_playlist_mut().unwrap();
+        pl.current_index = None;
+        let tracks_to_insert = vec![make_track("X")];
+        pl.insert_tracks(tracks_to_insert, Some(0)).unwrap();
+        let pl = engine.active_playlist().unwrap();
+        assert_eq!(pl.tracks[0].title, "X");
+        assert_eq!(pl.tracks[1].title, "A");
+        assert_eq!(pl.tracks[2].title, "B");
+    }
+
+    #[test]
+    fn insert_next_track_after_current_index() {
+        let mut engine = Engine::new();
+        engine.create_playlist("Main".to_string());
+        engine.set_active("Main").unwrap();
+        let pl = engine.active_playlist_mut().unwrap();
+        pl.tracks.push(make_track("A"));
+        pl.tracks.push(make_track("B"));
+        pl.tracks.push(make_track("C"));
+        pl.current_index = Some(1); // currently at "B"
+        let tracks_to_insert = vec![make_track("X")];
+        pl.insert_tracks(tracks_to_insert, Some(2)).unwrap();
+        let pl = engine.active_playlist().unwrap();
+        assert_eq!(pl.tracks[0].title, "A");
+        assert_eq!(pl.tracks[1].title, "B");
+        assert_eq!(pl.tracks[2].title, "X");
+        assert_eq!(pl.tracks[3].title, "C");
+    }
+
+    #[test]
+    fn insert_next_track_no_active_playlist_errors() {
+        let mut engine = Engine::new();
+        // No active playlist set
+        let result = engine.active_playlist_mut();
+        assert!(result.is_none());
     }
 
     #[test]
