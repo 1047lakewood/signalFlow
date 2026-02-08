@@ -95,7 +95,18 @@ signalFlow/
 - **ScheduleEventInfo**: id, time, mode, file, priority, enabled, label, days
 - **ConfigResponse**: crossfade_secs, silence_threshold, silence_duration_secs, intros_folder, conflict_policy, now_playing_path
 
+## Main Playlist View (DONE)
+
+- `PlaylistView` component: table with columns #, Status, Artist, Title, Duration
+- Current track highlighted with `--bg-row-current` background and `--highlight` text color
+- Playing indicator (triangle) on current track, intro dot (blue) on tracks with `has_intro`
+- Sticky header, hover highlight, tabular-nums for duration column
+- `types.ts`: TypeScript interfaces matching all IPC response types
+- `App.tsx`: loads playlists via `get_playlists`, auto-selects active playlist, loads tracks via `get_playlist_tracks`
+- Playlist tabs in header for quick switching between playlists (preview for Playlist Tabs feature)
+- Empty state messaging for no playlists and empty playlists
+
 ## Next Steps
 
-- [ ] Main playlist view — track list with columns
+- [ ] Playlist tabs — full tab management (add/close/rename)
 - [ ] Transport controls — Play, Stop, Skip buttons

@@ -1,5 +1,17 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Main Playlist View
+- Created `gui/src/types.ts` — TypeScript interfaces matching all IPC response types (PlaylistInfo, TrackInfo, StatusResponse, ScheduleEventInfo, ConfigResponse)
+- Created `gui/src/PlaylistView.tsx` — track table component with columns: #, Status, Artist, Title, Duration
+- Current track row highlighted with purple background and red accent text, triangle (▶) indicator
+- Intro dot (blue ●) displayed on tracks with `has_intro` flag
+- Sticky table header, hover highlight on rows, tabular-nums for duration column
+- Updated `gui/src/App.tsx` — loads playlists via IPC, auto-selects active playlist, displays track list
+- Playlist tab buttons in header for quick switching (preview for full Playlist Tabs feature)
+- Empty state messaging for no playlists and empty playlists
+- Updated `gui/src/styles.css` — full dark-theme track table styles, playlist tab styles, status indicators
+- 123 unit tests passing (no new tests — frontend-only changes)
+
 ## 2026-02-08 — IPC Bridge
 - Created 20 Tauri IPC commands exposing all core engine functions to the frontend
 - Structured JSON response types: `StatusResponse`, `PlaylistInfo`, `TrackInfo`, `ScheduleEventInfo`, `ConfigResponse`

@@ -1,10 +1,13 @@
 :root {
   --bg-primary: #1a1a2e;
   --bg-secondary: #16213e;
+  --bg-row-hover: #1e2a4a;
+  --bg-row-current: #2a1a3e;
   --text-primary: #e0e0e0;
   --text-secondary: #a0a0a0;
   --accent: #0f3460;
   --highlight: #e94560;
+  --border: #2a2a4a;
 }
 
 * {
@@ -26,28 +29,176 @@ body {
   height: 100vh;
 }
 
+/* ── Header ────────────────────────────────────────────────────────── */
+
 .header {
   background: var(--bg-secondary);
-  padding: 12px 20px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
 .header h1 {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--highlight);
+  white-space: nowrap;
 }
+
+/* ── Playlist tabs ─────────────────────────────────────────────────── */
+
+.playlist-selector {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+}
+
+.playlist-tab {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px 4px 0 0;
+  color: var(--text-secondary);
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.playlist-tab:hover {
+  background: var(--bg-row-hover);
+  color: var(--text-primary);
+}
+
+.playlist-tab.active {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-bottom-color: var(--bg-primary);
+}
+
+.track-count {
+  background: var(--accent);
+  color: var(--text-secondary);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 8px;
+}
+
+/* ── Main content ──────────────────────────────────────────────────── */
 
 .main {
   flex: 1;
-  padding: 20px;
   overflow: auto;
 }
 
-.status {
-  font-family: "Cascadia Code", "Fira Code", monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;
+.no-playlist,
+.playlist-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
   color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* ── Track table ───────────────────────────────────────────────────── */
+
+.playlist-view {
+  height: 100%;
+}
+
+.track-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+}
+
+.track-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.track-table th {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.track-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-row {
+  transition: background 0.1s;
+}
+
+.track-row:hover {
+  background: var(--bg-row-hover);
+}
+
+.track-row.current {
+  background: var(--bg-row-current);
+}
+
+.track-row.current td {
+  color: var(--highlight);
+}
+
+/* ── Column widths ─────────────────────────────────────────────────── */
+
+.col-num {
+  width: 40px;
+  text-align: right;
+  color: var(--text-secondary);
+}
+
+.col-status {
+  width: 36px;
+  text-align: center;
+}
+
+.col-artist {
+  width: 30%;
+}
+
+.col-title {
+  /* Takes remaining space */
+}
+
+.col-duration {
+  width: 70px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+/* ── Status indicators ─────────────────────────────────────────────── */
+
+.playing-indicator {
+  color: var(--highlight);
+  font-size: 10px;
+}
+
+.intro-dot {
+  color: #4fc3f7;
+  font-size: 14px;
+  margin-left: 2px;
 }

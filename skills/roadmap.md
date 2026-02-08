@@ -93,10 +93,14 @@
 - All commands persist state via Engine::save() after mutations
 - Event system for engine → frontend updates (track change, position, levels) — deferred to transport controls
 
-### Main Playlist View
-- Track list table with columns: artist, title, duration, status
-- Highlight currently playing track
-- Right-click context menu for track operations (remove, copy, move)
+### Main Playlist View (DONE)
+- Track list table with columns: #, status, artist, title, duration
+- `PlaylistView` component with sticky header, hover highlight, row selection
+- Current track highlighted (purple background, red text, triangle indicator)
+- Intro dot indicator (blue) on tracks with `has_intro` flag
+- TypeScript types (`types.ts`) matching all IPC response types
+- Auto-loads active playlist on mount, playlist tab switching in header
+- Right-click context menu for track operations — deferred to later
 
 ### Playlist Tabs
 - Tabbed interface for multiple playlists
