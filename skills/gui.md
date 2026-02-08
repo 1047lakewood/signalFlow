@@ -226,6 +226,25 @@ signalFlow/
 - `.editable-cell` and `.cell-edit-input` CSS classes for edit styling
 - Uses existing `edit_track_metadata` IPC (playlist, trackIndex, artist?, title?)
 
+## Schedule Side Pane (DONE)
+
+- `SchedulePane.tsx` component: collapsible side panel on the right side of the main content area
+- Clock icon button (⏰) in header toggles visibility, highlighted when active
+- Main layout refactored: `.main-content` flexbox wrapper with `.playlist-area` (flex: 1) + `.schedule-pane` (320px fixed)
+- Event list displays all scheduled events sorted by time via `get_schedule` IPC
+- Each event shows: time (bold), mode badge (colored: overlay=blue, stop=red, insert=green), label or filename, priority, days
+- Per-event actions: ON/OFF toggle (`toggle_schedule_event` IPC), remove button (`remove_schedule_event` IPC)
+- Disabled events shown at 50% opacity
+- Inline add form (toggled by "+" button) with fields:
+  - Time (text input, HH:MM or HH:MM:SS)
+  - Mode (select: Overlay, Stop, Insert)
+  - Audio file (read-only path + Browse button via native file dialog)
+  - Priority (number input, 1–9)
+  - Label (optional text input)
+  - Days (toggle buttons for Mon–Sun, empty = daily)
+- Add form calls `add_schedule_event` IPC with validation
+- Error display for failed adds
+
 ## Next Steps
 
-- [ ] Schedule side pane
+- [ ] Log pane

@@ -800,3 +800,316 @@ body {
   outline: none;
   font-family: inherit;
 }
+
+/* ── Main content layout ─────────────────────────────────────────── */
+
+.main-content {
+  display: flex;
+  height: 100%;
+}
+
+.playlist-area {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  height: 100%;
+}
+
+/* ── Header schedule button ──────────────────────────────────────── */
+
+.header-schedule-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.header-schedule-btn:hover {
+  background: var(--bg-row-hover);
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+.header-schedule-btn.active {
+  background: var(--accent);
+  color: var(--text-primary);
+  border-color: var(--highlight);
+}
+
+/* ── Schedule side pane ──────────────────────────────────────────── */
+
+.schedule-pane {
+  width: 320px;
+  min-width: 280px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.schedule-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.schedule-pane-header h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.schedule-pane-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.schedule-add-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 16px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+
+.schedule-add-btn:hover {
+  background: var(--bg-row-hover);
+  color: var(--text-primary);
+}
+
+/* ── Schedule add form ───────────────────────────────────────────── */
+
+.schedule-add-form {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--bg-primary);
+}
+
+.schedule-mode-select {
+  width: 120px;
+}
+
+.schedule-label-input {
+  width: 100%;
+}
+
+.schedule-days-row {
+  display: flex;
+  gap: 2px;
+}
+
+.schedule-day-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  padding: 3px 5px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.schedule-day-btn:hover {
+  background: var(--bg-row-hover);
+  color: var(--text-primary);
+}
+
+.schedule-day-btn.active {
+  background: var(--accent);
+  color: var(--text-primary);
+  border-color: var(--highlight);
+}
+
+.schedule-error {
+  font-size: 11px;
+  color: #f44336;
+}
+
+.schedule-add-form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* ── Schedule event list ─────────────────────────────────────────── */
+
+.schedule-event-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.schedule-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.schedule-event {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: background 0.1s;
+}
+
+.schedule-event:hover {
+  background: var(--bg-row-hover);
+}
+
+.schedule-event.disabled {
+  opacity: 0.5;
+}
+
+.schedule-event-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.schedule-event-time {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.schedule-event-mode {
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.sched-mode-overlay {
+  background: rgba(79, 195, 247, 0.15);
+  color: #4fc3f7;
+}
+
+.sched-mode-stop {
+  background: rgba(244, 67, 54, 0.15);
+  color: #f44336;
+}
+
+.sched-mode-insert {
+  background: rgba(76, 175, 80, 0.15);
+  color: #4caf50;
+}
+
+.schedule-event-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.schedule-event-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 0;
+}
+
+.schedule-event-priority {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.schedule-event-days {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.schedule-event-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  margin-top: -20px;
+  align-self: flex-end;
+}
+
+.schedule-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.schedule-toggle-btn.on {
+  color: #4caf50;
+  border-color: #4caf50;
+}
+
+.schedule-toggle-btn.on:hover {
+  background: rgba(76, 175, 80, 0.15);
+}
+
+.schedule-toggle-btn.off {
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+.schedule-toggle-btn.off:hover {
+  background: var(--bg-row-hover);
+  color: var(--text-primary);
+}
+
+.schedule-remove-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.schedule-remove-btn:hover {
+  background: rgba(244, 67, 54, 0.15);
+  color: #f44336;
+  border-color: #f44336;
+}

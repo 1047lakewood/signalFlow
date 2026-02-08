@@ -1,5 +1,19 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Schedule Side Pane (GUI)
+- Created `SchedulePane.tsx` — collapsible side panel displaying all scheduled events
+- Events listed by time with colored mode badges (overlay=blue, stop=red, insert=green), priority, days, and label/filename
+- ON/OFF toggle button per event calls `toggle_schedule_event` IPC
+- Remove button (×) per event calls `remove_schedule_event` IPC
+- "+" button opens inline add form with: time input, mode selector, file browser (native dialog), priority (1–9), optional label, day-of-week toggle buttons
+- Add form validates required fields (time, file) and calls `add_schedule_event` IPC
+- Clock icon (⏰) in header bar toggles the schedule pane open/closed, highlighted when active
+- Main content layout refactored to flexbox with `.main-content` wrapper for side-by-side playlist + schedule
+- `.playlist-area` takes remaining space, `.schedule-pane` fixed at 320px width
+- Disabled events shown at 50% opacity
+- Full dark-theme CSS matching existing design: event hover, mode color coding, day toggle buttons
+- 129 unit tests passing (no new tests — frontend-only changes over existing IPC commands)
+
 ## 2026-02-08 — Track Metadata Editor (GUI)
 - Double-click Artist or Title cell in playlist view to inline edit
 - Input field replaces cell text with current value pre-selected, highlight border

@@ -7,6 +7,7 @@ import TransportBar from "./TransportBar";
 import CrossfadeSettings from "./CrossfadeSettings";
 import SilenceSettings from "./SilenceSettings";
 import IntroSettings from "./IntroSettings";
+import SchedulePane from "./SchedulePane";
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "ogg", "aac", "m4a"];
 
@@ -21,6 +22,7 @@ function App() {
   const [showSilenceSettings, setShowSilenceSettings] = useState(false);
   const [showIntroSettings, setShowIntroSettings] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showSchedulePane, setShowSchedulePane] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
@@ -248,6 +250,13 @@ function App() {
             +
           </button>
         </div>
+        <button
+            className={`header-schedule-btn ${showSchedulePane ? "active" : ""}`}
+            onClick={() => setShowSchedulePane((v) => !v)}
+            title="Toggle schedule"
+          >
+            {"\u23F0"}
+          </button>
         <div className="settings-menu-wrapper" ref={settingsMenuRef}>
           <button
             className="header-settings-btn"
@@ -272,21 +281,28 @@ function App() {
         </div>
       </header>
       <main className="main">
-        {selectedPlaylist ? (
-          <PlaylistView
-            tracks={tracks}
-            currentIndex={currentIndex}
-            playlistName={selectedPlaylist}
-            onReorder={handleReorder}
-            onAddFiles={handleAddFiles}
-            onFileDrop={handleFileDrop}
-            onTracksChanged={loadTracks}
-          />
-        ) : (
-          <div className="no-playlist">
-            <p>No playlists available</p>
+        <div className={`main-content ${showSchedulePane ? "with-schedule" : ""}`}>
+          <div className="playlist-area">
+            {selectedPlaylist ? (
+              <PlaylistView
+                tracks={tracks}
+                currentIndex={currentIndex}
+                playlistName={selectedPlaylist}
+                onReorder={handleReorder}
+                onAddFiles={handleAddFiles}
+                onFileDrop={handleFileDrop}
+                onTracksChanged={loadTracks}
+              />
+            ) : (
+              <div className="no-playlist">
+                <p>No playlists available</p>
+              </div>
+            )}
           </div>
-        )}
+          {showSchedulePane && (
+            <SchedulePane onClose={() => setShowSchedulePane(false)} />
+          )}
+        </div>
       </main>
       <TransportBar onTrackChange={loadTracks} />
       {showCrossfadeSettings && (
