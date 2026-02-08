@@ -47,14 +47,14 @@
 - [x] Schedule side pane — Editable schedule list in a side panel
 - [x] Log pane — Playback events and system logs underneath the schedule pane
 - [x] Level meter — Real-time audio level visualization
-- [ ] Waveform display — Waveform overview for the currently playing track
+- [x] Waveform display — Waveform overview for the currently playing track
 - [ ] Settings config window — Centralized settings dialog for all engine configuration (crossfade, silence detection, intros, now-playing, conflict policy)
 - [ ] Theme / dark mode — Dark-first UI with optional light theme
 
 ## Phase F: Ad Inserter / Scheduler System
 
 - [ ] Ad scheduler handler — Intelligent hourly ad scheduling with lecture detection and track boundary awareness
-- [ ] Ad inserter service — MP3 concatenation, RadioBoss URL triggering, XML polling confirmation
+- [ ] Ad inserter service — Internal MP3 concatenation via rodio, queue-based insertion into active playlist
 - [ ] Ad play logger — JSON play statistics (per-ad, per-date, per-hour), failure tracking
 - [ ] Ad report generator — CSV and PDF verified-play reports with hourly/daily breakdowns
 - [ ] Ad config UI — Modal editor for ad CRUD, enable/disable, MP3 file picker, day/hour scheduling
@@ -64,7 +64,6 @@
 
 - [ ] RDS message rotation handler — TCP socket protocol (DPSTEXT commands), keepalive resends, configurable rotation timing
 - [ ] RDS message filtering — Enable/disable, lecture detection, placeholder support ({artist}, {title}), day/hour scheduling
-- [ ] Now-playing reader for RDS — XML reader with retry logic, artist polling, file change detection
 - [ ] Lecture detector — Track classification (blacklist > whitelist > starts-with-R), current/next track analysis
 - [ ] RDS config UI — Modal message editor with 64-char limit, duration, day/hour scheduling, live treeview
 

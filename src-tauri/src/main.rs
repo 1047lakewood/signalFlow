@@ -189,6 +189,7 @@ struct TransportState {
     track_title: Option<String>,
     next_artist: Option<String>,
     next_title: Option<String>,
+    track_path: Option<String>,
 }
 
 // ── Status ──────────────────────────────────────────────────────────────────
@@ -622,25 +623,25 @@ fn transport_status(state: State<AppState>) -> TransportState {
     };
 
     let elapsed = pb.elapsed();
-    let (artist, title, next_artist, next_title) = if let (Some(idx), Some(pl_name)) = (pb.track_index, &pb.playlist_name) {
+    let (artist, title, next_artist, next_title, track_path) = if let (Some(idx), Some(pl_name)) = (pb.track_index, &pb.playlist_name) {
         let engine = state.engine.lock().unwrap();
         if let Some(pl) = engine.find_playlist(pl_name) {
             let current = if let Some(track) = pl.tracks.get(idx) {
-                (Some(track.artist.clone()), Some(track.title.clone()))
+                (Some(track.artist.clone()), Some(track.title.clone()), Some(track.path.to_string_lossy().to_string()))
             } else {
-                (None, None)
+                (None, None, None)
             };
             let next = if let Some(next_track) = pl.tracks.get(idx + 1) {
                 (Some(next_track.artist.clone()), Some(next_track.title.clone()))
             } else {
                 (None, None)
             };
-            (current.0, current.1, next.0, next.1)
+            (current.0, current.1, next.0, next.1, current.2)
         } else {
-            (None, None, None, None)
+            (None, None, None, None, None)
         }
     } else {
-        (None, None, None, None)
+        (None, None, None, None, None)
     };
 
     TransportState {
@@ -653,6 +654,7 @@ fn transport_status(state: State<AppState>) -> TransportState {
         track_title: title,
         next_artist,
         next_title,
+        track_path,
     }
 }
 
@@ -661,6 +663,13 @@ fn transport_status(state: State<AppState>) -> TransportState {
 #[tauri::command]
 fn get_audio_level(state: State<AppState>) -> f32 {
     state.level_monitor.level()
+}
+
+// ── Waveform ────────────────────────────────────────────────────────────────
+
+#[tauri::command]
+fn get_waveform(path: String) -> Result<Vec<f32>, String> {
+    signal_flow::waveform::generate_peaks_default(std::path::Path::new(&path))
 }
 
 // ── Schedule ────────────────────────────────────────────────────────────────
@@ -875,6 +884,7 @@ fn main() {
             transport_seek,
             transport_status,
             get_audio_level,
+            get_waveform,
             // Schedule
             get_schedule,
             add_schedule_event,

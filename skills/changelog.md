@@ -1,5 +1,22 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Waveform Display (GUI)
+- Created `src/waveform.rs` — `generate_peaks(path, num_peaks)` and `generate_peaks_default(path)` functions
+- Decodes audio file via rodio, collects all samples, computes max absolute amplitude per time bucket
+- Normalizes peaks so loudest bucket = 1.0, returns `Vec<f32>` of 200 values (configurable)
+- Added `get_waveform` IPC command in Tauri backend — takes file path, returns peak data
+- Extended `TransportState` with `track_path: Option<String>` field (Rust + TypeScript) for waveform loading
+- Created `WaveformDisplay.tsx` — canvas-based waveform visualization in transport bar
+- Canvas renders mirrored bars (top/bottom of center line) with played portion in highlight red, unplayed in dark gray
+- Playhead rendered as white vertical line synced to elapsed/duration ratio
+- Click-to-seek on the waveform replaces the old range slider for seeking
+- Waveform data fetched once per track change (cached until track path changes)
+- DPI-aware canvas rendering via `devicePixelRatio` scaling
+- CLI: `waveform <file> [-p peaks]` — generates ASCII waveform visualization (every 10th peak printed)
+- CSS: `.waveform-display` (flex: 1, 36px height, rounded, clickable), `.waveform-canvas`
+- Removed old seek slider HTML and associated `isSeeking`/`seekValue` state from `TransportBar`
+- 137 unit tests passing (+2 new: generate_peaks_rejects_missing_file, default_peaks_count)
+
 ## 2026-02-08 — Level Meter (GUI)
 - Created `src/level_monitor.rs` — `LevelMonitor` (shared `Arc<AtomicU32>` storing f32 RMS as bits) and `LevelSource<S>` source wrapper
 - `LevelSource` computes RMS over ~50ms windows, updates `LevelMonitor` atomically from the audio thread

@@ -171,9 +171,13 @@
 - Real-time audio level visualization (VU or peak meter)
 - Stereo L/R display
 
-### Waveform Display
-- Waveform overview for the currently playing track
-- Playhead position indicator synced to playback
+### Waveform Display (DONE)
+- Waveform overview for the currently playing track via canvas-based rendering
+- Playhead position indicator synced to playback (white vertical line)
+- Core: `src/waveform.rs` — `generate_peaks(path, num_peaks)` decodes audio and downsamples to peak amplitudes
+- IPC: `get_waveform(path)` returns `Vec<f32>` of 200 normalized peaks
+- GUI: `WaveformDisplay.tsx` — replaces seek slider, supports click-to-seek
+- CLI: `waveform <file> [-p peaks]` for ASCII visualization
 
 ### Settings Config Window
 - Centralized settings dialog (modal or dedicated page) for all engine configuration
@@ -197,7 +201,7 @@
 
 ### Ad Inserter / Scheduler System
 - **AdSchedulerHandler**: Intelligent hourly ad scheduling with lecture detection, track boundary awareness, and safety-margin fallbacks
-- **AdInserterService**: MP3 concatenation (pydub-style), RadioBoss URL triggering (schedule + instant modes), XML polling confirmation
+- **AdInserterService**: Internal MP3 concatenation via rodio, queue-based insertion into active playlist, playback confirmation via engine state
 - **AdPlayLogger**: Compact JSON play statistics (per-ad, per-date, per-hour), failure tracking (last 50), date-filtered queries
 - **AdReportGenerator**: CSV and PDF verified-play reports with hourly/daily breakdowns, multi-ad matrix reports
 - **Ad Config UI**: Modal editor for ad CRUD, enable/disable, MP3 file picker, day/hour scheduling, station ID prepend option
@@ -207,9 +211,8 @@
 ### RDS Engine (Radio Data System)
 - **AutoRDSHandler**: RDS message rotation engine with TCP socket protocol (DPSTEXT commands), keepalive resends, configurable rotation timing
 - **Message filtering**: Enable/disable, lecture detection (whitelist > blacklist > starts-with-R rule), placeholder availability ({artist}, {title}), day/hour scheduling
-- **NowPlayingReader**: Robust XML reader with anti-caching (open+read+fromstring), retry logic, artist polling (wait_for_artist), file change detection
-- **LectureDetector**: Track classification (blacklist > whitelist > starts-with-R), current/next track analysis, shared cross-station lists
-- **RDS Config UI**: Modal message editor with 64-char limit, duration (1-60s), day/hour scheduling, live treeview updates, per-station state
+- **LectureDetector**: Track classification (blacklist > whitelist > starts-with-R), current/next track analysis via internal engine state
+- **RDS Config UI**: Modal message editor with 64-char limit, duration (1-60s), day/hour scheduling, live treeview updates
 - Reference spec: `skills/specs/rds-engine-spec.md`
 
 ### Advanced Auto Playlist Builder

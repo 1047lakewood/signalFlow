@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { TransportState } from "./types";
 import LevelMeter from "./LevelMeter";
+import WaveformDisplay from "./WaveformDisplay";
 
 function formatTime(secs: number): string {
   const m = Math.floor(secs / 60);
@@ -24,9 +25,8 @@ function TransportBar({ onTrackChange }: TransportBarProps) {
     track_title: null,
     next_artist: null,
     next_title: null,
+    track_path: null,
   });
-  const [isSeeking, setIsSeeking] = useState(false);
-  const [seekValue, setSeekValue] = useState(0);
   const pollRef = useRef<number | null>(null);
 
   const pollStatus = useCallback(async () => {
@@ -88,28 +88,17 @@ function TransportBar({ onTrackChange }: TransportBarProps) {
     }
   };
 
-  const handleSeekStart = () => {
-    setIsSeeking(true);
-    setSeekValue(state.elapsed_secs);
-  };
-
-  const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSeekValue(parseFloat(e.target.value));
-  };
-
-  const handleSeekEnd = async () => {
-    setIsSeeking(false);
+  const handleWaveformSeek = useCallback(async (positionSecs: number) => {
     try {
-      await invoke("transport_seek", { positionSecs: seekValue });
+      await invoke("transport_seek", { positionSecs });
       pollStatus();
     } catch (e) {
       console.error("transport_seek error:", e);
     }
-  };
+  }, [pollStatus]);
 
-  const elapsed = isSeeking ? seekValue : state.elapsed_secs;
+  const elapsed = state.elapsed_secs;
   const remaining = Math.max(0, state.duration_secs - elapsed);
-  const progress = state.duration_secs > 0 ? (elapsed / state.duration_secs) * 100 : 0;
   const hasTrack = state.track_artist || state.track_title;
 
   return (
@@ -145,22 +134,15 @@ function TransportBar({ onTrackChange }: TransportBarProps) {
         </button>
       </div>
 
-      {/* Seek / progress */}
+      {/* Seek / progress with waveform */}
       <div className="transport-seek">
         <span className="transport-time">{formatTime(elapsed)}</span>
-        <input
-          type="range"
-          className="transport-slider"
-          min={0}
-          max={state.duration_secs || 1}
-          step={0.1}
-          value={isSeeking ? seekValue : state.elapsed_secs}
-          onChange={handleSeekChange}
-          onMouseDown={handleSeekStart}
-          onMouseUp={handleSeekEnd}
-          onTouchStart={handleSeekStart}
-          onTouchEnd={handleSeekEnd}
-          style={{ "--progress": `${progress}%` } as React.CSSProperties}
+        <WaveformDisplay
+          trackPath={state.track_path}
+          elapsed={elapsed}
+          duration={state.duration_secs}
+          isPlaying={state.is_playing && !state.is_paused}
+          onSeek={handleWaveformSeek}
         />
         <span className="transport-time">-{formatTime(remaining)}</span>
       </div>

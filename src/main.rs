@@ -75,6 +75,14 @@ enum Commands {
         #[command(subcommand)]
         action: ScheduleCmd,
     },
+    /// Generate waveform peaks for an audio file
+    Waveform {
+        /// Audio file path
+        file: PathBuf,
+        /// Number of peaks to generate (default 200)
+        #[arg(short, long, default_value = "200")]
+        peaks: usize,
+    },
 }
 
 #[derive(Subcommand)]
@@ -876,6 +884,26 @@ fn main() {
                 }
             }
         },
+        Commands::Waveform { file, peaks } => {
+            match signal_flow::waveform::generate_peaks(&file, peaks) {
+                Ok(data) => {
+                    println!("Waveform ({} peaks) for '{}':", data.len(), file.display());
+                    // Print a simple ASCII visualization
+                    let max_bar = 40;
+                    for (i, &val) in data.iter().enumerate() {
+                        let bar_len = (val * max_bar as f32) as usize;
+                        let bar: String = "#".repeat(bar_len);
+                        if i % 10 == 0 {
+                            println!("{:>4} |{:<40} {:.2}", i, bar, val);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
         Commands::Playlist { action } => match action {
             PlaylistCmd::Create { name } => {
                 if engine.find_playlist(&name).is_some() {

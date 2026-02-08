@@ -12,3 +12,4 @@ pub mod playlist;
 pub mod scheduler;
 pub mod silence;
 pub mod track;
+pub mod waveform;

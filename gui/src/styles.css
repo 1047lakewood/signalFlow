@@ -433,6 +433,25 @@ body {
   transform: scale(1.3);
 }
 
+/* ── Waveform display ────────────────────────────────────────────── */
+
+.waveform-display {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  cursor: pointer;
+  border-radius: 4px;
+  background: var(--bg-primary);
+  overflow: hidden;
+  position: relative;
+}
+
+.waveform-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 /* ── Level meter ──────────────────────────────────────────────────── */
 
 .level-meter {
