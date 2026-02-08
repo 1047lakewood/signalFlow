@@ -57,4 +57,6 @@ export interface TransportState {
   track_index: number | null;
   track_artist: string | null;
   track_title: string | null;
+  next_artist: string | null;
+  next_title: string | null;
 }

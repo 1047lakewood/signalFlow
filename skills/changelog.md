@@ -1,5 +1,15 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Now-Playing Display (GUI)
+- Enhanced `TransportBar` into a full now-playing display with separate title (bold, 13px) and artist (11px, secondary color) lines
+- Added "Next up" panel showing the upcoming track's artist and title
+- Extended `TransportState` with `next_artist` and `next_title` fields (Rust backend + TypeScript interface)
+- `transport_status` IPC now fetches next track info from the playlist (current index + 1)
+- Empty states: "No track loaded" when idle, dash when no next track
+- New CSS classes: `.now-playing-panel`, `.now-playing-title`, `.now-playing-artist`, `.now-playing-next`, `.next-label`, `.next-track`
+- No album art per user specification
+- 123 unit tests passing (no new tests — frontend-only display changes + thin IPC field addition)
+
 ## 2026-02-08 — File Browser / Add Tracks (GUI)
 - Added `@tauri-apps/plugin-dialog` (JS) and `tauri-plugin-dialog` (Rust) for native file picker
 - Dialog plugin registered in Tauri builder, `dialog:default` + `dialog:allow-open` capabilities added

@@ -144,6 +144,8 @@ struct TransportState {
     track_index: Option<usize>,
     track_artist: Option<String>,
     track_title: Option<String>,
+    next_artist: Option<String>,
+    next_title: Option<String>,
 }
 
 // ── Status ──────────────────────────────────────────────────────────────────
@@ -537,19 +539,25 @@ fn transport_status(state: State<AppState>) -> TransportState {
     };
 
     let elapsed = pb.elapsed();
-    let (artist, title) = if let (Some(idx), Some(pl_name)) = (pb.track_index, &pb.playlist_name) {
+    let (artist, title, next_artist, next_title) = if let (Some(idx), Some(pl_name)) = (pb.track_index, &pb.playlist_name) {
         let engine = state.engine.lock().unwrap();
         if let Some(pl) = engine.find_playlist(pl_name) {
-            if let Some(track) = pl.tracks.get(idx) {
+            let current = if let Some(track) = pl.tracks.get(idx) {
                 (Some(track.artist.clone()), Some(track.title.clone()))
             } else {
                 (None, None)
-            }
+            };
+            let next = if let Some(next_track) = pl.tracks.get(idx + 1) {
+                (Some(next_track.artist.clone()), Some(next_track.title.clone()))
+            } else {
+                (None, None)
+            };
+            (current.0, current.1, next.0, next.1)
         } else {
-            (None, None)
+            (None, None, None, None)
         }
     } else {
-        (None, None)
+        (None, None, None, None)
     };
 
     TransportState {
@@ -560,6 +568,8 @@ fn transport_status(state: State<AppState>) -> TransportState {
         track_index: pb.track_index,
         track_artist: artist,
         track_title: title,
+        next_artist,
+        next_title,
     }
 }
 

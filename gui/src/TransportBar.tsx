@@ -21,6 +21,8 @@ function TransportBar({ onTrackChange }: TransportBarProps) {
     track_index: null,
     track_artist: null,
     track_title: null,
+    next_artist: null,
+    next_title: null,
   });
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekValue, setSeekValue] = useState(0);
@@ -107,20 +109,23 @@ function TransportBar({ onTrackChange }: TransportBarProps) {
   const elapsed = isSeeking ? seekValue : state.elapsed_secs;
   const remaining = Math.max(0, state.duration_secs - elapsed);
   const progress = state.duration_secs > 0 ? (elapsed / state.duration_secs) * 100 : 0;
+  const hasTrack = state.track_artist || state.track_title;
 
   return (
     <div className="transport-bar">
-      <div className="transport-track-info">
-        {state.track_artist && state.track_title ? (
-          <span className="transport-track-name">
-            {state.track_artist} — {state.track_title}
-          </span>
+      {/* Now-playing info panel */}
+      <div className="now-playing-panel">
+        {hasTrack ? (
+          <>
+            <span className="now-playing-title">{state.track_title ?? "Unknown"}</span>
+            <span className="now-playing-artist">{state.track_artist ?? "Unknown"}</span>
+          </>
         ) : (
-          <span className="transport-track-name transport-no-track">
-            No track loaded
-          </span>
+          <span className="now-playing-empty">No track loaded</span>
         )}
       </div>
+
+      {/* Controls */}
       <div className="transport-controls">
         {state.is_playing && !state.is_paused ? (
           <button className="transport-btn" onClick={handlePause} title="Pause">
@@ -138,6 +143,8 @@ function TransportBar({ onTrackChange }: TransportBarProps) {
           {"\u23ED"}
         </button>
       </div>
+
+      {/* Seek / progress */}
       <div className="transport-seek">
         <span className="transport-time">{formatTime(elapsed)}</span>
         <input
@@ -155,6 +162,18 @@ function TransportBar({ onTrackChange }: TransportBarProps) {
           style={{ "--progress": `${progress}%` } as React.CSSProperties}
         />
         <span className="transport-time">-{formatTime(remaining)}</span>
+      </div>
+
+      {/* Next up */}
+      <div className="now-playing-next">
+        {state.next_artist || state.next_title ? (
+          <>
+            <span className="next-label">Next</span>
+            <span className="next-track">{state.next_artist ?? "Unknown"} — {state.next_title ?? "Unknown"}</span>
+          </>
+        ) : (
+          <span className="next-label next-empty">—</span>
+        )}
       </div>
     </div>
   );
