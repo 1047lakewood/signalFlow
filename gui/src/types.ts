@@ -67,6 +67,27 @@ export interface LogEntry {
   message: string;
 }
 
+export interface AdStatsResponse {
+  total_plays: number;
+  per_ad: AdStatEntry[];
+}
+
+export interface AdStatEntry {
+  name: string;
+  play_count: number;
+}
+
+export interface AdDailyCount {
+  date: string;
+  count: number;
+}
+
+export interface AdFailure {
+  timestamp: string;
+  ads: string[];
+  error: string;
+}
+
 export interface TransportState {
   is_playing: boolean;
   is_paused: boolean;

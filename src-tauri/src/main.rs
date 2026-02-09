@@ -926,6 +926,106 @@ fn reorder_ad(state: State<AppState>, from: usize, to: usize) -> Result<(), Stri
     Ok(())
 }
 
+// ── Ad Statistics & Reports ──────────────────────────────────────────────────
+
+#[derive(Serialize)]
+struct AdStatsResponse {
+    total_plays: usize,
+    per_ad: Vec<AdStatEntryResponse>,
+}
+
+#[derive(Serialize)]
+struct AdStatEntryResponse {
+    name: String,
+    play_count: usize,
+}
+
+#[derive(Serialize)]
+struct AdDailyCountResponse {
+    date: String,
+    count: usize,
+}
+
+#[derive(Serialize)]
+struct AdFailureResponse {
+    timestamp: String,
+    ads: Vec<String>,
+    error: String,
+}
+
+#[tauri::command]
+fn get_ad_stats(start: Option<String>, end: Option<String>) -> AdStatsResponse {
+    let logger = signal_flow::ad_logger::AdPlayLogger::new(std::path::Path::new("."));
+    let stats = match (start, end) {
+        (Some(s), Some(e)) => logger.get_ad_statistics_filtered(&s, &e),
+        _ => logger.get_ad_statistics(),
+    };
+    AdStatsResponse {
+        total_plays: stats.total_plays,
+        per_ad: stats.per_ad.into_iter().map(|e| AdStatEntryResponse {
+            name: e.name,
+            play_count: e.play_count,
+        }).collect(),
+    }
+}
+
+#[tauri::command]
+fn get_ad_daily_counts(ad_name: String) -> Vec<AdDailyCountResponse> {
+    let logger = signal_flow::ad_logger::AdPlayLogger::new(std::path::Path::new("."));
+    let counts = logger.get_daily_play_counts(&ad_name);
+    let mut entries: Vec<AdDailyCountResponse> = counts.into_iter()
+        .map(|(date, count)| AdDailyCountResponse { date, count })
+        .collect();
+    entries.sort_by(|a, b| a.date.cmp(&b.date));
+    entries
+}
+
+#[tauri::command]
+fn get_ad_failures() -> Vec<AdFailureResponse> {
+    let logger = signal_flow::ad_logger::AdPlayLogger::new(std::path::Path::new("."));
+    logger.get_failures().into_iter().map(|f| AdFailureResponse {
+        timestamp: f.t,
+        ads: f.ads,
+        error: f.err,
+    }).collect()
+}
+
+#[tauri::command]
+fn generate_ad_report(
+    start: String,
+    end: String,
+    output_dir: String,
+    ad_name: Option<String>,
+    company_name: Option<String>,
+) -> Result<Vec<String>, String> {
+    let logger = signal_flow::ad_logger::AdPlayLogger::new(std::path::Path::new("."));
+    let reporter = signal_flow::ad_report::AdReportGenerator::new(&logger);
+    let out_path = std::path::Path::new(&output_dir);
+
+    if !out_path.is_dir() {
+        return Err(format!("'{}' is not a valid directory", output_dir));
+    }
+
+    match ad_name {
+        Some(name) => {
+            match reporter.generate_single_report(&name, &start, &end, company_name.as_deref(), out_path) {
+                Some(r) => Ok(vec![
+                    r.csv_path.to_string_lossy().to_string(),
+                    r.pdf_path.to_string_lossy().to_string(),
+                ]),
+                None => Ok(vec![]),
+            }
+        }
+        None => {
+            let results = reporter.generate_report(&start, &end, company_name.as_deref(), out_path);
+            Ok(results.into_iter().flat_map(|r| vec![
+                r.csv_path.to_string_lossy().to_string(),
+                r.pdf_path.to_string_lossy().to_string(),
+            ]).collect())
+        }
+    }
+}
+
 // ── Logs ────────────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -993,6 +1093,11 @@ fn main() {
             toggle_ad,
             update_ad,
             reorder_ad,
+            // Ad Statistics & Reports
+            get_ad_stats,
+            get_ad_daily_counts,
+            get_ad_failures,
+            generate_ad_report,
             // Logs
             get_logs,
             clear_logs,

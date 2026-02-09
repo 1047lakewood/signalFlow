@@ -1,5 +1,19 @@
 # signalFlow — Changelog
 
+## 2026-02-09 — Ad Statistics UI (GUI)
+- Created `AdStatsWindow.tsx` — modal dialog for viewing ad play statistics, failures, and generating reports
+- Two tabs: "Play Stats" and "Failures"
+- Play Stats tab: date range filter (MM-DD-YY), summary bar (total plays + ad count), sortable table (by name or play count)
+- Expandable rows: click an ad to show daily play breakdown (date + count sub-rows)
+- Export button: opens native directory picker, generates CSV + PDF reports for all ads in the date range via `generate_ad_report` IPC
+- Failures tab: reverse-chronological list of ad insertion failures with timestamp, ad names, and error details
+- Added `AdStatsResponse`, `AdStatEntry`, `AdDailyCount`, `AdFailure` TypeScript interfaces to `types.ts`
+- Made `AdStatistics` and `AdStatEntry` `Serialize`-able in `src/ad_logger.rs`
+- Added 4 new IPC commands: `get_ad_stats` (with optional date range), `get_ad_daily_counts`, `get_ad_failures`, `generate_ad_report`
+- Stats button (bar chart icon) added to header bar between ad config and theme buttons
+- CSS: `.ad-stats-window` (640px), `.ad-stats-tabs`, `.ad-stats-table`, `.ad-stats-row`, `.ad-stats-detail-row`, `.ad-failure-item`
+- 211 unit tests passing (no new tests — frontend-only changes + thin IPC wiring over tested core methods)
+
 ## 2026-02-09 — Ad Config UI (GUI)
 - Created `AdConfigWindow.tsx` — modal dialog for ad CRUD, enable/disable, MP3 file picker, day/hour scheduling
 - Split-panel layout: left panel (200px) with scrollable ad list and move/add/delete buttons; right panel with detail editor

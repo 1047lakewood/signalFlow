@@ -240,14 +240,14 @@ impl AdPlayLogger {
 }
 
 /// Summary statistics for ad plays.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct AdStatistics {
     pub total_plays: usize,
     pub per_ad: Vec<AdStatEntry>,
 }
 
 /// Per-ad statistics entry.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct AdStatEntry {
     pub name: String,
     pub play_count: usize,

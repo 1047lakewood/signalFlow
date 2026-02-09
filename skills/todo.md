@@ -58,7 +58,7 @@
 - [x] Ad play logger — JSON play statistics (per-ad, per-date, per-hour), failure tracking
 - [x] Ad report generator — CSV and PDF verified-play reports with hourly/daily breakdowns
 - [x] Ad config UI — Modal editor for ad CRUD, enable/disable, MP3 file picker, day/hour scheduling
-- [ ] Ad statistics UI — Play calendar, sortable treeview, date filtering, export/report generation
+- [x] Ad statistics UI — Play calendar, sortable treeview, date filtering, export/report generation
 
 ## Phase G: RDS Engine (Radio Data System)
 

@@ -6,6 +6,7 @@ import PlaylistView from "./PlaylistView";
 import TransportBar from "./TransportBar";
 import SettingsWindow from "./SettingsWindow";
 import AdConfigWindow from "./AdConfigWindow";
+import AdStatsWindow from "./AdStatsWindow";
 import SchedulePane from "./SchedulePane";
 import LogPane from "./LogPane";
 
@@ -26,6 +27,7 @@ function App() {
   const [renameValue, setRenameValue] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [showAdConfig, setShowAdConfig] = useState(false);
+  const [showAdStats, setShowAdStats] = useState(false);
   const [showSchedulePane, setShowSchedulePane] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">(getInitialTheme);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -268,6 +270,13 @@ function App() {
           {"\uD83D\uDCE2"}
         </button>
         <button
+          className="header-schedule-btn"
+          onClick={() => setShowAdStats(true)}
+          title="Ad Statistics"
+        >
+          {"\uD83D\uDCCA"}
+        </button>
+        <button
           className="header-theme-btn"
           onClick={toggleTheme}
           title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
@@ -315,6 +324,9 @@ function App() {
       )}
       {showAdConfig && (
         <AdConfigWindow onClose={() => setShowAdConfig(false)} />
+      )}
+      {showAdStats && (
+        <AdStatsWindow onClose={() => setShowAdStats(false)} />
       )}
     </div>
   );
