@@ -163,6 +163,30 @@ body {
   position: relative;
 }
 
+/* ── Scrollbar theming ─────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--bg-primary);
+}
+
 /* ── Track table ───────────────────────────────────────────────────── */
 
 .track-table {
@@ -212,12 +236,20 @@ body {
   background: var(--bg-row-hover);
 }
 
+.track-row.selected {
+  background: var(--accent);
+}
+
 .track-row.current {
   background: var(--bg-row-current);
 }
 
 .track-row.current td {
   color: var(--highlight);
+}
+
+.track-row.current.selected {
+  background: var(--bg-row-current);
 }
 
 .track-row.dragging {

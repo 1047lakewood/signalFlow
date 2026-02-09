@@ -1,5 +1,16 @@
 # signalFlow — Changelog
 
+## 2026-02-09 — Playlist Scrollbar Dark Mode & Row Selection (GUI)
+- Added themed scrollbar CSS using `::-webkit-scrollbar` pseudo-elements matching dark/light themes
+- Scrollbar track uses `--bg-primary`, thumb uses `--border` with `--text-secondary` on hover
+- 8px width scrollbar with 4px border-radius thumb for consistent appearance
+- Added row selection: click a track row to highlight/select it visually
+- `selectedIndex` state managed in `App.tsx`, passed to `PlaylistView` via `selectedIndex` + `onSelectTrack` props
+- Selected row styled with `--accent` background via `.track-row.selected` CSS class
+- Current-playing row style takes priority over selected style (`.track-row.current.selected`)
+- Selection resets when switching playlists
+- 247 unit tests passing (no new tests — frontend-only CSS + state changes)
+
 ## 2026-02-09 — RDS Config UI (GUI)
 - Created `RdsConfigWindow.tsx` — modal dialog for RDS message CRUD, enable/disable, day/hour scheduling, connection settings
 - Split-panel layout: left panel (200px) with scrollable message list and move/add/delete buttons; right panel with detail editor

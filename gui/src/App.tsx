@@ -30,6 +30,7 @@ function App() {
   const [showAdConfig, setShowAdConfig] = useState(false);
   const [showAdStats, setShowAdStats] = useState(false);
   const [showRdsConfig, setShowRdsConfig] = useState(false);
+  const [selectedTrackIndex, setSelectedTrackIndex] = useState<number | null>(null);
   const [showSchedulePane, setShowSchedulePane] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">(getInitialTheme);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -93,6 +94,7 @@ function App() {
 
   const handlePlaylistSelect = async (name: string) => {
     setSelectedPlaylist(name);
+    setSelectedTrackIndex(null);
     try {
       await invoke("set_active_playlist", { name });
     } catch (e) {
@@ -308,6 +310,8 @@ function App() {
                 tracks={tracks}
                 currentIndex={currentIndex}
                 playlistName={selectedPlaylist}
+                selectedIndex={selectedTrackIndex}
+                onSelectTrack={setSelectedTrackIndex}
                 onReorder={handleReorder}
                 onAddFiles={handleAddFiles}
                 onFileDrop={handleFileDrop}

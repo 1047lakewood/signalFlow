@@ -6,6 +6,8 @@ interface PlaylistViewProps {
   tracks: TrackInfo[];
   currentIndex: number | null;
   playlistName: string;
+  selectedIndex: number | null;
+  onSelectTrack: (index: number | null) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
   onAddFiles: () => void;
   onFileDrop: (paths: string[]) => void;
@@ -17,7 +19,7 @@ interface EditingCell {
   field: "artist" | "title";
 }
 
-function PlaylistView({ tracks, currentIndex, playlistName, onReorder, onAddFiles, onFileDrop, onTracksChanged }: PlaylistViewProps) {
+function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, onSelectTrack, onReorder, onAddFiles, onFileDrop, onTracksChanged }: PlaylistViewProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
   const [isDroppingFiles, setIsDroppingFiles] = useState(false);
@@ -200,11 +202,13 @@ function PlaylistView({ tracks, currentIndex, playlistName, onReorder, onAddFile
         <tbody>
           {tracks.map((track) => {
             const isCurrent = track.index === currentIndex;
+            const isSelected = track.index === selectedIndex;
             const isDragging = track.index === dragIndex;
             const isDropTarget = track.index === dropTarget && dropTarget !== dragIndex;
             const isEditingArtist = editingCell?.trackIndex === track.index && editingCell?.field === "artist";
             const isEditingTitle = editingCell?.trackIndex === track.index && editingCell?.field === "title";
             let className = "track-row";
+            if (isSelected) className += " selected";
             if (isCurrent) className += " current";
             if (isDragging) className += " dragging";
             if (isDropTarget) className += " drop-target";
@@ -213,6 +217,7 @@ function PlaylistView({ tracks, currentIndex, playlistName, onReorder, onAddFile
                 key={track.index}
                 className={className}
                 draggable={!editingCell}
+                onClick={() => onSelectTrack(track.index)}
                 onDragStart={(e) => handleDragStart(e, track.index)}
                 onDragEnd={handleDragEnd}
                 onDragOver={(e) => handleDragOver(e, track.index)}
