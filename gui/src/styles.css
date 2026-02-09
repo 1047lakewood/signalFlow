@@ -1721,3 +1721,101 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ── RDS Config Window ─────────────────────────────────────────────────── */
+
+.rds-config-window {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 740px;
+  max-width: 95vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px var(--shadow);
+}
+
+.rds-connection-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+
+.rds-conn-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rds-conn-default {
+  flex: 1;
+}
+
+.rds-conn-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rds-conn-input {
+  font-size: 12px;
+  padding: 4px 8px;
+  width: 120px;
+}
+
+.rds-conn-port {
+  width: 70px;
+}
+
+.rds-conn-default .rds-conn-input {
+  width: 100%;
+}
+
+.rds-conn-save {
+  flex-shrink: 0;
+  height: 28px;
+}
+
+.rds-list-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rds-text-input {
+  font-family: "Consolas", "Courier New", monospace;
+  letter-spacing: 0.3px;
+}
+
+.rds-char-count {
+  float: right;
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-weight: normal;
+}
+
+.rds-char-count.over {
+  color: var(--highlight);
+}
+
+.rds-placeholder-hint {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.rds-placeholder-hint code {
+  background: var(--bg-primary);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+.rds-duration-input {
+  width: 80px;
+}

@@ -88,6 +88,23 @@ export interface AdFailure {
   error: string;
 }
 
+export interface RdsMessageInfo {
+  index: number;
+  text: string;
+  enabled: boolean;
+  duration: number;
+  scheduled: boolean;
+  days: string[];
+  hours: number[];
+}
+
+export interface RdsConfigResponse {
+  ip: string;
+  port: number;
+  default_message: string;
+  messages: RdsMessageInfo[];
+}
+
 export interface TransportState {
   is_playing: boolean;
   is_paused: boolean;

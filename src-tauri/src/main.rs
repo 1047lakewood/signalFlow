@@ -4,6 +4,7 @@ use signal_flow::auto_intro;
 use signal_flow::engine::Engine;
 use signal_flow::level_monitor::LevelMonitor;
 use signal_flow::player::Player;
+use signal_flow::rds::{RdsMessage, RdsSchedule};
 use signal_flow::scheduler::{ConflictPolicy, ScheduleMode, Priority, parse_time};
 use chrono::Local;
 use serde::Serialize;
@@ -1026,6 +1027,137 @@ fn generate_ad_report(
     }
 }
 
+// ── RDS ─────────────────────────────────────────────────────────────────────
+
+#[derive(Serialize)]
+struct RdsMessageInfo {
+    index: usize,
+    text: String,
+    enabled: bool,
+    duration: u32,
+    scheduled: bool,
+    days: Vec<String>,
+    hours: Vec<u8>,
+}
+
+#[derive(Serialize)]
+struct RdsConfigResponse {
+    ip: String,
+    port: u16,
+    default_message: String,
+    messages: Vec<RdsMessageInfo>,
+}
+
+#[tauri::command]
+fn get_rds_config(state: State<AppState>) -> RdsConfigResponse {
+    let engine = state.engine.lock().unwrap();
+    RdsConfigResponse {
+        ip: engine.rds.ip.clone(),
+        port: engine.rds.port,
+        default_message: engine.rds.default_message.clone(),
+        messages: engine.rds.messages.iter().enumerate().map(|(i, m)| RdsMessageInfo {
+            index: i,
+            text: m.text.clone(),
+            enabled: m.enabled,
+            duration: m.duration,
+            scheduled: m.scheduled.enabled,
+            days: m.scheduled.days.clone(),
+            hours: m.scheduled.hours.clone(),
+        }).collect(),
+    }
+}
+
+#[tauri::command]
+fn add_rds_message(state: State<AppState>, text: String) -> Result<usize, String> {
+    let mut engine = state.engine.lock().unwrap();
+    let msg = RdsMessage::new(&text);
+    engine.rds.messages.push(msg);
+    let idx = engine.rds.messages.len() - 1;
+    engine.save()?;
+    Ok(idx)
+}
+
+#[tauri::command]
+fn remove_rds_message(state: State<AppState>, index: usize) -> Result<(), String> {
+    let mut engine = state.engine.lock().unwrap();
+    let len = engine.rds.messages.len();
+    if index >= len {
+        return Err(format!("RDS message index {} out of range ({} messages)", index, len));
+    }
+    engine.rds.messages.remove(index);
+    engine.save()?;
+    Ok(())
+}
+
+#[tauri::command]
+fn toggle_rds_message(state: State<AppState>, index: usize) -> Result<bool, String> {
+    let mut engine = state.engine.lock().unwrap();
+    let len = engine.rds.messages.len();
+    let msg = engine.rds.messages.get_mut(index).ok_or_else(|| {
+        format!("RDS message index {} out of range ({} messages)", index, len)
+    })?;
+    msg.enabled = !msg.enabled;
+    let new_state = msg.enabled;
+    engine.save()?;
+    Ok(new_state)
+}
+
+#[tauri::command]
+fn update_rds_message(
+    state: State<AppState>,
+    index: usize,
+    text: String,
+    enabled: bool,
+    duration: u32,
+    scheduled: bool,
+    days: Vec<String>,
+    hours: Vec<u8>,
+) -> Result<(), String> {
+    let mut engine = state.engine.lock().unwrap();
+    let len = engine.rds.messages.len();
+    let msg = engine.rds.messages.get_mut(index).ok_or_else(|| {
+        format!("RDS message index {} out of range ({} messages)", index, len)
+    })?;
+    msg.text = text;
+    msg.enabled = enabled;
+    msg.duration = duration.clamp(1, 60);
+    msg.scheduled = RdsSchedule {
+        enabled: scheduled,
+        days,
+        hours,
+    };
+    engine.save()?;
+    Ok(())
+}
+
+#[tauri::command]
+fn reorder_rds_message(state: State<AppState>, from: usize, to: usize) -> Result<(), String> {
+    let mut engine = state.engine.lock().unwrap();
+    let len = engine.rds.messages.len();
+    if from >= len || to >= len {
+        return Err(format!("RDS message index out of range ({} messages)", len));
+    }
+    let msg = engine.rds.messages.remove(from);
+    engine.rds.messages.insert(to, msg);
+    engine.save()?;
+    Ok(())
+}
+
+#[tauri::command]
+fn update_rds_settings(
+    state: State<AppState>,
+    ip: String,
+    port: u16,
+    default_message: String,
+) -> Result<(), String> {
+    let mut engine = state.engine.lock().unwrap();
+    engine.rds.ip = ip;
+    engine.rds.port = port;
+    engine.rds.default_message = default_message;
+    engine.save()?;
+    Ok(())
+}
+
 // ── Logs ────────────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -1093,6 +1225,14 @@ fn main() {
             toggle_ad,
             update_ad,
             reorder_ad,
+            // RDS
+            get_rds_config,
+            add_rds_message,
+            remove_rds_message,
+            toggle_rds_message,
+            update_rds_message,
+            reorder_rds_message,
+            update_rds_settings,
             // Ad Statistics & Reports
             get_ad_stats,
             get_ad_daily_counts,

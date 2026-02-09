@@ -7,6 +7,7 @@ import TransportBar from "./TransportBar";
 import SettingsWindow from "./SettingsWindow";
 import AdConfigWindow from "./AdConfigWindow";
 import AdStatsWindow from "./AdStatsWindow";
+import RdsConfigWindow from "./RdsConfigWindow";
 import SchedulePane from "./SchedulePane";
 import LogPane from "./LogPane";
 
@@ -28,6 +29,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAdConfig, setShowAdConfig] = useState(false);
   const [showAdStats, setShowAdStats] = useState(false);
+  const [showRdsConfig, setShowRdsConfig] = useState(false);
   const [showSchedulePane, setShowSchedulePane] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">(getInitialTheme);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -277,6 +279,13 @@ function App() {
           {"\uD83D\uDCCA"}
         </button>
         <button
+          className="header-schedule-btn"
+          onClick={() => setShowRdsConfig(true)}
+          title="RDS Configuration"
+        >
+          {"\uD83D\uDCFB"}
+        </button>
+        <button
           className="header-theme-btn"
           onClick={toggleTheme}
           title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
@@ -327,6 +336,9 @@ function App() {
       )}
       {showAdStats && (
         <AdStatsWindow onClose={() => setShowAdStats(false)} />
+      )}
+      {showRdsConfig && (
+        <RdsConfigWindow onClose={() => setShowRdsConfig(false)} />
       )}
     </div>
   );

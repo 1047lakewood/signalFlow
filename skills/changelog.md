@@ -1,5 +1,22 @@
 # signalFlow — Changelog
 
+## 2026-02-09 — RDS Config UI (GUI)
+- Created `RdsConfigWindow.tsx` — modal dialog for RDS message CRUD, enable/disable, day/hour scheduling, connection settings
+- Split-panel layout: left panel (200px) with scrollable message list and move/add/delete buttons; right panel with detail editor
+- Green/gray enabled dot on each message in list, click to toggle
+- Detail editor: message text input (monospace, 64-char max with live character counter), enabled checkbox, duration input (1–60s), scheduled checkbox
+- Placeholder hint showing `{artist}` (UPPERCASE) and `{title}` (as-is) usage
+- Day checkboxes (Sun–Sat) with Select All / Clear All links, disabled when Scheduled is unchecked
+- Hour checkboxes (0–23 in AM/PM format, 6-column grid) with Select All / Clear All links
+- Connection settings bar at top: IP input, port input, default message input, Save button with feedback
+- Move Up / Move Down buttons reorder messages via `reorder_rds_message` IPC
+- Each edit immediately persists via IPC (add_rds_message, remove_rds_message, toggle_rds_message, update_rds_message, reorder_rds_message, update_rds_settings)
+- Added `RdsMessageInfo`, `RdsConfigResponse` TypeScript interfaces to `types.ts`
+- Added 7 new IPC commands: `get_rds_config`, `add_rds_message`, `remove_rds_message`, `toggle_rds_message`, `update_rds_message`, `reorder_rds_message`, `update_rds_settings`
+- Radio icon button added to header bar between ad stats and theme buttons
+- CSS: `.rds-config-window` (740px), `.rds-connection-bar`, `.rds-conn-field`, `.rds-char-count`, `.rds-placeholder-hint`, `.rds-text-input`, `.rds-duration-input`
+- 247 unit tests passing (no new tests — frontend-only changes + thin IPC wiring over existing RDS data model)
+
 ## 2026-02-09 — RDS Message Rotation Handler
 - Created `src/rds.rs` — RDS message rotation engine with TCP socket protocol, keepalive resends, and configurable rotation timing
 - `RdsMessage` struct: text (64-char max with {artist}/{title} placeholders), enabled, duration (1–60s), scheduled (days/hours)

@@ -219,7 +219,7 @@
 - **Message filtering** (DONE): Enable/disable, lecture detection (whitelist > blacklist > starts-with-R rule), placeholder availability ({artist}, {title}), day/hour scheduling
 - `should_display_message()` — 4-step check: enabled, lecture detection for {artist} messages, placeholder availability, schedule matching
 - **LectureDetector** (DONE — Phase F): Track classification (blacklist > whitelist > starts-with-R), current/next track analysis via internal engine state
-- **RDS Config UI**: Modal message editor with 64-char limit, duration (1-60s), day/hour scheduling, live treeview updates
+- **RDS Config UI** (DONE): Modal message editor with 64-char limit and live counter, duration (1-60s), day/hour scheduling, connection settings (IP/port/default message), split-panel layout matching Ad Config pattern
 - Reference spec: `skills/specs/rds-engine-spec.md`
 
 ### Advanced Auto Playlist Builder
