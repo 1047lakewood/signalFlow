@@ -1,5 +1,26 @@
 # signalFlow — Changelog
 
+## 2026-02-09 — Ad Report Generator
+- Created `src/ad_report.rs` — CSV and PDF verified-play report generation from ad play data
+- `AdReportGenerator` struct wrapping `AdPlayLogger` reference
+- `ReportFormat` enum: Csv, Pdf with `from_str_loose()` and `extension()` helpers
+- `ReportResult` struct: ad_name, csv_path, pdf_path
+- `MultiReportResult` struct: path, format
+- `generate_report(start, end, company_name, output_dir)` — generates CSV + PDF for all ads with plays in period
+- `generate_single_report(ad_name, start, end, company_name, output_dir)` — generates CSV + PDF for a specific ad
+- `generate_multi_ad_report(ad_names, start, end, output_file, format)` — matrix report with dates as rows, ads as columns
+- CSV format: VERIFIED Advertiser Report header, hourly breakdown (Date,Hour,Plays), daily summary (Date,Total Plays), grand total
+- PDF format: A4 pages via `printpdf` crate, title with optional company name, summary box (total plays, hours/days with airplay, avg/day), hourly breakdown table with alternating row colors, daily summary table, grand total, footer
+- Multi-ad CSV: matrix with Date column + one column per ad, totals row
+- Multi-ad PDF: same matrix as table with header, alternating rows, totals row
+- Automatic page breaks when content exceeds page height
+- File naming: `REPORT_{sanitized_name}_{YYYYMMDD_HHMMSS}.csv/.pdf`
+- `sanitize_filename()` helper replaces special chars with underscores
+- Added `printpdf = "0.9"` dependency to `Cargo.toml`
+- CLI: `ad report <start> <end> [--ad <name>] [--company <name>] [--output <dir>]` — generate reports for all or a specific ad
+- CLI: `ad report-multi <start> <end> [--ads <names>] [--output <file>] [--format csv|pdf]` — generate multi-ad matrix report
+- 211 unit tests passing (+14 new: generate_report creates files, with company name, CSV sections, hourly sorted, empty returns empty, single report none for unknown, single report creates files, multi CSV matrix format, multi PDF creates file, multi report none for no data, format from_str_loose, sanitize_filename, pdf_bytes_are_valid, file_naming_convention)
+
 ## 2026-02-08 — Ad Play Logger
 - Created `src/ad_logger.rs` — JSON-based ad play statistics and failure tracking
 - `AdPlayLogger` struct with `plays_path` and `failures_path` pointing to `ad_plays.json` / `ad_failures.json`

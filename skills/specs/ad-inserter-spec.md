@@ -283,7 +283,7 @@ Compact JSON:
 
 ---
 
-## 4. AdReportGenerator - CSV & PDF Reports
+## 4. AdReportGenerator - CSV & PDF Reports (DONE)
 
 ### 4.1 Main Entry Point
 

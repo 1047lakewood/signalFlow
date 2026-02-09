@@ -5,6 +5,7 @@
 
 pub mod ad_inserter;
 pub mod ad_logger;
+pub mod ad_report;
 pub mod ad_scheduler;
 pub mod auto_intro;
 pub mod engine;

@@ -56,7 +56,7 @@
 - [x] Ad scheduler handler — Intelligent hourly ad scheduling with lecture detection and track boundary awareness
 - [x] Ad inserter service — Internal MP3 concatenation via rodio, queue-based insertion into active playlist
 - [x] Ad play logger — JSON play statistics (per-ad, per-date, per-hour), failure tracking
-- [ ] Ad report generator — CSV and PDF verified-play reports with hourly/daily breakdowns
+- [x] Ad report generator — CSV and PDF verified-play reports with hourly/daily breakdowns
 - [ ] Ad config UI — Modal editor for ad CRUD, enable/disable, MP3 file picker, day/hour scheduling
 - [ ] Ad statistics UI — Play calendar, sortable treeview, date filtering, export/report generation
 

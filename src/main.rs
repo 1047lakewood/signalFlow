@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use signal_flow::ad_inserter::AdInserterService;
 use signal_flow::ad_logger::AdPlayLogger;
+use signal_flow::ad_report::{AdReportGenerator, ReportFormat};
 use signal_flow::ad_scheduler::AdConfig;
 use signal_flow::engine::Engine;
 use signal_flow::now_playing::NowPlaying;
@@ -366,6 +367,38 @@ enum AdCmd {
     Failures,
     /// Clear all ad play statistics and failure records
     ResetStats,
+    /// Generate CSV and PDF reports for ads in a date range
+    Report {
+        /// Start date (MM-DD-YY)
+        start: String,
+        /// End date (MM-DD-YY)
+        end: String,
+        /// Filter to a specific ad name
+        #[arg(long)]
+        ad: Option<String>,
+        /// Company name for PDF title
+        #[arg(long)]
+        company: Option<String>,
+        /// Output directory (default: current directory)
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Generate a multi-ad matrix report
+    ReportMulti {
+        /// Start date (MM-DD-YY)
+        start: String,
+        /// End date (MM-DD-YY)
+        end: String,
+        /// Ad names to include (comma-separated; omit for all)
+        #[arg(long)]
+        ads: Option<String>,
+        /// Output file path
+        #[arg(long)]
+        output: Option<PathBuf>,
+        /// Output format: csv or pdf (default: csv)
+        #[arg(long, default_value = "csv")]
+        format: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1375,6 +1408,68 @@ fn main() {
                 let logger = AdPlayLogger::new(Path::new("."));
                 logger.reset_all();
                 println!("Ad play statistics and failure records cleared.");
+            }
+            AdCmd::Report { start, end, ad, company, output } => {
+                let logger = AdPlayLogger::new(Path::new("."));
+                let reporter = AdReportGenerator::new(&logger);
+                let output_dir = output.unwrap_or_else(|| PathBuf::from("."));
+
+                if !output_dir.exists() {
+                    std::fs::create_dir_all(&output_dir).expect("Failed to create output directory");
+                }
+
+                if let Some(ad_name) = ad {
+                    match reporter.generate_single_report(&ad_name, &start, &end, company.as_deref(), &output_dir) {
+                        Some(r) => {
+                            println!("Generated reports for '{}':", r.ad_name);
+                            println!("  CSV: {}", r.csv_path.display());
+                            println!("  PDF: {}", r.pdf_path.display());
+                        }
+                        None => {
+                            println!("No plays found for '{}' in period {} to {}", ad_name, start, end);
+                        }
+                    }
+                } else {
+                    let results = reporter.generate_report(&start, &end, company.as_deref(), &output_dir);
+                    if results.is_empty() {
+                        println!("No ad plays found in period {} to {}", start, end);
+                    } else {
+                        println!("Generated {} report(s):", results.len());
+                        for r in &results {
+                            println!("  {} — CSV: {}, PDF: {}", r.ad_name, r.csv_path.display(), r.pdf_path.display());
+                        }
+                    }
+                }
+            }
+            AdCmd::ReportMulti { start, end, ads, output, format } => {
+                let fmt = match ReportFormat::from_str_loose(&format) {
+                    Some(f) => f,
+                    None => {
+                        eprintln!("Error: invalid format '{}'. Use 'csv' or 'pdf'.", format);
+                        std::process::exit(1);
+                    }
+                };
+
+                let ad_names: Vec<String> = ads
+                    .map(|s| s.split(',').map(|n| n.trim().to_string()).collect())
+                    .unwrap_or_default();
+
+                let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
+                let output_file = output.unwrap_or_else(|| {
+                    PathBuf::from(format!("REPORT_multi_{}.{}", timestamp, fmt.extension()))
+                });
+
+                let logger = AdPlayLogger::new(Path::new("."));
+                let reporter = AdReportGenerator::new(&logger);
+
+                match reporter.generate_multi_ad_report(&ad_names, &start, &end, &output_file, fmt) {
+                    Some(r) => {
+                        println!("Generated multi-ad report: {}", r.path.display());
+                    }
+                    None => {
+                        println!("No ad plays found in period {} to {}", start, end);
+                    }
+                }
             }
         },
         Commands::Playlist { action } => match action {

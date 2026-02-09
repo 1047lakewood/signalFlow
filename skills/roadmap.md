@@ -206,7 +206,7 @@
 - **AdSchedulerHandler**: Intelligent hourly ad scheduling with lecture detection, track boundary awareness, and safety-margin fallbacks
 - **AdInserterService**: Internal MP3 concatenation via rodio, queue-based insertion into active playlist, playback confirmation via engine state
 - **AdPlayLogger**: Compact JSON play statistics (per-ad, per-date, per-hour), failure tracking (last 50), date-filtered queries
-- **AdReportGenerator**: CSV and PDF verified-play reports with hourly/daily breakdowns, multi-ad matrix reports
+- **AdReportGenerator** (DONE): CSV and PDF verified-play reports with hourly/daily breakdowns, multi-ad matrix reports
 - **Ad Config UI**: Modal editor for ad CRUD, enable/disable, MP3 file picker, day/hour scheduling, station ID prepend option
 - **Ad Statistics UI**: Play calendar with dot indicators, sortable treeview, date filtering, export/report generation, failure viewer
 - Reference spec: `skills/specs/ad-inserter-spec.md`
