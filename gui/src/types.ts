@@ -51,6 +51,16 @@ export interface ConfigResponse {
   now_playing_path: string | null;
 }
 
+export interface AdInfo {
+  index: number;
+  name: string;
+  enabled: boolean;
+  mp3_file: string;
+  scheduled: boolean;
+  days: string[];
+  hours: number[];
+}
+
 export interface LogEntry {
   timestamp: string;
   level: string;

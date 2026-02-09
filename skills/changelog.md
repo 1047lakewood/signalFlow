@@ -1,5 +1,20 @@
 # signalFlow — Changelog
 
+## 2026-02-09 — Ad Config UI (GUI)
+- Created `AdConfigWindow.tsx` — modal dialog for ad CRUD, enable/disable, MP3 file picker, day/hour scheduling
+- Split-panel layout: left panel (200px) with scrollable ad list and move/add/delete buttons; right panel with detail editor
+- Green/gray enabled dot on each ad in list, click to toggle
+- Detail editor: name input, enabled checkbox, MP3 file browser (native dialog via `@tauri-apps/plugin-dialog`), scheduled checkbox
+- Day checkboxes (Sun–Sat) with Select All / Clear All links, disabled when Scheduled is unchecked
+- Hour checkboxes (0–23 in AM/PM format, 6-column grid) with Select All / Clear All links
+- Move Up / Move Down buttons reorder ads in the list via `reorder_ad` IPC
+- Each edit immediately persists via IPC (add_ad, remove_ad, toggle_ad, update_ad, reorder_ad)
+- Added `AdInfo` Rust response struct and 6 new IPC commands: `get_ads`, `add_ad`, `remove_ad`, `toggle_ad`, `update_ad`, `reorder_ad`
+- Added `AdInfo` TypeScript interface to `types.ts`
+- Ad config button (megaphone icon) added to header bar between schedule and theme buttons
+- CSS: `.ad-config-window` (700px wide), `.ad-list-panel`, `.ad-detail-panel`, `.ad-list-item`, `.ad-day-grid`, `.ad-hour-grid`, `.ad-select-link`
+- 211 unit tests passing (no new tests — frontend-only changes + thin IPC wiring over tested core methods)
+
 ## 2026-02-09 — Ad Report Generator
 - Created `src/ad_report.rs` — CSV and PDF verified-play report generation from ad play data
 - `AdReportGenerator` struct wrapping `AdPlayLogger` reference

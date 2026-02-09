@@ -830,6 +830,102 @@ fn set_nowplaying_path(state: State<AppState>, path: Option<String>) -> Result<(
     Ok(())
 }
 
+// ── Ads ─────────────────────────────────────────────────────────────────
+
+#[derive(Serialize)]
+struct AdInfo {
+    index: usize,
+    name: String,
+    enabled: bool,
+    mp3_file: String,
+    scheduled: bool,
+    days: Vec<String>,
+    hours: Vec<u8>,
+}
+
+#[tauri::command]
+fn get_ads(state: State<AppState>) -> Vec<AdInfo> {
+    let engine = state.engine.lock().unwrap();
+    engine
+        .ads
+        .iter()
+        .enumerate()
+        .map(|(i, ad)| AdInfo {
+            index: i,
+            name: ad.name.clone(),
+            enabled: ad.enabled,
+            mp3_file: ad.mp3_file.to_string_lossy().to_string(),
+            scheduled: ad.scheduled,
+            days: ad.days.clone(),
+            hours: ad.hours.clone(),
+        })
+        .collect()
+}
+
+#[tauri::command]
+fn add_ad(state: State<AppState>, name: String, mp3_file: String) -> Result<usize, String> {
+    let mut engine = state.engine.lock().unwrap();
+    let ad = signal_flow::ad_scheduler::AdConfig::new(name, PathBuf::from(mp3_file));
+    let idx = engine.add_ad(ad);
+    engine.save()?;
+    Ok(idx)
+}
+
+#[tauri::command]
+fn remove_ad(state: State<AppState>, index: usize) -> Result<(), String> {
+    let mut engine = state.engine.lock().unwrap();
+    engine.remove_ad(index)?;
+    engine.save()?;
+    Ok(())
+}
+
+#[tauri::command]
+fn toggle_ad(state: State<AppState>, index: usize) -> Result<bool, String> {
+    let mut engine = state.engine.lock().unwrap();
+    let new_state = engine.toggle_ad(index)?;
+    engine.save()?;
+    Ok(new_state)
+}
+
+#[tauri::command]
+fn update_ad(
+    state: State<AppState>,
+    index: usize,
+    name: String,
+    enabled: bool,
+    mp3_file: String,
+    scheduled: bool,
+    days: Vec<String>,
+    hours: Vec<u8>,
+) -> Result<(), String> {
+    let mut engine = state.engine.lock().unwrap();
+    let len = engine.ads.len();
+    let ad = engine.ads.get_mut(index).ok_or_else(|| {
+        format!("Ad index {} out of range ({} ads)", index, len)
+    })?;
+    ad.name = name;
+    ad.enabled = enabled;
+    ad.mp3_file = PathBuf::from(mp3_file);
+    ad.scheduled = scheduled;
+    ad.days = days;
+    ad.hours = hours;
+    engine.save()?;
+    Ok(())
+}
+
+#[tauri::command]
+fn reorder_ad(state: State<AppState>, from: usize, to: usize) -> Result<(), String> {
+    let mut engine = state.engine.lock().unwrap();
+    let len = engine.ads.len();
+    if from >= len || to >= len {
+        return Err(format!("Ad index out of range ({} ads)", len));
+    }
+    let ad = engine.ads.remove(from);
+    engine.ads.insert(to, ad);
+    engine.save()?;
+    Ok(())
+}
+
 // ── Logs ────────────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -890,6 +986,13 @@ fn main() {
             add_schedule_event,
             remove_schedule_event,
             toggle_schedule_event,
+            // Ads
+            get_ads,
+            add_ad,
+            remove_ad,
+            toggle_ad,
+            update_ad,
+            reorder_ad,
             // Logs
             get_logs,
             clear_logs,

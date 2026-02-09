@@ -367,7 +367,7 @@ REPORT_{ad_name}_{YYYYMMDD_HHMMSS}.pdf
 
 ---
 
-## 6. Ad Config UI (Tauri)
+## 6. Ad Config UI (Tauri) (DONE)
 
 ### 6.1 Window Properties
 
