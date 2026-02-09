@@ -1,11 +1,12 @@
 use clap::{Parser, Subcommand};
 use signal_flow::ad_inserter::AdInserterService;
+use signal_flow::ad_logger::AdPlayLogger;
 use signal_flow::ad_scheduler::AdConfig;
 use signal_flow::engine::Engine;
 use signal_flow::now_playing::NowPlaying;
 use signal_flow::player::{play_playlist, PlaybackResult, Player, RecurringIntroConfig, SilenceConfig};
 use signal_flow::scheduler::{self, ConflictPolicy, Priority, ScheduleMode};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
 #[command(name = "signalflow", about = "Radio Automation Engine CLI")]
@@ -352,6 +353,19 @@ enum AdCmd {
     InsertInstant,
     /// Manually trigger scheduled ad insertion (queues ads as next tracks)
     InsertScheduled,
+    /// Show ad play statistics
+    Stats {
+        /// Start date filter (MM-DD-YY)
+        #[arg(long)]
+        from: Option<String>,
+        /// End date filter (MM-DD-YY)
+        #[arg(long)]
+        to: Option<String>,
+    },
+    /// Show recent ad insertion failures
+    Failures,
+    /// Clear all ad play statistics and failure records
+    ResetStats,
 }
 
 #[derive(Subcommand)]
@@ -1263,6 +1277,7 @@ fn main() {
                         std::process::exit(1);
                     }
                 };
+                let logger = AdPlayLogger::new(Path::new("."));
                 println!("Running instant ad insertion...");
                 match AdInserterService::insert_instant(&player, &engine, false) {
                     Ok(result) => {
@@ -1270,17 +1285,24 @@ fn main() {
                             println!("  Station ID: played");
                         }
                         for name in &result.ads_inserted {
+                            logger.log_play(name);
                             println!("  Played: {}", name);
                         }
                         println!("Instant insertion complete: {} ad(s) played.", result.ad_count);
                     }
                     Err(e) => {
+                        let ad_names: Vec<String> = engine.ads.iter()
+                            .filter(|a| a.enabled)
+                            .map(|a| a.name.clone())
+                            .collect();
+                        logger.log_failure(&ad_names, &format!("instant:{}", e));
                         eprintln!("Error: {}", e);
                         std::process::exit(1);
                     }
                 }
             }
             AdCmd::InsertScheduled => {
+                let logger = AdPlayLogger::new(Path::new("."));
                 println!("Running scheduled ad insertion...");
                 match AdInserterService::insert_scheduled(&mut engine, false) {
                     Ok(result) => {
@@ -1288,6 +1310,7 @@ fn main() {
                             println!("  Station ID: queued");
                         }
                         for name in &result.ads_inserted {
+                            logger.log_play(name);
                             println!("  Queued: {}", name);
                         }
                         println!(
@@ -1297,10 +1320,61 @@ fn main() {
                         engine.save().expect("Failed to save state");
                     }
                     Err(e) => {
+                        let ad_names: Vec<String> = engine.ads.iter()
+                            .filter(|a| a.enabled)
+                            .map(|a| a.name.clone())
+                            .collect();
+                        logger.log_failure(&ad_names, &format!("scheduled:{}", e));
                         eprintln!("Error: {}", e);
                         std::process::exit(1);
                     }
                 }
+            }
+            AdCmd::Stats { from, to } => {
+                let logger = AdPlayLogger::new(Path::new("."));
+                let stats = match (&from, &to) {
+                    (Some(start), Some(end)) => logger.get_ad_statistics_filtered(start, end),
+                    _ => logger.get_ad_statistics(),
+                };
+
+                if let (Some(start), Some(end)) = (&from, &to) {
+                    println!("Ad Play Statistics ({} to {}):", start, end);
+                } else {
+                    println!("Ad Play Statistics (all time):");
+                }
+                println!("Total plays: {}", stats.total_plays);
+                println!();
+
+                if stats.per_ad.is_empty() {
+                    println!("No ad plays recorded.");
+                } else {
+                    println!("{:<30} {:>8}", "Ad Name", "Plays");
+                    println!("{}", "-".repeat(40));
+                    for entry in &stats.per_ad {
+                        println!("{:<30} {:>8}", truncate(&entry.name, 29), entry.play_count);
+                    }
+                }
+            }
+            AdCmd::Failures => {
+                let logger = AdPlayLogger::new(Path::new("."));
+                let failures = logger.get_failures();
+
+                if failures.is_empty() {
+                    println!("No ad insertion failures recorded.");
+                } else {
+                    println!("Recent Ad Insertion Failures ({}):", failures.len());
+                    println!("{:<16} {:<30} {}", "Time", "Ads", "Error");
+                    println!("{}", "-".repeat(70));
+                    for f in failures.iter().rev() {
+                        let ads_str = f.ads.join(", ");
+                        println!("{:<16} {:<30} {}", f.t, truncate(&ads_str, 29), f.err);
+                    }
+                }
+            }
+            AdCmd::ResetStats => {
+                let logger = AdPlayLogger::new(Path::new("."));
+                logger.reset_all();
+                println!("Ad play statistics and failure records cleared.");
             }
         },
         Commands::Playlist { action } => match action {

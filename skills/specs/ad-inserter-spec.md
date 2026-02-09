@@ -238,7 +238,7 @@ Prefix codes: "concat:", "playback:", "timeout:"
 
 ---
 
-## 3. AdPlayLogger - Play Statistics Storage
+## 3. AdPlayLogger - Play Statistics Storage (DONE)
 
 ### 3.1 Storage Format - Plays (ad_plays.json)
 

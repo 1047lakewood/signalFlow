@@ -55,7 +55,7 @@
 
 - [x] Ad scheduler handler — Intelligent hourly ad scheduling with lecture detection and track boundary awareness
 - [x] Ad inserter service — Internal MP3 concatenation via rodio, queue-based insertion into active playlist
-- [ ] Ad play logger — JSON play statistics (per-ad, per-date, per-hour), failure tracking
+- [x] Ad play logger — JSON play statistics (per-ad, per-date, per-hour), failure tracking
 - [ ] Ad report generator — CSV and PDF verified-play reports with hourly/daily breakdowns
 - [ ] Ad config UI — Modal editor for ad CRUD, enable/disable, MP3 file picker, day/hour scheduling
 - [ ] Ad statistics UI — Play calendar, sortable treeview, date filtering, export/report generation
@@ -69,6 +69,7 @@
 
 ## Phase E2: GUI Playlist Interaction
 
+- [ ] Playlist scrollbar dark mode — Fix scrollbar styling to match dark theme
 - [ ] Row selection — Click a row to highlight/select it visually
 - [ ] Play from selection — Double-click or press Play to start playback from the selected row
 - [ ] Pause/unpause — Add a Pause button; Play resumes from where it paused instead of restarting

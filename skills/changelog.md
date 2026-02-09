@@ -1,5 +1,28 @@
 # signalFlow — Changelog
 
+## 2026-02-08 — Ad Play Logger
+- Created `src/ad_logger.rs` — JSON-based ad play statistics and failure tracking
+- `AdPlayLogger` struct with `plays_path` and `failures_path` pointing to `ad_plays.json` / `ad_failures.json`
+- `AdPlayData` type: `HashMap<String, HashMap<String, Vec<u8>>>` (ad_name → date → hours)
+- `AdFailure` struct: timestamp, ad names, error description
+- `log_play(ad_name)` — appends current hour to ad's date entry, saves to disk
+- `log_play_at(ad_name, date, hour)` — testable variant with explicit date/hour
+- `log_failure(ad_names, error)` — appends failure record, trims to 50 max (oldest discarded)
+- `get_ad_statistics()` — returns total plays + per-ad counts sorted by play_count descending
+- `get_ad_statistics_filtered(start, end)` — date-range filtered variant (MM-DD-YY format)
+- `get_play_hours_for_date(ad_name, date)` — sorted hour list for a specific ad/date
+- `get_daily_play_counts(ad_name)` — `{date: count}` map per ad
+- `get_failures()` — full failure list
+- `get_daily_confirmed_stats(start, end)` — `{"YYYY-MM-DD": {"Ad Name": count}}`
+- `get_hourly_confirmed_stats(start, end)` — `{"YYYY-MM-DD_HH": {"Ad Name": count}}`
+- `reset_all()` — clears both plays and failures files
+- File I/O: load from disk on each operation, save after mutation, graceful fallback on corruption/missing
+- CLI: `ad stats [--from <date>] [--to <date>]` — display play statistics summary + per-ad table
+- CLI: `ad failures` — display recent insertion failures (reverse chronological)
+- CLI: `ad reset-stats` — clear all play data and failure records
+- CLI: `ad insert-instant` and `ad insert-scheduled` now log plays on success and failures on error
+- 197 unit tests passing (+14 new: log_play creates/appends/new_date, failure trim at 50, statistics sorted, date filtering, daily counts, play hours sorted, daily/hourly confirmed stats, reset clears both, missing files graceful, corrupt json graceful, mm-dd-yy conversion)
+
 ## 2026-02-08 — Ad Inserter Service
 - Created `src/ad_inserter.rs` — stateless ad insertion service with instant and scheduled modes
 - `AdInsertionResult` struct: ad_count, ads_inserted (names), station_id_played
