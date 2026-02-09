@@ -1,5 +1,34 @@
 # signalFlow — Changelog
 
+## 2026-02-09 — RDS Message Rotation Handler
+- Created `src/rds.rs` — RDS message rotation engine with TCP socket protocol, keepalive resends, and configurable rotation timing
+- `RdsMessage` struct: text (64-char max with {artist}/{title} placeholders), enabled, duration (1–60s), scheduled (days/hours)
+- `RdsSchedule` struct: enabled flag, day names, hour list for message scheduling
+- `RdsConfig` struct: ip, port, default_message, messages list — stored in Engine state with `#[serde(default)]`
+- `should_display_message()` — 4-step filtering: enabled check, lecture detection ({artist} only shown for lectures), placeholder availability, schedule matching
+- `format_message_text()` — replaces {artist} with UPPERCASE, {title} as-is, trims result
+- `sanitize_rds_text()` — removes newlines, trims whitespace, truncates to 64 chars, falls back to default_message if empty
+- `send_message_to_rds()` — TCP socket connection with SOCKET_TIMEOUT (10s), sends `DPSTEXT={text}\r\n`, reads 1024-byte response, validates non-empty and no "Error:" prefix
+- `RdsHandler` — background thread with rotation loop: filters valid messages, tracks rotation index, sends on duration expiry or keepalive (60s), ERROR_RETRY_DELAY (15s) on failure
+- `RdsHandler::start()` — spawns thread with `get_config` and `get_now_playing` closures for decoupled engine access
+- `RdsHandler::stop()` — sets running=false, joins thread
+- `RdsHandler::status()` — returns `RdsStatus` (running, last_sent_text, last_send_status, message_index)
+- `format_hour_ampm()` — hour (0–23) to AM/PM string conversion
+- Constants: SOCKET_TIMEOUT=10s, COMMAND_DELAY=200ms, LOOP_SLEEP=1s, ERROR_RETRY_DELAY=15s, KEEPALIVE_INTERVAL=60s, MAX_RDS_TEXT_LEN=64
+- Added `Engine.rds: RdsConfig` field with `#[serde(default)]` for backward compatibility
+- CLI: `rds add <text> [-d duration] [--scheduled] [--days "Mon,Fri"] [--hours "9,10,14"]` — add RDS message
+- CLI: `rds list` — show all RDS messages with status, text, duration, schedule
+- CLI: `rds remove <num>` — remove message by 1-based number
+- CLI: `rds toggle <num>` — enable/disable message
+- CLI: `rds show <num>` — show message details
+- CLI: `rds status` — show RDS encoder config and message counts
+- CLI: `config rds ip <address>` — set RDS encoder IP
+- CLI: `config rds port <port>` — set RDS encoder TCP port
+- CLI: `config rds default-message <text>` — set fallback message
+- CLI: `config show` now displays RDS encoder address, port, message count, and default message
+- CLI: `status` now shows RDS enabled/total message counts
+- 247 unit tests passing (+36 new: 3 RdsMessage, 3 RdsConfig, 5 sanitize, 5 format, 14 should_display_message, 1 format_hour_ampm, 2 days_display, 2 hours_display, 3 engine RDS config)
+
 ## 2026-02-09 — Ad Statistics UI (GUI)
 - Created `AdStatsWindow.tsx` — modal dialog for viewing ad play statistics, failures, and generating reports
 - Two tabs: "Play Stats" and "Failures"

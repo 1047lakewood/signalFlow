@@ -1,6 +1,7 @@
 use crate::ad_scheduler::{AdConfig, AdInserterSettings};
 use crate::lecture_detector::LectureDetector;
 use crate::playlist::Playlist;
+use crate::rds::RdsConfig;
 use crate::scheduler::{ConflictPolicy, Schedule};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -53,6 +54,9 @@ pub struct Engine {
     /// Lecture detector with blacklist/whitelist (shared between ad scheduler and RDS).
     #[serde(default)]
     pub lecture_detector: LectureDetector,
+    /// RDS (Radio Data System) message rotation configuration.
+    #[serde(default)]
+    pub rds: RdsConfig,
 }
 
 impl Engine {
@@ -73,6 +77,7 @@ impl Engine {
             ads: Vec::new(),
             ad_inserter: AdInserterSettings::default(),
             lecture_detector: LectureDetector::new(),
+            rds: RdsConfig::default(),
         }
     }
 
@@ -639,5 +644,35 @@ mod tests {
             has_intro: false,
         });
         assert_eq!(engine.active_playlist().unwrap().track_count(), 1);
+    }
+
+    #[test]
+    fn rds_config_defaults() {
+        let engine = Engine::new();
+        assert_eq!(engine.rds.ip, "127.0.0.1");
+        assert_eq!(engine.rds.port, 10001);
+        assert!(engine.rds.messages.is_empty());
+    }
+
+    #[test]
+    fn rds_config_survives_serialization() {
+        let mut engine = Engine::new();
+        engine.rds.ip = "10.0.0.1".to_string();
+        engine.rds.port = 5000;
+        engine.rds.messages.push(crate::rds::RdsMessage::new("Test"));
+        let json = serde_json::to_string(&engine).unwrap();
+        let loaded: Engine = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.rds.ip, "10.0.0.1");
+        assert_eq!(loaded.rds.port, 5000);
+        assert_eq!(loaded.rds.messages.len(), 1);
+    }
+
+    #[test]
+    fn rds_config_defaults_when_missing_from_json() {
+        let json = r#"{"playlists":[],"active_playlist_id":null,"next_id":1}"#;
+        let engine: Engine = serde_json::from_str(json).unwrap();
+        assert_eq!(engine.rds.ip, "127.0.0.1");
+        assert_eq!(engine.rds.port, 10001);
+        assert!(engine.rds.messages.is_empty());
     }
 }

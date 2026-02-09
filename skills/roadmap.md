@@ -212,9 +212,13 @@
 - Reference spec: `skills/specs/ad-inserter-spec.md`
 
 ### RDS Engine (Radio Data System)
-- **AutoRDSHandler**: RDS message rotation engine with TCP socket protocol (DPSTEXT commands), keepalive resends, configurable rotation timing
-- **Message filtering**: Enable/disable, lecture detection (whitelist > blacklist > starts-with-R rule), placeholder availability ({artist}, {title}), day/hour scheduling
-- **LectureDetector**: Track classification (blacklist > whitelist > starts-with-R), current/next track analysis via internal engine state
+- **AutoRDSHandler** (DONE): RDS message rotation engine with TCP socket protocol (DPSTEXT commands), keepalive resends, configurable rotation timing
+- `src/rds.rs` — RdsMessage, RdsConfig, RdsSchedule data models; RdsHandler background thread; send/filter/format/sanitize functions
+- Engine config: `rds: RdsConfig` with ip, port, default_message, messages list
+- CLI: `rds add/list/remove/toggle/show/status`, `config rds ip/port/default-message`
+- **Message filtering** (DONE): Enable/disable, lecture detection (whitelist > blacklist > starts-with-R rule), placeholder availability ({artist}, {title}), day/hour scheduling
+- `should_display_message()` — 4-step check: enabled, lecture detection for {artist} messages, placeholder availability, schedule matching
+- **LectureDetector** (DONE — Phase F): Track classification (blacklist > whitelist > starts-with-R), current/next track analysis via internal engine state
 - **RDS Config UI**: Modal message editor with 64-char limit, duration (1-60s), day/hour scheduling, live treeview updates
 - Reference spec: `skills/specs/rds-engine-spec.md`
 

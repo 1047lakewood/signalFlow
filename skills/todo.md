@@ -62,9 +62,9 @@
 
 ## Phase G: RDS Engine (Radio Data System)
 
-- [ ] RDS message rotation handler — TCP socket protocol (DPSTEXT commands), keepalive resends, configurable rotation timing
-- [ ] RDS message filtering — Enable/disable, lecture detection, placeholder support ({artist}, {title}), day/hour scheduling
-- [ ] Lecture detector — Track classification (blacklist > whitelist > starts-with-R), current/next track analysis
+- [x] RDS message rotation handler — TCP socket protocol (DPSTEXT commands), keepalive resends, configurable rotation timing
+- [x] RDS message filtering — Enable/disable, lecture detection, placeholder support ({artist}, {title}), day/hour scheduling
+- [x] Lecture detector — Track classification (blacklist > whitelist > starts-with-R), current/next track analysis
 - [ ] RDS config UI — Modal message editor with 64-char limit, duration, day/hour scheduling, live treeview
 
 ## Phase E2: GUI Playlist Interaction

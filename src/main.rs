@@ -6,6 +6,7 @@ use signal_flow::ad_scheduler::AdConfig;
 use signal_flow::engine::Engine;
 use signal_flow::now_playing::NowPlaying;
 use signal_flow::player::{play_playlist, PlaybackResult, Player, RecurringIntroConfig, SilenceConfig};
+use signal_flow::rds::{RdsMessage, RdsSchedule};
 use signal_flow::scheduler::{self, ConflictPolicy, Priority, ScheduleMode};
 use std::path::{Path, PathBuf};
 
@@ -91,6 +92,11 @@ enum Commands {
     Ad {
         #[command(subcommand)]
         action: AdCmd,
+    },
+    /// RDS message management (Radio Data System)
+    Rds {
+        #[command(subcommand)]
+        action: RdsCmd,
     },
 }
 
@@ -195,6 +201,11 @@ enum ConfigCmd {
     AdInserter {
         #[command(subcommand)]
         action: AdInserterConfigCmd,
+    },
+    /// Configure RDS encoder settings
+    Rds {
+        #[command(subcommand)]
+        action: RdsConfigCmd,
     },
     /// Configure lecture detector (blacklist/whitelist)
     Lecture {
@@ -435,6 +446,65 @@ enum ScheduleCmd {
     },
 }
 
+#[derive(Subcommand)]
+enum RdsCmd {
+    /// Add a new RDS message
+    Add {
+        /// Message text (max 64 chars, supports {artist} and {title} placeholders)
+        text: String,
+        /// Display duration in seconds (1-60, default 10)
+        #[arg(short, long, default_value = "10")]
+        duration: u32,
+        /// Enable scheduling (day/hour restrictions)
+        #[arg(long)]
+        scheduled: bool,
+        /// Days of the week (e.g., "Monday,Wednesday,Friday")
+        #[arg(long)]
+        days: Option<String>,
+        /// Hours to display (e.g., "9,10,14,15")
+        #[arg(long)]
+        hours: Option<String>,
+    },
+    /// List all RDS messages
+    List,
+    /// Remove an RDS message by number (1-based)
+    Remove {
+        /// Message number (1-based)
+        num: usize,
+    },
+    /// Toggle an RDS message's enabled state
+    Toggle {
+        /// Message number (1-based)
+        num: usize,
+    },
+    /// Show RDS handler status
+    Status,
+    /// Show details of an RDS message
+    Show {
+        /// Message number (1-based)
+        num: usize,
+    },
+}
+
+#[derive(Subcommand)]
+enum RdsConfigCmd {
+    /// Set RDS encoder IP address
+    Ip {
+        /// IP address (e.g., "192.168.1.100")
+        address: String,
+    },
+    /// Set RDS encoder TCP port
+    Port {
+        /// Port number (e.g., 10001)
+        port: u16,
+    },
+    /// Set default RDS message (shown when no messages are valid)
+    DefaultMessage {
+        /// Default message text (max 64 chars)
+        text: String,
+    },
+}
+
 fn main() {
     let cli = Cli::parse();
     let mut engine = Engine::load();
@@ -457,8 +527,10 @@ fn main() {
             let sched_count = engine.schedule.len();
             let ad_count = engine.ads.len();
             let enabled_ads = engine.ads.iter().filter(|a| a.enabled).count();
+            let rds_msg_count = engine.rds.messages.len();
+            let rds_enabled = engine.rds.messages.iter().filter(|m| m.enabled).count();
             println!(
-                "Playlists: {} | Active: {} | Crossfade: {}s | Silence: {} | Intros: {} | Schedule: {} event(s) | Ads: {}/{} | Conflict: {}",
+                "Playlists: {} | Active: {} | Crossfade: {}s | Silence: {} | Intros: {} | Schedule: {} event(s) | Ads: {}/{} | RDS: {}/{} | Conflict: {}",
                 engine.playlists.len(),
                 engine
                     .active_playlist()
@@ -470,6 +542,8 @@ fn main() {
                 sched_count,
                 enabled_ads,
                 ad_count,
+                rds_enabled,
+                rds_msg_count,
                 engine.conflict_policy
             );
             if let Some(pl) = engine.active_playlist() {
@@ -915,6 +989,24 @@ fn main() {
                     }
                 },
             },
+            ConfigCmd::Rds { action } => match action {
+                RdsConfigCmd::Ip { address } => {
+                    engine.rds.ip = address.clone();
+                    engine.save().expect("Failed to save state");
+                    println!("RDS encoder IP set to: {}", address);
+                }
+                RdsConfigCmd::Port { port } => {
+                    engine.rds.port = port;
+                    engine.save().expect("Failed to save state");
+                    println!("RDS encoder port set to: {}", port);
+                }
+                RdsConfigCmd::DefaultMessage { text } => {
+                    let truncated = if text.len() > 64 { &text[..64] } else { &text };
+                    engine.rds.default_message = truncated.to_string();
+                    engine.save().expect("Failed to save state");
+                    println!("RDS default message set to: {}", truncated);
+                }
+            },
             ConfigCmd::Lecture { action } => match action {
                 LectureCmd::BlacklistAdd { artist } => {
                     engine.lecture_detector.add_blacklist(&artist);
@@ -1019,6 +1111,13 @@ fn main() {
                 println!(
                     "Lecture detector: blacklist={}, whitelist={}",
                     bl_count, wl_count
+                );
+                println!(
+                    "RDS: {}:{} | messages={} | default=\"{}\"",
+                    engine.rds.ip,
+                    engine.rds.port,
+                    engine.rds.messages.len(),
+                    truncate(&engine.rds.default_message, 30)
                 );
             }
         },
@@ -1470,6 +1569,142 @@ fn main() {
                         println!("No ad plays found in period {} to {}", start, end);
                     }
                 }
+            }
+        },
+        Commands::Rds { action } => match action {
+            RdsCmd::Add {
+                text,
+                duration,
+                scheduled,
+                days,
+                hours,
+            } => {
+                if text.len() > 64 {
+                    eprintln!("Error: message text must be 64 characters or fewer (got {})", text.len());
+                    std::process::exit(1);
+                }
+                if duration == 0 || duration > 60 {
+                    eprintln!("Error: duration must be 1-60 seconds");
+                    std::process::exit(1);
+                }
+                let parsed_days: Vec<String> = match days {
+                    Some(d) => d.split(',').map(|s| s.trim().to_string()).collect(),
+                    None => vec![],
+                };
+                let parsed_hours: Vec<u8> = match hours {
+                    Some(h) => {
+                        let mut result = Vec::new();
+                        for part in h.split(',') {
+                            match part.trim().parse::<u8>() {
+                                Ok(v) if v <= 23 => result.push(v),
+                                _ => {
+                                    eprintln!("Error: invalid hour '{}'. Use 0-23", part.trim());
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+                        result
+                    }
+                    None => vec![],
+                };
+                let msg = RdsMessage {
+                    text: text.clone(),
+                    enabled: true,
+                    duration,
+                    scheduled: RdsSchedule {
+                        enabled: scheduled,
+                        days: parsed_days,
+                        hours: parsed_hours,
+                    },
+                };
+                engine.rds.messages.push(msg);
+                let num = engine.rds.messages.len();
+                engine.save().expect("Failed to save state");
+                println!("Added RDS message #{}: \"{}\" ({}s)", num, text, duration);
+            }
+            RdsCmd::List => {
+                if engine.rds.messages.is_empty() {
+                    println!("No RDS messages configured. Use 'rds add' to create one.");
+                    println!("RDS encoder: {}:{}", engine.rds.ip, engine.rds.port);
+                    println!("Default message: \"{}\"", engine.rds.default_message);
+                    return;
+                }
+                println!("RDS encoder: {}:{}", engine.rds.ip, engine.rds.port);
+                println!("Default message: \"{}\"", engine.rds.default_message);
+                println!();
+                println!(
+                    "{:<4} {:<8} {:<34} {:>5} {:<8} {:<10} {}",
+                    "#", "Status", "Message", "Dur", "Sched", "Days", "Hours"
+                );
+                println!("{}", "-".repeat(85));
+                for (i, msg) in engine.rds.messages.iter().enumerate() {
+                    let status = if msg.enabled { "on" } else { "off" };
+                    let sched = if msg.scheduled.enabled { "yes" } else { "no" };
+                    println!(
+                        "{:<4} {:<8} {:<34} {:>3}s {:<8} {:<10} {}",
+                        i + 1,
+                        status,
+                        truncate(&msg.text, 33),
+                        msg.duration,
+                        sched,
+                        truncate(&msg.days_display(), 9),
+                        msg.hours_display()
+                    );
+                }
+            }
+            RdsCmd::Remove { num } => {
+                if num == 0 || num > engine.rds.messages.len() {
+                    eprintln!(
+                        "Error: message #{} not found ({} messages total)",
+                        num,
+                        engine.rds.messages.len()
+                    );
+                    std::process::exit(1);
+                }
+                let removed = engine.rds.messages.remove(num - 1);
+                engine.save().expect("Failed to save state");
+                println!("Removed RDS message #{}: \"{}\"", num, removed.text);
+            }
+            RdsCmd::Toggle { num } => {
+                if num == 0 || num > engine.rds.messages.len() {
+                    eprintln!(
+                        "Error: message #{} not found ({} messages total)",
+                        num,
+                        engine.rds.messages.len()
+                    );
+                    std::process::exit(1);
+                }
+                let msg = &mut engine.rds.messages[num - 1];
+                msg.enabled = !msg.enabled;
+                let status = if msg.enabled { "enabled" } else { "disabled" };
+                engine.save().expect("Failed to save state");
+                println!("RDS message #{} {}", num, status);
+            }
+            RdsCmd::Show { num } => {
+                if num == 0 || num > engine.rds.messages.len() {
+                    eprintln!(
+                        "Error: message #{} not found ({} messages total)",
+                        num,
+                        engine.rds.messages.len()
+                    );
+                    std::process::exit(1);
+                }
+                let msg = &engine.rds.messages[num - 1];
+                println!("RDS Message #{}", num);
+                println!("  Text:      \"{}\"", msg.text);
+                println!("  Enabled:   {}", msg.enabled);
+                println!("  Duration:  {}s", msg.duration);
+                println!("  Scheduled: {}", msg.scheduled.enabled);
+                println!("  Days:      {}", msg.days_display());
+                println!("  Hours:     {}", msg.hours_display());
+            }
+            RdsCmd::Status => {
+                println!("RDS Configuration:");
+                println!("  Encoder: {}:{}", engine.rds.ip, engine.rds.port);
+                println!("  Default: \"{}\"", engine.rds.default_message);
+                let total = engine.rds.messages.len();
+                let enabled = engine.rds.messages.iter().filter(|m| m.enabled).count();
+                println!("  Messages: {}/{} enabled", enabled, total);
             }
         },
         Commands::Playlist { action } => match action {
