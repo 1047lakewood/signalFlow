@@ -1,5 +1,14 @@
 # signalFlow — Changelog
 
+## 2026-02-10 — Unified Architecture Design (Phase E4)
+- Created `skills/unified_architecture.md` design doc for merging CLI+GUI into one Tauri app
+- **AppCore** — central command dispatcher (`AppCommand` enum → `execute()` → `AppResponse`), eliminates duplicated logic between CLI and Tauri
+- **AudioRuntime** — background playback thread with channel-based commands, replaces blocking `play_playlist()` and enables crossfade/auto-advance in GUI
+- **AppEvent bus** — event-driven architecture replacing 500ms polling (TransportChanged, TrackFinished, TrackStarted, AudioLevel, etc.)
+- **Single Mutex** — one `Mutex<AppCore>` replaces three separate Mutexes (engine, player, playback), eliminating deadlock risk
+- **Migration plan** — 5 steps: AppCore → AudioRuntime → Wire Tauri → Test harness → Remove CLI binary
+- No code changes — design only, all existing functionality preserved
+
 ## 2026-02-10 — Play from Selection (GUI)
 - Double-click a track row (on #, status, or duration columns) to start playback from that track
 - Artist/title columns retain their existing double-click-to-edit behavior (no conflict)

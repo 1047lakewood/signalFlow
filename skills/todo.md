@@ -67,6 +67,14 @@
 - [x] Lecture detector — Track classification (blacklist > whitelist > starts-with-R), current/next track analysis
 - [x] RDS config UI — Modal message editor with 64-char limit, duration, day/hour scheduling, live treeview
 
+## Phase E4: Unified App Architecture
+
+- [x] Design unified architecture — Plan how to merge CLI+GUI into one Tauri app while preserving full testability
+- [ ] Migrate CLI commands into Tauri — Move all CLI functionality into Tauri commands (remove standalone CLI binary)
+- [ ] Remove polling/Mutex overhead — Replace Mutex-based state sharing with direct engine ownership or event-driven architecture
+- [ ] Headless test harness — Ensure all features are testable via `cargo test` without launching the GUI
+- [ ] Remove standalone CLI binary — Delete `src/main.rs` CLI once all functionality is covered by the unified app + test suite
+
 ## Phase E2: GUI Playlist Interaction
 
 - [x] Playlist scrollbar dark mode — Fix scrollbar styling to match dark theme
