@@ -12,9 +12,10 @@ function formatTime(secs: number): string {
 
 interface TransportBarProps {
   onTrackChange?: () => void;
+  selectedTrackIndex?: number | null;
 }
 
-function TransportBar({ onTrackChange }: TransportBarProps) {
+function TransportBar({ onTrackChange, selectedTrackIndex }: TransportBarProps) {
   const [state, setState] = useState<TransportState>({
     is_playing: false,
     is_paused: false,
@@ -51,7 +52,8 @@ function TransportBar({ onTrackChange }: TransportBarProps) {
 
   const handlePlay = async () => {
     try {
-      await invoke("transport_play", {});
+      const trackIndex = selectedTrackIndex ?? undefined;
+      await invoke("transport_play", { trackIndex });
       onTrackChange?.();
       pollStatus();
     } catch (e) {

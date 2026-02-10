@@ -8,6 +8,7 @@ interface PlaylistViewProps {
   playlistName: string;
   selectedIndex: number | null;
   onSelectTrack: (index: number | null) => void;
+  onPlayTrack: (index: number) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
   onAddFiles: () => void;
   onFileDrop: (paths: string[]) => void;
@@ -19,7 +20,7 @@ interface EditingCell {
   field: "artist" | "title";
 }
 
-function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, onSelectTrack, onReorder, onAddFiles, onFileDrop, onTracksChanged }: PlaylistViewProps) {
+function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, onSelectTrack, onPlayTrack, onReorder, onAddFiles, onFileDrop, onTracksChanged }: PlaylistViewProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
   const [isDroppingFiles, setIsDroppingFiles] = useState(false);
@@ -218,6 +219,13 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, onSel
                 className={className}
                 draggable={!editingCell}
                 onClick={() => onSelectTrack(track.index)}
+                onDoubleClick={(e) => {
+                  // Don't trigger play if double-clicking an editable cell (artist/title handle their own double-click)
+                  const target = e.target as HTMLElement;
+                  if (!target.closest(".editable-cell")) {
+                    onPlayTrack(track.index);
+                  }
+                }}
                 onDragStart={(e) => handleDragStart(e, track.index)}
                 onDragEnd={handleDragEnd}
                 onDragOver={(e) => handleDragOver(e, track.index)}

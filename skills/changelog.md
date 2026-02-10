@@ -1,5 +1,14 @@
 # signalFlow — Changelog
 
+## 2026-02-10 — Play from Selection (GUI)
+- Double-click a track row (on #, status, or duration columns) to start playback from that track
+- Artist/title columns retain their existing double-click-to-edit behavior (no conflict)
+- Play button in transport bar now starts playback from the selected row instead of the current/first track
+- Added `onPlayTrack` callback prop to `PlaylistView`, fires on row double-click outside editable cells
+- `TransportBar` accepts `selectedTrackIndex` prop, passes it to `transport_play` IPC when pressing Play
+- `handlePlayTrack` in `App.tsx` calls `transport_play` with the track index and refreshes the track list
+- 247 unit tests passing (no new tests — frontend-only wiring over existing `transport_play` IPC with `track_index` parameter)
+
 ## 2026-02-09 — Playlist Scrollbar Dark Mode & Row Selection (GUI)
 - Added themed scrollbar CSS using `::-webkit-scrollbar` pseudo-elements matching dark/light themes
 - Scrollbar track uses `--bg-primary`, thumb uses `--border` with `--text-secondary` on hover

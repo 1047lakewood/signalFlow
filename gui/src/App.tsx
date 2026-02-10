@@ -161,6 +161,15 @@ function App() {
     }
   };
 
+  const handlePlayTrack = useCallback(async (trackIndex: number) => {
+    try {
+      await invoke("transport_play", { trackIndex });
+      await loadTracks();
+    } catch (e) {
+      console.error("Failed to play track:", e);
+    }
+  }, [loadTracks]);
+
   const handleReorder = useCallback(async (fromIndex: number, toIndex: number) => {
     if (!selectedPlaylist) return;
     try {
@@ -312,6 +321,7 @@ function App() {
                 playlistName={selectedPlaylist}
                 selectedIndex={selectedTrackIndex}
                 onSelectTrack={setSelectedTrackIndex}
+                onPlayTrack={handlePlayTrack}
                 onReorder={handleReorder}
                 onAddFiles={handleAddFiles}
                 onFileDrop={handleFileDrop}
@@ -331,7 +341,7 @@ function App() {
           )}
         </div>
       </main>
-      <TransportBar onTrackChange={loadTracks} />
+      <TransportBar onTrackChange={loadTracks} selectedTrackIndex={selectedTrackIndex} />
       {showSettings && (
         <SettingsWindow onClose={() => setShowSettings(false)} />
       )}
