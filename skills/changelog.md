@@ -1,5 +1,17 @@
 # signalFlow — Changelog
 
+## 2026-02-12 — Wire Tauri to AppCore (Phase E4, Step 3)
+- Rewrote `src-tauri/src/main.rs` to delegate all commands through `AppCore` instead of direct `Engine` access
+- **1,315 → 380 lines** — 71% reduction in Tauri backend code
+- **Removed all duplicated types** from main.rs: LogEntry, LogBuffer, PlaybackState, StatusResponse, PlaylistInfo, TrackInfo, ScheduleEventInfo, ConfigResponse, TransportState, AdInfo, RdsMessageInfo, RdsConfigResponse — now imported from `signal_flow::app_core`
+- **Eliminated 2 of 4 Mutexes**: `engine` + `playback` + `logs` consolidated into single `Mutex<AppCore>`; only `player` remains separate
+- **AppState simplified**: `core: Mutex<AppCore>` + `player: Mutex<SendPlayer>` + `level_monitor: LevelMonitor`
+- All 42 IPC handlers are now thin wrappers (1–3 lines each for non-transport, ~20 lines for transport commands)
+- Transport commands use AppCore helpers: `prepare_play()`, `on_stop()`, `on_pause_toggle()`, `prepare_skip()`, `on_seek()`, `get_transport_state()`
+- Ad stats/failures/reports delegate to AppCore methods; thin wrappers remain only for `AdDailyCountResponse` and `AdFailureResponse` (field name mapping)
+- No frontend changes — JSON serialization field names are identical
+- 293 unit tests passing, zero warnings
+
 ## 2026-02-12 — AppCore Module (Phase E4, Step 1)
 - Created `src/app_core.rs` — central command dispatcher that unifies all engine operations
 - **AppCore struct** owns Engine + PlaybackState + LogBuffer in a single place

@@ -1,6 +1,6 @@
 # Unified App Architecture — Design Doc
 
-## Status: STEP 1 COMPLETE — AppCore created, Step 2/3 next
+## Status: STEP 1+3 COMPLETE — AppCore created + Tauri wired to AppCore
 
 ## Problem Statement
 
@@ -177,6 +177,7 @@ The `clap` dependency moves out of the core library.
 - New module `src/app_core.rs` — created with typed methods (not enum-based, more ergonomic)
 - All non-audio commands implemented: playlists, tracks, config, schedule, ads, RDS, lecture detector, logs
 - Transport state helpers: prepare_play(), prepare_skip(), on_stop(), on_pause_toggle(), on_seek()
+- Response data types: StatusData, PlaylistData, TrackData, ConfigData, TransportData, ScheduleEventData, AdData, RdsConfigData, RdsMessageData, LectureConfigData
 - 46 tests against AppCore directly (no Tauri, no GUI)
 - Existing CLI and Tauri still work unchanged
 
@@ -187,17 +188,15 @@ The `clap` dependency moves out of the core library.
 - Auto-advance logic (crossfade, silence skip, auto-intro) runs on audio thread
 - Test with unit tests (mock audio or short test files)
 
-#### Step 3: Wire Tauri to AppCore
-- Replace all 42 IPC handlers with thin wrappers:
-  ```rust
-  #[tauri::command]
-  fn transport_play(state: State<Mutex<AppCore>>, track_index: Option<usize>) -> Result<...> {
-      state.lock().unwrap().execute(AppCommand::Play { track_index })
-  }
-  ```
-- Replace polling with Tauri event emission from AppEvent subscriber
-- Remove Mutex<SendPlayer>, Mutex<PlaybackState>, Arc patterns
-- Single `Mutex<AppCore>` for all state
+#### Step 3: Wire Tauri to AppCore (DONE)
+- Replaced all 42 IPC handlers with thin wrappers calling AppCore methods
+- `main.rs` reduced from 1,315 lines to 380 lines
+- Removed all duplicated types: LogEntry, LogBuffer, PlaybackState, StatusResponse, PlaylistInfo, TrackInfo, etc.
+- AppState simplified: `core: Mutex<AppCore>` + `player: Mutex<SendPlayer>` + `level_monitor: LevelMonitor`
+- Eliminated 2 of 4 Mutexes (engine + playback + logs consolidated into single AppCore Mutex)
+- Transport commands use AppCore helpers: `prepare_play()`, `on_stop()`, `on_pause_toggle()`, `prepare_skip()`, `on_seek()`
+- Player remains separate (will move into AudioRuntime in Step 2)
+- All 293 tests pass, zero warnings
 
 #### Step 4: Create headless test harness
 - `AppCore::new_test()` — creates AppCore with in-memory state (no file persistence)
