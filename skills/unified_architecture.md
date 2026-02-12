@@ -1,6 +1,6 @@
 # Unified App Architecture — Design Doc
 
-## Status: STEP 1+3 COMPLETE — AppCore created + Tauri wired to AppCore
+## Status: STEPS 1+2+3 COMPLETE — AppCore + AudioRuntime + Tauri wired + Polling removed
 
 ## Problem Statement
 
@@ -181,12 +181,18 @@ The `clap` dependency moves out of the core library.
 - 46 tests against AppCore directly (no Tauri, no GUI)
 - Existing CLI and Tauri still work unchanged
 
-#### Step 2: Create AudioRuntime
-- New module `src/audio_runtime.rs`
-- Background thread owns Player, receives AudioCmd via channel
-- Sends AppEvent on track transitions, silence, level changes
-- Auto-advance logic (crossfade, silence skip, auto-intro) runs on audio thread
-- Test with unit tests (mock audio or short test files)
+#### Step 2: Create AudioRuntime (DONE)
+- New module `src/audio_runtime.rs` — dedicated audio thread with channel-based command dispatch
+- `AudioHandle` wraps `mpsc::Sender<AudioCmd>` — naturally Send+Sync, no unsafe needed
+- `spawn_audio_runtime(on_event)` spawns named "audio-runtime" thread, lazy-inits Player
+- Track-end detection via `recv_timeout(50ms)` + `player.is_empty()` — emits `TrackFinished` event
+- File decode happens ON the audio thread (no lock contention)
+- Tauri's `setup()` callback wires AudioRuntime events to `app.emit("transport-changed"/"logs-changed")`
+- `SendPlayer` + `unsafe impl Send/Sync` + `Mutex<SendPlayer>` + `ensure_player()` all removed
+- AppState simplified: `core: Arc<Mutex<AppCore>>` + `audio: AudioHandle` + `level_monitor: LevelMonitor`
+- Frontend polling replaced with `listen("transport-changed")` + `listen("logs-changed")`
+- TransportBar uses `requestAnimationFrame` for smooth elapsed time interpolation
+- 4 new tests: handle_is_send_sync, shutdown_stops_thread, play_nonexistent_emits_error, stop_without_play_emits_stopped
 
 #### Step 3: Wire Tauri to AppCore (DONE)
 - Replaced all 42 IPC handlers with thin wrappers calling AppCore methods
@@ -195,8 +201,8 @@ The `clap` dependency moves out of the core library.
 - AppState simplified: `core: Mutex<AppCore>` + `player: Mutex<SendPlayer>` + `level_monitor: LevelMonitor`
 - Eliminated 2 of 4 Mutexes (engine + playback + logs consolidated into single AppCore Mutex)
 - Transport commands use AppCore helpers: `prepare_play()`, `on_stop()`, `on_pause_toggle()`, `prepare_skip()`, `on_seek()`
-- Player remains separate (will move into AudioRuntime in Step 2)
-- All 293 tests pass, zero warnings
+- Player moved into AudioRuntime in Step 2 — no more Player Mutex
+- All 297 tests pass (293 existing + 4 new AudioRuntime), zero warnings
 
 #### Step 4: Create headless test harness
 - `AppCore::new_test()` — creates AppCore with in-memory state (no file persistence)

@@ -4,23 +4,17 @@ use signal_flow::app_core::{
     AppCore, AdData, ConfigData, LogEntry, PlaylistData, RdsConfigData,
     ScheduleEventData, StatusData, TrackData, TransportData,
 };
+use signal_flow::audio_runtime::{AudioEvent, AudioHandle, spawn_audio_runtime};
 use signal_flow::level_monitor::LevelMonitor;
-use signal_flow::player::Player;
 use serde::Serialize;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tauri::State;
-
-/// Wrapper to make Player Send+Sync for Tauri state.
-/// Safety: Player is only ever accessed behind a Mutex, ensuring exclusive access.
-struct SendPlayer(Option<Player>);
-unsafe impl Send for SendPlayer {}
-unsafe impl Sync for SendPlayer {}
+use tauri::{AppHandle, Emitter, Manager, State};
 
 struct AppState {
-    core: Mutex<AppCore>,
-    player: Mutex<SendPlayer>,
+    core: Arc<Mutex<AppCore>>,
+    audio: AudioHandle,
     level_monitor: LevelMonitor,
 }
 
@@ -113,153 +107,115 @@ fn edit_track_metadata(
 
 // ── Transport controls ─────────────────────────────────────────────────────
 
-fn ensure_player(player_lock: &Mutex<SendPlayer>) -> Result<(), String> {
-    let mut sp = player_lock.lock().unwrap();
-    if sp.0.is_none() {
-        sp.0 = Some(Player::new()?);
-    }
-    Ok(())
-}
-
 #[tauri::command]
-fn transport_play(state: State<AppState>, track_index: Option<usize>) -> Result<(), String> {
-    ensure_player(&state.player)?;
-
-    // 1. Lock core: prepare play state (updates engine, playback, logs)
+fn transport_play(state: State<AppState>, app: AppHandle, track_index: Option<usize>) -> Result<(), String> {
+    // Lock core: prepare play state (updates engine, playback, logs)
     let (track_path, ..) = {
         let mut core = state.core.lock().unwrap();
         core.prepare_play(track_index)?
     }; // core lock dropped
 
-    // 2. Decode file BEFORE locking player (file I/O is slow)
-    let prepared = Player::prepare_file_with_level(&track_path, state.level_monitor.clone())?;
+    // Send play command to audio thread (file decode happens there)
+    state.audio.play(track_path, state.level_monitor.clone());
 
-    // 3. Lock player briefly: stop + play prepared source
-    {
-        state.level_monitor.reset();
-        let player_guard = state.player.lock().unwrap();
-        let player = player_guard.0.as_ref().unwrap();
-        player.stop_and_play_prepared(prepared);
-    } // player lock dropped
+    // Emit events so frontend updates immediately
+    let _ = app.emit("transport-changed", ());
+    let _ = app.emit("logs-changed", ());
 
     Ok(())
 }
 
 #[tauri::command]
-fn transport_stop(state: State<AppState>) -> Result<(), String> {
-    // 1. Stop the player
-    {
-        let player_guard = state.player.lock().unwrap();
-        if let Some(player) = player_guard.0.as_ref() {
-            player.stop();
-        }
-    } // player lock dropped
-
+fn transport_stop(state: State<AppState>, app: AppHandle) -> Result<(), String> {
+    // Stop audio
+    state.audio.stop();
     state.level_monitor.reset();
 
-    // 2. Update core state (resets playback + logs)
+    // Update core state
     {
         let mut core = state.core.lock().unwrap();
         core.on_stop();
-    } // core lock dropped
+    }
+
+    let _ = app.emit("transport-changed", ());
+    let _ = app.emit("logs-changed", ());
 
     Ok(())
 }
 
 #[tauri::command]
-fn transport_pause(state: State<AppState>) -> Result<(), String> {
-    // 1. Toggle pause state in core (validates + updates playback + logs)
+fn transport_pause(state: State<AppState>, app: AppHandle) -> Result<(), String> {
+    // Toggle pause state in core
     let now_paused = {
         let mut core = state.core.lock().unwrap();
         core.on_pause_toggle()?
-    }; // core lock dropped
+    };
 
-    // 2. Perform player action
-    {
-        let player_guard = state.player.lock().unwrap();
-        let player = player_guard.0.as_ref().ok_or("No audio player")?;
-        if now_paused {
-            player.pause();
-        } else {
-            player.resume();
-        }
-    } // player lock dropped
+    // Send to audio thread
+    if now_paused {
+        state.audio.pause();
+    } else {
+        state.audio.resume();
+    }
+
+    let _ = app.emit("transport-changed", ());
+    let _ = app.emit("logs-changed", ());
 
     Ok(())
 }
 
 #[tauri::command]
-fn transport_skip(state: State<AppState>) -> Result<(), String> {
-    // 1. Stop current playback
-    {
-        let player_guard = state.player.lock().unwrap();
-        if let Some(player) = player_guard.0.as_ref() {
-            player.stop();
-        }
-    } // player lock dropped
+fn transport_skip(state: State<AppState>, app: AppHandle) -> Result<(), String> {
+    // Stop current playback
+    state.audio.stop();
 
-    // 2. Advance to next track in core (updates engine, playback, logs)
+    // Advance to next track in core
     let skip_result = {
         let mut core = state.core.lock().unwrap();
         core.prepare_skip()
-    }; // core lock dropped
+    };
 
     let (track_path, ..) = match skip_result {
         Ok(data) => data,
-        Err(ref e) if e == "__end_of_playlist__" => return Ok(()),
+        Err(ref e) if e == "__end_of_playlist__" => {
+            let _ = app.emit("transport-changed", ());
+            let _ = app.emit("logs-changed", ());
+            return Ok(());
+        }
         Err(e) => return Err(e),
     };
 
-    // 3. Play next track
-    {
-        ensure_player(&state.player)?;
-        let player_guard = state.player.lock().unwrap();
-        let player = player_guard.0.as_ref().unwrap();
-        player.play_file(&track_path)?;
-    } // player lock dropped
+    // Play next track on audio thread
+    state.audio.play(track_path, state.level_monitor.clone());
+
+    let _ = app.emit("transport-changed", ());
+    let _ = app.emit("logs-changed", ());
 
     Ok(())
 }
 
 #[tauri::command]
-fn transport_seek(state: State<AppState>, position_secs: f64) -> Result<(), String> {
-    // 1. Update timing in core
+fn transport_seek(state: State<AppState>, app: AppHandle, position_secs: f64) -> Result<(), String> {
+    // Update timing in core
     {
         let mut core = state.core.lock().unwrap();
         core.on_seek(position_secs)?;
-    } // core lock dropped
+    }
 
-    // 2. Seek on the player
+    // Seek on audio thread
     let seek_pos = Duration::from_secs_f64(position_secs.max(0.0));
-    {
-        let player_guard = state.player.lock().unwrap();
-        let player = player_guard.0.as_ref().ok_or("No audio player")?;
-        player.try_seek(seek_pos)?;
-    } // player lock dropped
+    state.audio.seek(seek_pos);
+
+    let _ = app.emit("transport-changed", ());
 
     Ok(())
 }
 
 #[tauri::command]
 fn transport_status(state: State<AppState>) -> TransportData {
-    // 1. Get transport state from core
-    let mut transport = {
-        let core = state.core.lock().unwrap();
-        core.get_transport_state()
-    }; // core lock dropped
-
-    // 2. Check if the sink has finished playing (track ended naturally)
-    if transport.is_playing && !transport.is_paused {
-        let player_guard = state.player.lock().unwrap();
-        let actually_playing = if let Some(player) = player_guard.0.as_ref() {
-            !player.is_empty()
-        } else {
-            false
-        };
-        transport.is_playing = actually_playing;
-    } // player lock dropped
-
-    transport
+    // Simplified: only locks core, no player check needed.
+    // Track-end detection is handled by the audio runtime thread.
+    state.core.lock().unwrap().get_transport_state()
 }
 
 // ── Audio Level ─────────────────────────────────────────────────────────────
@@ -490,15 +446,47 @@ fn main() {
         .unwrap_or_else(|| PathBuf::from("."))
         .join("signalFlow");
     let state_path = data_dir.join("signalflow_state.json");
-    let core = AppCore::new(&state_path);
     let level_monitor = LevelMonitor::new();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .manage(AppState {
-            core: Mutex::new(core),
-            player: Mutex::new(SendPlayer(None)),
-            level_monitor,
+        .setup(move |app| {
+            let core = Arc::new(Mutex::new(AppCore::new(&state_path)));
+            let app_handle = app.handle().clone();
+
+            // Spawn audio runtime with event callback
+            let core_for_audio = core.clone();
+            let audio = spawn_audio_runtime(move |event| {
+                match event {
+                    AudioEvent::TrackFinished => {
+                        core_for_audio.lock().unwrap().on_stop();
+                        let _ = app_handle.emit("transport-changed", ());
+                        let _ = app_handle.emit("logs-changed", ());
+                    }
+                    AudioEvent::PlayError(ref e) => {
+                        let mut c = core_for_audio.lock().unwrap();
+                        c.on_stop();
+                        c.log("error", format!("Audio error: {}", e));
+                        let _ = app_handle.emit("transport-changed", ());
+                        let _ = app_handle.emit("logs-changed", ());
+                    }
+                    AudioEvent::Playing
+                    | AudioEvent::Stopped
+                    | AudioEvent::Paused
+                    | AudioEvent::Resumed
+                    | AudioEvent::Seeked(_) => {
+                        let _ = app_handle.emit("transport-changed", ());
+                    }
+                }
+            });
+
+            app.manage(AppState {
+                core,
+                audio,
+                level_monitor,
+            });
+
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             // Status

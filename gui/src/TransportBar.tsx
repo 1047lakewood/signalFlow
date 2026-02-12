@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { TransportState } from "./types";
 import LevelMeter from "./LevelMeter";
 import WaveformDisplay from "./WaveformDisplay";
@@ -29,16 +30,20 @@ function TransportBar({ onTrackChange, selectedTrackIndex, onPlayingIndexChange 
     next_title: null,
     track_path: null,
   });
-  const pollRef = useRef<number | null>(null);
   const lastReportedIndex = useRef<number | null | undefined>(undefined);
-  const pollInFlight = useRef(false);
 
-  const pollStatus = useCallback(async () => {
-    if (pollInFlight.current) return; // skip if previous poll hasn't returned
-    pollInFlight.current = true;
+  // Elapsed time interpolation: store base values from last status fetch
+  const baseElapsed = useRef(0);
+  const baseTimestamp = useRef(0);
+  const [displayElapsed, setDisplayElapsed] = useState(0);
+
+  const fetchStatus = useCallback(async () => {
     try {
       const s = await invoke<TransportState>("transport_status");
       setState(s);
+      // Update interpolation base
+      baseElapsed.current = s.elapsed_secs;
+      baseTimestamp.current = performance.now();
       // Report playing track index back to parent
       const newIndex = s.is_playing ? (s.track_index ?? null) : null;
       if (newIndex !== lastReportedIndex.current) {
@@ -47,28 +52,51 @@ function TransportBar({ onTrackChange, selectedTrackIndex, onPlayingIndexChange 
       }
     } catch (e) {
       console.error("transport_status error:", e);
-    } finally {
-      pollInFlight.current = false;
     }
   }, [onPlayingIndexChange]);
 
+  // Listen for transport-changed events instead of polling
   useEffect(() => {
-    // Poll every 500ms
-    pollStatus();
-    pollRef.current = window.setInterval(pollStatus, 500);
+    // Fetch initial state on mount
+    fetchStatus();
+
+    const unlisten = listen("transport-changed", () => {
+      fetchStatus();
+    });
+
     return () => {
-      if (pollRef.current !== null) {
-        window.clearInterval(pollRef.current);
-      }
+      unlisten.then((fn) => fn());
     };
-  }, [pollStatus]);
+  }, [fetchStatus]);
+
+  // Smooth elapsed time interpolation via requestAnimationFrame
+  useEffect(() => {
+    let rafId: number;
+
+    const tick = () => {
+      if (state.is_playing && !state.is_paused) {
+        const now = performance.now();
+        const delta = (now - baseTimestamp.current) / 1000;
+        const interpolated = Math.min(
+          baseElapsed.current + delta,
+          state.duration_secs
+        );
+        setDisplayElapsed(interpolated);
+      } else {
+        setDisplayElapsed(baseElapsed.current);
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [state.is_playing, state.is_paused, state.duration_secs]);
 
   const handlePlay = async () => {
     try {
       const trackIndex = selectedTrackIndex ?? undefined;
       await invoke("transport_play", { trackIndex });
       onTrackChange?.();
-      pollStatus();
     } catch (e) {
       console.error("transport_play error:", e);
     }
@@ -78,7 +106,6 @@ function TransportBar({ onTrackChange, selectedTrackIndex, onPlayingIndexChange 
     try {
       await invoke("transport_stop");
       onTrackChange?.();
-      pollStatus();
     } catch (e) {
       console.error("transport_stop error:", e);
     }
@@ -87,7 +114,6 @@ function TransportBar({ onTrackChange, selectedTrackIndex, onPlayingIndexChange 
   const handlePause = async () => {
     try {
       await invoke("transport_pause");
-      pollStatus();
     } catch (e) {
       console.error("transport_pause error:", e);
     }
@@ -97,7 +123,6 @@ function TransportBar({ onTrackChange, selectedTrackIndex, onPlayingIndexChange 
     try {
       await invoke("transport_skip");
       onTrackChange?.();
-      pollStatus();
     } catch (e) {
       console.error("transport_skip error:", e);
     }
@@ -106,13 +131,12 @@ function TransportBar({ onTrackChange, selectedTrackIndex, onPlayingIndexChange 
   const handleWaveformSeek = useCallback(async (positionSecs: number) => {
     try {
       await invoke("transport_seek", { positionSecs });
-      pollStatus();
     } catch (e) {
       console.error("transport_seek error:", e);
     }
-  }, [pollStatus]);
+  }, []);
 
-  const elapsed = state.elapsed_secs;
+  const elapsed = displayElapsed;
   const remaining = Math.max(0, state.duration_secs - elapsed);
   const hasTrack = state.track_artist || state.track_title;
 

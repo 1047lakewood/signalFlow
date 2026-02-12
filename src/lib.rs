@@ -4,6 +4,7 @@
 //! The CLI and future Tauri GUI consume this crate.
 
 pub mod app_core;
+pub mod audio_runtime;
 pub mod ad_inserter;
 pub mod ad_logger;
 pub mod ad_report;

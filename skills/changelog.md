@@ -1,5 +1,19 @@
 # signalFlow — Changelog
 
+## 2026-02-12 — Remove polling/Mutex overhead with AudioRuntime (Phase E4)
+- Created `src/audio_runtime.rs` — dedicated audio thread with channel-based command dispatch
+- **Removed all `unsafe` code** from `src-tauri/src/main.rs`: `SendPlayer`, `unsafe impl Send/Sync` eliminated
+- **Removed `Mutex<SendPlayer>`** — Player now lives on the audio thread, `AudioHandle` (wraps `mpsc::Sender`) is naturally Send+Sync
+- **Replaced frontend polling with Tauri events**: `listen("transport-changed")` and `listen("logs-changed")`
+- **TransportBar.tsx**: removed 500ms `setInterval` polling, added `requestAnimationFrame` elapsed time interpolation for smooth display
+- **LogPane.tsx**: removed 1s `setInterval` polling, listens for `logs-changed` events
+- **Track-end detection** moved from `transport_status` poll to audio thread (50ms `recv_timeout` + `player.is_empty()`)
+- Audio file decoding now happens entirely on the audio thread — no lock contention during I/O
+- AppState simplified: `core: Arc<Mutex<AppCore>>` + `audio: AudioHandle` + `level_monitor: LevelMonitor`
+- Tauri `setup()` callback wires AudioRuntime events to emit Tauri events (TrackFinished → on_stop + emit, PlayError → log + emit)
+- `transport_status` command simplified — only locks core, no player check needed
+- 4 new AudioRuntime tests, 297 total tests passing, zero warnings
+
 ## 2026-02-12 — Wire Tauri to AppCore (Phase E4, Step 3)
 - Rewrote `src-tauri/src/main.rs` to delegate all commands through `AppCore` instead of direct `Engine` access
 - **1,315 → 380 lines** — 71% reduction in Tauri backend code

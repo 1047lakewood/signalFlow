@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { LogEntry } from "./types";
 
 function LogPane() {
@@ -17,9 +18,17 @@ function LogPane() {
   }, []);
 
   useEffect(() => {
+    // Fetch once on mount
     loadLogs();
-    const interval = setInterval(loadLogs, 1000);
-    return () => clearInterval(interval);
+
+    // Listen for logs-changed events instead of polling
+    const unlisten = listen("logs-changed", () => {
+      loadLogs();
+    });
+
+    return () => {
+      unlisten.then((fn) => fn());
+    };
   }, [loadLogs]);
 
   useEffect(() => {
