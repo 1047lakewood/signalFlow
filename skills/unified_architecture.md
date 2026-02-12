@@ -1,6 +1,6 @@
 # Unified App Architecture — Design Doc
 
-## Status: DESIGN PHASE
+## Status: STEP 1 COMPLETE — AppCore created, Step 2/3 next
 
 ## Problem Statement
 
@@ -173,11 +173,12 @@ The `clap` dependency moves out of the core library.
 
 ### Migration Plan
 
-#### Step 1: Create AppCore + AppCommand in core library
-- New module `src/app_core.rs`
-- Implement `execute()` for all commands, delegating to existing Engine/Player methods
-- Write tests against AppCore directly (no Tauri, no GUI)
-- Keep existing CLI and Tauri working during migration
+#### Step 1: Create AppCore + AppCommand in core library (DONE)
+- New module `src/app_core.rs` — created with typed methods (not enum-based, more ergonomic)
+- All non-audio commands implemented: playlists, tracks, config, schedule, ads, RDS, lecture detector, logs
+- Transport state helpers: prepare_play(), prepare_skip(), on_stop(), on_pause_toggle(), on_seek()
+- 46 tests against AppCore directly (no Tauri, no GUI)
+- Existing CLI and Tauri still work unchanged
 
 #### Step 2: Create AudioRuntime
 - New module `src/audio_runtime.rs`

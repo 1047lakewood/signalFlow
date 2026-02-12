@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tauri dev:*)",
+      "Bash(timeout:*)",
+      "Bash(npx:*)",
+      "Bash(\"G:/Misc/Dev/signalFlow/gui/node_modules/.bin/tauri\" dev)",
+      "Bash(npm run dev:*)",
+      "Bash(cargo run:*)",
+      "Bash(cmd.exe /c \"taskkill /f /im node.exe\")",
+      "Bash(cmd.exe /c \"netstat -ano | findstr :1420\")",
+      "Bash(node -e:*)"
+    ]
+  }
+}

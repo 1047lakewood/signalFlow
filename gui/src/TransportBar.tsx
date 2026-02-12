@@ -13,9 +13,10 @@ function formatTime(secs: number): string {
 interface TransportBarProps {
   onTrackChange?: () => void;
   selectedTrackIndex?: number | null;
+  onPlayingIndexChange?: (index: number | null) => void;
 }
 
-function TransportBar({ onTrackChange, selectedTrackIndex }: TransportBarProps) {
+function TransportBar({ onTrackChange, selectedTrackIndex, onPlayingIndexChange }: TransportBarProps) {
   const [state, setState] = useState<TransportState>({
     is_playing: false,
     is_paused: false,
@@ -29,15 +30,27 @@ function TransportBar({ onTrackChange, selectedTrackIndex }: TransportBarProps) 
     track_path: null,
   });
   const pollRef = useRef<number | null>(null);
+  const lastReportedIndex = useRef<number | null | undefined>(undefined);
+  const pollInFlight = useRef(false);
 
   const pollStatus = useCallback(async () => {
+    if (pollInFlight.current) return; // skip if previous poll hasn't returned
+    pollInFlight.current = true;
     try {
       const s = await invoke<TransportState>("transport_status");
       setState(s);
+      // Report playing track index back to parent
+      const newIndex = s.is_playing ? (s.track_index ?? null) : null;
+      if (newIndex !== lastReportedIndex.current) {
+        lastReportedIndex.current = newIndex;
+        onPlayingIndexChange?.(newIndex);
+      }
     } catch (e) {
       console.error("transport_status error:", e);
+    } finally {
+      pollInFlight.current = false;
     }
-  }, []);
+  }, [onPlayingIndexChange]);
 
   useEffect(() => {
     // Poll every 500ms

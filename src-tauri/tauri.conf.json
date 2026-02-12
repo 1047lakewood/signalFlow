@@ -5,8 +5,8 @@
   "build": {
     "frontendDist": "../gui/dist",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "cd ../gui && npm run dev",
-    "beforeBuildCommand": "cd ../gui && npm run build"
+    "beforeDevCommand": { "script": "npm run dev", "cwd": "../gui" },
+    "beforeBuildCommand": { "script": "npm run build", "cwd": "../gui" }
   },
   "app": {
     "windows": [

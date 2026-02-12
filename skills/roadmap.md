@@ -222,5 +222,17 @@
 - **RDS Config UI** (DONE): Modal message editor with 64-char limit and live counter, duration (1-60s), day/hour scheduling, connection settings (IP/port/default message), split-panel layout matching Ad Config pattern
 - Reference spec: `skills/specs/rds-engine-spec.md`
 
+### Unified App Architecture
+- **Merge CLI and GUI into a single application** — eliminate the separate CLI binary and Tauri backend split
+- The current architecture (core library + CLI binary + Tauri backend) causes polling and data transfer issues between the GUI and engine
+- Target: one Tauri app that embeds the engine directly, with no IPC polling or Mutex-heavy state sharing
+- **Testability is a hard requirement:** the original reason for CLI-first was to enable LLM/automated testing without clicking through the UI
+- Preserve testability via:
+  - Comprehensive Rust unit/integration tests on the core library (already exists)
+  - Tauri command-level integration tests (invoke commands programmatically, assert responses)
+  - Headless/CLI test harness: a test binary or `cargo test` suite that exercises all features without launching the GUI
+  - Optional: expose a CLI subcommand or socket interface within the Tauri app for scripted testing
+- Remove the standalone CLI binary (`src/main.rs`) once all its functionality is testable through the unified app's test suite
+
 ### Advanced Auto Playlist Builder
 - Rule-based automatic playlist generation (genre, tempo, artist separation, dayparting, etc.)

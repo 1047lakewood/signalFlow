@@ -5,7 +5,7 @@ use crate::rds::RdsConfig;
 use crate::scheduler::{ConflictPolicy, Schedule};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const STATE_FILE: &str = "signalflow_state.json";
 
@@ -57,6 +57,9 @@ pub struct Engine {
     /// RDS (Radio Data System) message rotation configuration.
     #[serde(default)]
     pub rds: RdsConfig,
+    /// Runtime-only: path to the state file. Not serialized.
+    #[serde(skip)]
+    state_path: Option<PathBuf>,
 }
 
 impl Engine {
@@ -78,29 +81,52 @@ impl Engine {
             ad_inserter: AdInserterSettings::default(),
             lecture_detector: LectureDetector::new(),
             rds: RdsConfig::default(),
+            state_path: None,
         }
     }
 
-    /// Load engine state from JSON, or create a new instance if not found.
+    fn resolve_path(&self) -> &Path {
+        self.state_path
+            .as_deref()
+            .unwrap_or_else(|| Path::new(STATE_FILE))
+    }
+
+    /// Load engine state from the default state file (CWD).
     pub fn load() -> Self {
-        let path = Path::new(STATE_FILE);
+        Self::load_from(Path::new(STATE_FILE))
+    }
+
+    /// Load engine state from a specific path.
+    pub fn load_from(path: &Path) -> Self {
         if path.exists() {
             match fs::read_to_string(path) {
-                Ok(data) => match serde_json::from_str(&data) {
-                    Ok(engine) => return engine,
+                Ok(data) => match serde_json::from_str::<Engine>(&data) {
+                    Ok(mut engine) => {
+                        engine.state_path = Some(path.to_path_buf());
+                        return engine;
+                    }
                     Err(e) => eprintln!("Warning: corrupt state file, starting fresh: {}", e),
                 },
                 Err(e) => eprintln!("Warning: could not read state file: {}", e),
             }
         }
-        Engine::new()
+        let mut engine = Engine::new();
+        engine.state_path = Some(path.to_path_buf());
+        engine
     }
 
     /// Persist current state to JSON.
     pub fn save(&self) -> Result<(), String> {
+        let path = self.resolve_path();
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                fs::create_dir_all(parent)
+                    .map_err(|e| format!("Create dir error: {}", e))?;
+            }
+        }
         let json =
             serde_json::to_string_pretty(self).map_err(|e| format!("Serialize error: {}", e))?;
-        fs::write(STATE_FILE, json).map_err(|e| format!("Write error: {}", e))?;
+        fs::write(path, json).map_err(|e| format!("Write error: {}", e))?;
         Ok(())
     }
 

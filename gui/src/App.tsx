@@ -53,6 +53,10 @@ function App() {
       const target = active ?? pls[0];
       if (target && selectedPlaylist === null) {
         setSelectedPlaylist(target.name);
+        // If no playlist was active on the backend, activate the auto-selected one
+        if (!active) {
+          await invoke("set_active_playlist", { name: target.name });
+        }
       }
     } catch (e) {
       console.error("Failed to load playlists:", e);
@@ -62,19 +66,16 @@ function App() {
   const loadTracks = useCallback(async () => {
     if (!selectedPlaylist) {
       setTracks([]);
-      setCurrentIndex(null);
       return;
     }
     try {
       const t = await invoke<TrackInfo[]>("get_playlist_tracks", { name: selectedPlaylist });
       setTracks(t);
-      const pl = playlists.find((p) => p.name === selectedPlaylist);
-      setCurrentIndex(pl?.current_index ?? null);
     } catch (e) {
       console.error("Failed to load tracks:", e);
       setTracks([]);
     }
-  }, [selectedPlaylist, playlists]);
+  }, [selectedPlaylist]);
 
   useEffect(() => {
     loadPlaylists();
@@ -161,9 +162,14 @@ function App() {
     }
   };
 
+  const handlePlayingIndexChange = useCallback((index: number | null) => {
+    setCurrentIndex(index);
+  }, []);
+
   const handlePlayTrack = useCallback(async (trackIndex: number) => {
     try {
       await invoke("transport_play", { trackIndex });
+      setCurrentIndex(trackIndex);
       await loadTracks();
     } catch (e) {
       console.error("Failed to play track:", e);
@@ -341,7 +347,7 @@ function App() {
           )}
         </div>
       </main>
-      <TransportBar onTrackChange={loadTracks} selectedTrackIndex={selectedTrackIndex} />
+      <TransportBar onTrackChange={loadTracks} selectedTrackIndex={selectedTrackIndex} onPlayingIndexChange={handlePlayingIndexChange} />
       {showSettings && (
         <SettingsWindow onClose={() => setShowSettings(false)} />
       )}

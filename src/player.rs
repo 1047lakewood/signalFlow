@@ -57,6 +57,26 @@ impl Player {
         Ok(())
     }
 
+    /// Stop current playback and play a pre-decoded source with level monitoring.
+    /// Use `prepare_file_with_level` to create the source outside the lock,
+    /// then call this briefly under the lock.
+    pub fn stop_and_play_prepared(&self, source: LevelSource<rodio::source::SamplesConverter<Decoder<BufReader<File>>, f32>>) {
+        self.sink.stop();
+        self.sink.append(source);
+        self.sink.play();
+    }
+
+    /// Prepare a file for playback with level monitoring.
+    /// Does file I/O and decoding — call this OUTSIDE any lock.
+    /// Then pass the result to `stop_and_play_prepared` under the lock.
+    pub fn prepare_file_with_level(path: &Path, monitor: LevelMonitor) -> Result<LevelSource<rodio::source::SamplesConverter<Decoder<BufReader<File>>, f32>>, String> {
+        let file = File::open(path)
+            .map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
+        let source = Decoder::new(BufReader::new(file))
+            .map_err(|e| format!("Cannot decode '{}': {}", path.display(), e))?;
+        Ok(LevelSource::new(source.convert_samples::<f32>(), monitor))
+    }
+
     /// Play an audio file on a new sink, returning ownership of that sink.
     pub fn play_file_new_sink(&self, path: &Path) -> Result<Sink, String> {
         let sink = self.create_sink()?;

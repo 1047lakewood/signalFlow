@@ -21,7 +21,25 @@
       "Bash(node:*)",
       "Bash(git reset:*)",
       "Bash(git rm:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(git -C \"G:\\\\Misc\\\\Dev\\\\signalFlow\" commit -m \"$\\(cat <<''EOF''\nAdd GUI auto-intro dot indicator: dynamic has_intro computation in IPC layer\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git -C \"G:\\\\Misc\\\\Dev\\\\signalFlow\" push origin main)",
+      "Bash(git -C \"G:\\\\Misc\\\\Dev\\\\signalFlow\" status)",
+      "Bash(git -C \"G:\\\\Misc\\\\Dev\\\\signalFlow\" diff --stat)",
+      "Bash(git -C \"G:\\\\Misc\\\\Dev\\\\signalFlow\" log --oneline -5)",
+      "Bash(git -C \"G:\\\\Misc\\\\Dev\\\\signalFlow\" add gui/src/IntroSettings.tsx gui/src/App.tsx gui/src/styles.css gui/src/types.ts skills/auto_intro.md skills/changelog.md skills/gui.md skills/todo.md)",
+      "Bash(git -C \"G:\\\\Misc\\\\Dev\\\\signalFlow\" commit -m \"$\\(cat <<''EOF''\nAdd GUI auto-intro config: modal dialog with folder picker, recurring interval/duck volume settings\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git -C \"G:\\\\Misc\\\\Dev\\\\signalFlow\" add src/waveform.rs src/lib.rs src/main.rs src-tauri/src/main.rs gui/src/WaveformDisplay.tsx gui/src/TransportBar.tsx gui/src/types.ts gui/src/styles.css skills/todo.md skills/changelog.md skills/roadmap.md)",
+      "Bash(del \"gui\\\\src\\\\CrossfadeSettings.tsx\")",
+      "Bash(del \"gui\\\\src\\\\SilenceSettings.tsx\")",
+      "Bash(del \"gui\\\\src\\\\IntroSettings.tsx\")",
+      "Bash(\"G:/Misc/Dev/signalFlow/gui/node_modules/.bin/tauri\" dev)",
+      "Bash(powershell -Command:*)",
+      "Bash(cargo search:*)",
+      "Bash(cargo doc:*)",
+      "Bash(dir:*)",
+      "Bash(git status:*)",
+      "Bash(ls -la \"G:\\\\Misc\\\\Dev\\\\signalFlow\\\\gui\\\\src\"\" | grep -i \".tsx|.ts \")"
     ]
   }
 }

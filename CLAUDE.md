@@ -80,12 +80,18 @@ This is planning only. Implementation happens through the "Continue" protocol.
 
 ## Rules
 
+- **"Run" means launch the app:** When the user says "run", they mean launch the Tauri dev app (see Memory for launch steps), NOT the continue/workloop cycle
+- **Learn from mistakes:** When something fails (running/stopping the app, builds, tests, anything), record what actually worked in Memory so the same mistake isn't repeated. This applies to everything — not just the app lifecycle
+- **Best practices override convenience:** The project structure keeps CLI and GUI separate for easier LLM debugging, but always override for best practices (e.g., storing runtime data in OS app data dir instead of source tree)
 - **CLI-first:** If it doesn't work in the CLI, it doesn't exist
 - **One feature per cycle:** Don't bundle unrelated changes
 - **Library/binary split:** Logic in `src/lib.rs` + modules, CLI wiring in `src/main.rs`
-- **Test everything:** Every module gets `#[cfg(test)]` unit tests
+- **Test everything:** Every module gets `#[cfg(test)]` unit tests. Write lots of tests — err on the side of more coverage, not less
+- **Test GUI too:** GUI/Tauri code also needs tests (component tests, integration tests). Don't skip testing just because it's frontend
 - **Design before complexity:** Multi-step features get a `skills/*.md` doc first
 - **Full roadmap:** See `skills/roadmap.md` for the complete feature spec
+- **Phase-sized features get their own phase:** If a todo item is complex enough to warrant multiple sub-steps (e.g., has its own spec doc or multiple components), break it out into its own phase with individual checkboxes for each step
+- **Todo ordering:** When adding new todo items, always insert them before the last far-off phase (Phase H: Future / Long-Term)
 - **Keep skills docs current (hard gate):** Do NOT mark a todo item `[x]` until its design docs are accurate. During the LOG step, update all `skills/*.md` files that reference the completed feature:
   - Add status markers (DONE) to completed sections
   - Fix data model descriptions to match actual struct fields

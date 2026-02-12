@@ -424,45 +424,55 @@ fn transport_play(
 ) -> Result<(), String> {
     ensure_player(&state.player)?;
 
-    let mut engine = state.engine.lock().unwrap();
-    let pl = engine
-        .active_playlist_mut()
-        .ok_or_else(|| "No active playlist".to_string())?;
+    // 1. Lock engine, extract what we need, then drop it
+    let (track_path, track_duration, track_artist, track_title, playlist_name, idx) = {
+        let mut engine = state.engine.lock().unwrap();
+        let pl = engine
+            .active_playlist_mut()
+            .ok_or_else(|| "No active playlist".to_string())?;
 
-    let idx = track_index.unwrap_or_else(|| pl.current_index.unwrap_or(0));
-    if idx >= pl.tracks.len() {
-        return Err(format!(
-            "Track index {} out of range ({} tracks)",
-            idx,
-            pl.tracks.len()
-        ));
-    }
+        let idx = track_index.unwrap_or_else(|| pl.current_index.unwrap_or(0));
+        if idx >= pl.tracks.len() {
+            return Err(format!(
+                "Track index {} out of range ({} tracks)",
+                idx,
+                pl.tracks.len()
+            ));
+        }
 
-    let track_path = pl.tracks[idx].path.clone();
-    let track_duration = pl.tracks[idx].duration;
-    let track_artist = pl.tracks[idx].artist.clone();
-    let track_title = pl.tracks[idx].title.clone();
-    let playlist_name = pl.name.clone();
-    pl.current_index = Some(idx);
-    engine.save().ok(); // best-effort persist
+        let track_path = pl.tracks[idx].path.clone();
+        let track_duration = pl.tracks[idx].duration;
+        let track_artist = pl.tracks[idx].artist.clone();
+        let track_title = pl.tracks[idx].title.clone();
+        let playlist_name = pl.name.clone();
+        pl.current_index = Some(idx);
+        engine.save().ok(); // best-effort persist
+        (track_path, track_duration, track_artist, track_title, playlist_name, idx)
+    }; // engine lock dropped
 
-    // Play the file with level monitoring
-    state.level_monitor.reset();
-    let player_guard = state.player.lock().unwrap();
-    let player = player_guard.0.as_ref().unwrap();
-    player.stop(); // stop any current playback
-    player.play_file_with_level(&track_path, state.level_monitor.clone())?;
+    // 2. Decode file BEFORE locking player (file I/O is slow)
+    let prepared = Player::prepare_file_with_level(&track_path, state.level_monitor.clone())?;
 
-    // Update playback state
-    let mut pb = state.playback.lock().unwrap();
-    pb.is_playing = true;
-    pb.is_paused = false;
-    pb.track_index = Some(idx);
-    pb.playlist_name = Some(playlist_name);
-    pb.track_duration = track_duration;
-    pb.start_time = Some(Instant::now());
-    pb.total_paused = Duration::ZERO;
-    pb.pause_start = None;
+    // 3. Lock player briefly: stop + append + play
+    {
+        state.level_monitor.reset();
+        let player_guard = state.player.lock().unwrap();
+        let player = player_guard.0.as_ref().unwrap();
+        player.stop_and_play_prepared(prepared);
+    } // player lock dropped
+
+    // 3. Lock playback state
+    {
+        let mut pb = state.playback.lock().unwrap();
+        pb.is_playing = true;
+        pb.is_paused = false;
+        pb.track_index = Some(idx);
+        pb.playlist_name = Some(playlist_name);
+        pb.track_duration = track_duration;
+        pb.start_time = Some(Instant::now());
+        pb.total_paused = Duration::ZERO;
+        pb.pause_start = None;
+    } // playback lock dropped
 
     // Log
     state.logs.lock().unwrap().push("info", format!("Playing: {} — {}", track_artist, track_title));
@@ -472,14 +482,19 @@ fn transport_play(
 
 #[tauri::command]
 fn transport_stop(state: State<AppState>) -> Result<(), String> {
-    let player_guard = state.player.lock().unwrap();
-    if let Some(player) = player_guard.0.as_ref() {
-        player.stop();
-    }
+    {
+        let player_guard = state.player.lock().unwrap();
+        if let Some(player) = player_guard.0.as_ref() {
+            player.stop();
+        }
+    } // player lock dropped
+
     state.level_monitor.reset();
 
-    let mut pb = state.playback.lock().unwrap();
-    pb.reset();
+    {
+        let mut pb = state.playback.lock().unwrap();
+        pb.reset();
+    } // playback lock dropped
 
     state.logs.lock().unwrap().push("info", "Playback stopped".to_string());
 
@@ -488,131 +503,170 @@ fn transport_stop(state: State<AppState>) -> Result<(), String> {
 
 #[tauri::command]
 fn transport_pause(state: State<AppState>) -> Result<(), String> {
-    let player_guard = state.player.lock().unwrap();
-    let player = player_guard.0.as_ref().ok_or("No audio player")?;
+    // 1. Read playback state to decide action
+    let (is_playing, is_paused) = {
+        let pb = state.playback.lock().unwrap();
+        (pb.is_playing, pb.is_paused)
+    }; // playback lock dropped
 
-    let mut pb = state.playback.lock().unwrap();
-    if !pb.is_playing {
+    if !is_playing {
         return Err("Nothing is playing".to_string());
     }
 
-    if pb.is_paused {
-        // Resume
-        player.resume();
-        pb.is_paused = false;
-        if let Some(ps) = pb.pause_start.take() {
-            pb.total_paused += ps.elapsed();
+    // 2. Perform player action
+    {
+        let player_guard = state.player.lock().unwrap();
+        let player = player_guard.0.as_ref().ok_or("No audio player")?;
+        if is_paused {
+            player.resume();
+        } else {
+            player.pause();
         }
-        state.logs.lock().unwrap().push("info", "Playback resumed".to_string());
-    } else {
-        // Pause
-        player.pause();
-        pb.is_paused = true;
-        pb.pause_start = Some(Instant::now());
-        state.logs.lock().unwrap().push("info", "Playback paused".to_string());
-    }
+    } // player lock dropped
+
+    // 3. Update playback state
+    let log_msg = {
+        let mut pb = state.playback.lock().unwrap();
+        if is_paused {
+            pb.is_paused = false;
+            if let Some(ps) = pb.pause_start.take() {
+                pb.total_paused += ps.elapsed();
+            }
+            "Playback resumed"
+        } else {
+            pb.is_paused = true;
+            pb.pause_start = Some(Instant::now());
+            "Playback paused"
+        }
+    }; // playback lock dropped
+
+    state.logs.lock().unwrap().push("info", log_msg.to_string());
 
     Ok(())
 }
 
 #[tauri::command]
 fn transport_skip(state: State<AppState>) -> Result<(), String> {
-    // Stop current playback
+    // 1. Stop current playback
     {
         let player_guard = state.player.lock().unwrap();
         if let Some(player) = player_guard.0.as_ref() {
             player.stop();
         }
-    }
+    } // player lock dropped
 
-    // Advance index
-    let next_idx;
-    let track_path;
-    let track_duration;
-    let playlist_name;
-    {
+    // 2. Advance index in engine, extract what we need
+    let skip_result: Result<(usize, std::path::PathBuf, Duration, String, String, String), String> = {
         let mut engine = state.engine.lock().unwrap();
         let pl = engine
             .active_playlist_mut()
             .ok_or_else(|| "No active playlist".to_string())?;
 
         let current = pl.current_index.unwrap_or(0);
-        next_idx = current + 1;
+        let next_idx = current + 1;
         if next_idx >= pl.tracks.len() {
             // End of playlist
             pl.current_index = None;
             engine.save().ok();
+            Err("__end_of_playlist__".to_string())
+        } else {
+            let track_path = pl.tracks[next_idx].path.clone();
+            let track_duration = pl.tracks[next_idx].duration;
+            let playlist_name = pl.name.clone();
+            let track_artist = pl.tracks[next_idx].artist.clone();
+            let track_title = pl.tracks[next_idx].title.clone();
+            pl.current_index = Some(next_idx);
+            engine.save().ok();
+            Ok((next_idx, track_path, track_duration, playlist_name, track_artist, track_title))
+        }
+    }; // engine lock dropped
+
+    let (next_idx, track_path, track_duration, playlist_name, track_artist, track_title) = match skip_result {
+        Ok(data) => data,
+        Err(ref e) if e == "__end_of_playlist__" => {
             let mut pb = state.playback.lock().unwrap();
             pb.reset();
+            drop(pb);
             state.logs.lock().unwrap().push("info", "Reached end of playlist".to_string());
             return Ok(());
         }
+        Err(e) => return Err(e),
+    };
 
-        track_path = pl.tracks[next_idx].path.clone();
-        track_duration = pl.tracks[next_idx].duration;
-        playlist_name = pl.name.clone();
-        pl.current_index = Some(next_idx);
-        engine.save().ok();
-    }
-
-    // Play next track
-    ensure_player(&state.player)?;
-    let player_guard = state.player.lock().unwrap();
-    let player = player_guard.0.as_ref().unwrap();
-    player.play_file(&track_path)?;
-
-    let mut pb = state.playback.lock().unwrap();
-    pb.is_playing = true;
-    pb.is_paused = false;
-    pb.track_index = Some(next_idx);
-    pb.playlist_name = Some(playlist_name);
-    pb.track_duration = track_duration;
-    pb.start_time = Some(Instant::now());
-    pb.total_paused = Duration::ZERO;
-    pb.pause_start = None;
-
-    // Log skip
+    // 3. Play next track
     {
-        let engine = state.engine.lock().unwrap();
-        if let Some(pl) = engine.active_playlist() {
-            if let Some(track) = pl.tracks.get(next_idx) {
-                state.logs.lock().unwrap().push("info", format!("Skipped to: {} — {}", track.artist, track.title));
-            }
-        }
-    }
+        ensure_player(&state.player)?;
+        let player_guard = state.player.lock().unwrap();
+        let player = player_guard.0.as_ref().unwrap();
+        player.play_file(&track_path)?;
+    } // player lock dropped
+
+    // 4. Update playback state
+    {
+        let mut pb = state.playback.lock().unwrap();
+        pb.is_playing = true;
+        pb.is_paused = false;
+        pb.track_index = Some(next_idx);
+        pb.playlist_name = Some(playlist_name);
+        pb.track_duration = track_duration;
+        pb.start_time = Some(Instant::now());
+        pb.total_paused = Duration::ZERO;
+        pb.pause_start = None;
+    } // playback lock dropped
+
+    // 5. Log
+    state.logs.lock().unwrap().push("info", format!("Skipped to: {} — {}", track_artist, track_title));
 
     Ok(())
 }
 
 #[tauri::command]
 fn transport_seek(state: State<AppState>, position_secs: f64) -> Result<(), String> {
-    let player_guard = state.player.lock().unwrap();
-    let player = player_guard.0.as_ref().ok_or("No audio player")?;
+    // 1. Check playback state
+    let is_paused = {
+        let pb = state.playback.lock().unwrap();
+        if !pb.is_playing {
+            return Err("Nothing is playing".to_string());
+        }
+        pb.is_paused
+    }; // playback lock dropped
 
-    let pb = state.playback.lock().unwrap();
-    if !pb.is_playing {
-        return Err("Nothing is playing".to_string());
-    }
-    drop(pb);
-
+    // 2. Seek on the player
     let seek_pos = Duration::from_secs_f64(position_secs.max(0.0));
-    player.try_seek(seek_pos)?;
+    {
+        let player_guard = state.player.lock().unwrap();
+        let player = player_guard.0.as_ref().ok_or("No audio player")?;
+        player.try_seek(seek_pos)?;
+    } // player lock dropped
 
-    // Reset timing to reflect the seek position
-    let mut pb = state.playback.lock().unwrap();
-    pb.start_time = Some(Instant::now() - seek_pos);
-    pb.total_paused = Duration::ZERO;
-    pb.pause_start = if pb.is_paused { Some(Instant::now()) } else { None };
+    // 3. Reset timing to reflect the seek position
+    {
+        let mut pb = state.playback.lock().unwrap();
+        pb.start_time = Some(Instant::now() - seek_pos);
+        pb.total_paused = Duration::ZERO;
+        pb.pause_start = if is_paused { Some(Instant::now()) } else { None };
+    } // playback lock dropped
 
     Ok(())
 }
 
 #[tauri::command]
 fn transport_status(state: State<AppState>) -> TransportState {
-    let pb = state.playback.lock().unwrap();
+    // 1. Read playback state, then drop lock
+    let (is_playing, is_paused, elapsed, duration, track_index, playlist_name) = {
+        let pb = state.playback.lock().unwrap();
+        (
+            pb.is_playing,
+            pb.is_paused,
+            pb.elapsed(),
+            pb.track_duration,
+            pb.track_index,
+            pb.playlist_name.clone(),
+        )
+    }; // playback lock dropped
 
-    // Check if the sink has finished playing (track ended naturally)
-    let actually_playing = if pb.is_playing && !pb.is_paused {
+    // 2. Check if the sink has finished playing (track ended naturally)
+    let actually_playing = if is_playing && !is_paused {
         let player_guard = state.player.lock().unwrap();
         if let Some(player) = player_guard.0.as_ref() {
             !player.is_empty()
@@ -620,11 +674,11 @@ fn transport_status(state: State<AppState>) -> TransportState {
             false
         }
     } else {
-        pb.is_playing
-    };
+        is_playing
+    }; // player lock dropped
 
-    let elapsed = pb.elapsed();
-    let (artist, title, next_artist, next_title, track_path) = if let (Some(idx), Some(pl_name)) = (pb.track_index, &pb.playlist_name) {
+    // 3. Get track metadata from engine
+    let (artist, title, next_artist, next_title, track_path) = if let (Some(idx), Some(pl_name)) = (track_index, &playlist_name) {
         let engine = state.engine.lock().unwrap();
         if let Some(pl) = engine.find_playlist(pl_name) {
             let current = if let Some(track) = pl.tracks.get(idx) {
@@ -643,14 +697,14 @@ fn transport_status(state: State<AppState>) -> TransportState {
         }
     } else {
         (None, None, None, None, None)
-    };
+    }; // engine lock dropped
 
     TransportState {
         is_playing: actually_playing,
-        is_paused: pb.is_paused,
+        is_paused,
         elapsed_secs: elapsed.as_secs_f64(),
-        duration_secs: pb.track_duration.as_secs_f64(),
-        track_index: pb.track_index,
+        duration_secs: duration.as_secs_f64(),
+        track_index,
         track_artist: artist,
         track_title: title,
         next_artist,
@@ -1175,7 +1229,12 @@ fn clear_logs(state: State<AppState>) {
 // ── App entry ───────────────────────────────────────────────────────────────
 
 fn main() {
-    let engine = Engine::load();
+    // Store state in OS app data dir to avoid triggering the Tauri file watcher
+    let data_dir = dirs::data_local_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("signalFlow");
+    let state_path = data_dir.join("signalflow_state.json");
+    let engine = Engine::load_from(&state_path);
     let playback = Arc::new(Mutex::new(PlaybackState::new()));
     let level_monitor = LevelMonitor::new();
 

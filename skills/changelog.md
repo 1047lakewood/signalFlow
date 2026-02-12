@@ -1,5 +1,17 @@
 # signalFlow — Changelog
 
+## 2026-02-12 — AppCore Module (Phase E4, Step 1)
+- Created `src/app_core.rs` — central command dispatcher that unifies all engine operations
+- **AppCore struct** owns Engine + PlaybackState + LogBuffer in a single place
+- **46 new tests** covering all non-audio commands (playlists, tracks, config, schedule, ads, RDS, lecture detector, logs, transport state)
+- **Response data types**: StatusData, PlaylistData, TrackData, ConfigData, TransportData, ScheduleEventData, AdData, RdsConfigData, RdsMessageData, LectureConfigData
+- **PlaybackState + LogBuffer** moved from Tauri's main.rs into core library (reusable, testable)
+- **Transport helpers**: prepare_play(), prepare_skip(), on_stop(), on_pause_toggle(), on_seek() — manage playback state without owning Player
+- **Lecture detector API** — blacklist/whitelist add/remove/test exposed through AppCore (was CLI-only, now available to Tauri)
+- **Copy/paste tracks** — exposed through AppCore (was CLI-only)
+- All 293 existing tests still pass, full workspace compiles with no warnings
+- Next step: Wire Tauri's main.rs to use AppCore instead of direct Engine access
+
 ## 2026-02-10 — Unified Architecture Design (Phase E4)
 - Created `skills/unified_architecture.md` design doc for merging CLI+GUI into one Tauri app
 - **AppCore** — central command dispatcher (`AppCommand` enum → `execute()` → `AppResponse`), eliminates duplicated logic between CLI and Tauri
