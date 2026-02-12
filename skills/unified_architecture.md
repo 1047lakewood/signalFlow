@@ -1,6 +1,6 @@
 # Unified App Architecture — Design Doc
 
-## Status: STEPS 1+2+3 COMPLETE — AppCore + AudioRuntime + Tauri wired + Polling removed
+## Status: STEPS 1+2+3+4 COMPLETE — AppCore + AudioRuntime + Tauri wired + Polling removed + Headless tests
 
 ## Problem Statement
 
@@ -204,9 +204,11 @@ The `clap` dependency moves out of the core library.
 - Player moved into AudioRuntime in Step 2 — no more Player Mutex
 - All 297 tests pass (293 existing + 4 new AudioRuntime), zero warnings
 
-#### Step 4: Create headless test harness
+#### Step 4: Create headless test harness (DONE)
 - `AppCore::new_test()` — creates AppCore with in-memory state (no file persistence)
-- Integration tests create AppCore, execute commands, assert on responses and events
+- `Engine::save()` is a no-op when `state_path` is None — tests never touch the filesystem
+- `tests/headless.rs` — 21 integration tests exercising all features through AppCore
+- Covers: playlists, tracks, config, transport, schedule, ads, RDS, lecture detector, logs, AudioRuntime
 - No GUI needed for any test
 
 #### Step 5: Remove CLI binary

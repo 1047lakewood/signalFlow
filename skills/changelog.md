@@ -1,5 +1,24 @@
 # signalFlow — Changelog
 
+## 2026-02-12 — Headless test harness (Phase E4)
+- Fixed `Engine::save()` to be a no-op when `state_path` is `None` (in-memory/test mode) — previously fell back to CWD, causing unwanted file writes during tests
+- Added `Engine::state_path()` public accessor for inspecting persistence mode
+- Removed dead `Engine::resolve_path()` method (no longer needed after save refactor)
+- Created `tests/headless.rs` — 21 integration tests exercising AppCore end-to-end without GUI:
+  - Playlist lifecycle (create, rename, delete, set active, error handling)
+  - Track operations (add mock tracks, reorder, remove, copy/paste between playlists)
+  - Config round-trips (crossfade, silence detection, recurring intro, conflict policy, now-playing)
+  - Transport state management (prepare_play, skip, pause/resume, seek, end-of-playlist)
+  - Schedule workflow (add events, toggle, remove, time ordering)
+  - Ad workflow (add, update with schedule, reorder, toggle, remove)
+  - RDS workflow (connection settings, messages with schedules, reorder, toggle, remove)
+  - Lecture detector workflow (R-heuristic, blacklist, whitelist)
+  - Log capture verification (operations generate expected log entries)
+  - AudioRuntime headless tests (stop events, play error events, clean shutdown)
+  - In-memory save isolation (verify test mode doesn't write files)
+  - Full radio station setup (combined multi-feature end-to-end workflow)
+- 318 total tests passing (297 unit + 21 integration), zero warnings
+
 ## 2026-02-12 — Remove polling/Mutex overhead with AudioRuntime (Phase E4)
 - Created `src/audio_runtime.rs` — dedicated audio thread with channel-based command dispatch
 - **Removed all `unsafe` code** from `src-tauri/src/main.rs`: `SendPlayer`, `unsafe impl Send/Sync` eliminated

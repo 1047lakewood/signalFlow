@@ -85,10 +85,9 @@ impl Engine {
         }
     }
 
-    fn resolve_path(&self) -> &Path {
-        self.state_path
-            .as_deref()
-            .unwrap_or_else(|| Path::new(STATE_FILE))
+    /// Returns the state file path, or None if in-memory mode (tests).
+    pub fn state_path(&self) -> Option<&Path> {
+        self.state_path.as_deref()
     }
 
     /// Load engine state from the default state file (CWD).
@@ -116,8 +115,12 @@ impl Engine {
     }
 
     /// Persist current state to JSON.
+    /// When `state_path` is None (in-memory / test mode), this is a no-op.
     pub fn save(&self) -> Result<(), String> {
-        let path = self.resolve_path();
+        let path = match &self.state_path {
+            Some(p) => p.as_path(),
+            None => return Ok(()), // In-memory mode — skip file I/O
+        };
         if let Some(parent) = path.parent() {
             if !parent.exists() {
                 fs::create_dir_all(parent)
