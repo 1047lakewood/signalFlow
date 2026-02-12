@@ -1,5 +1,11 @@
 # signalFlow — Changelog
 
+## 2026-02-12 — Remove standalone CLI binary (Phase E4)
+- Deleted `src/main.rs` to complete the unified architecture migration (Tauri + AppCore is now the single runtime path)
+- Removed `clap` from root `Cargo.toml` dependencies since no standalone CLI binary remains
+- Updated docs (`skills/unified_architecture.md`, `skills/gui.md`, `skills/audio_engine.md`) to reflect that command execution now flows through AppCore/Tauri
+- Verified with `cargo test` and `cargo check`
+
 ## 2026-02-12 — Headless test harness (Phase E4)
 - Fixed `Engine::save()` to be a no-op when `state_path` is `None` (in-memory/test mode) — previously fell back to CWD, causing unwanted file writes during tests
 - Added `Engine::state_path()` public accessor for inspecting persistence mode

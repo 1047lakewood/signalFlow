@@ -73,7 +73,7 @@
 - [x] Migrate CLI commands into Tauri — Move all CLI functionality into Tauri commands (remove standalone CLI binary)
 - [x] Remove polling/Mutex overhead — Replace Mutex-based state sharing with direct engine ownership or event-driven architecture
 - [x] Headless test harness — Ensure all features are testable via `cargo test` without launching the GUI
-- [ ] Remove standalone CLI binary — Delete `src/main.rs` CLI once all functionality is covered by the unified app + test suite
+- [x] Remove standalone CLI binary — Delete `src/main.rs` CLI once all functionality is covered by the unified app + test suite
 
 ## Phase E2: GUI Playlist Interaction
 

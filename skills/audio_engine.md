@@ -11,7 +11,7 @@ All Phase A and Phase B features are implemented. The engine supports full playl
 - **Player** (`src/player.rs`) — Runtime-only struct wrapping rodio `OutputStream` + `OutputStreamHandle` + default `Sink`. Creates independent sinks via `create_sink()` for crossfade and intro playback.
 - **Silence** (`src/silence.rs`) — `SilenceDetector` source wrapper + `SilenceMonitor` (Arc<AtomicBool>). RMS-based detection.
 - **Auto-Intro** (`src/auto_intro.rs`) — `find_intro()` matches artist name to files in intros folder (case-insensitive).
-- **CLI** (`src/main.rs`) — clap subcommands: `play`, `stop`, `skip`, `status`, `playlist create|list|add|show|activate|remove|move|copy`, `config crossfade|silence set|silence off|intros set|intros off|show`.
+- **Unified app commands** — transport/playlist/config operations are exposed through `AppCore` and consumed by Tauri IPC handlers.
 - **Lib** (`src/lib.rs`) — Re-exports all modules.
 - **Tests** — 64 unit tests passing across all modules.
 
@@ -52,22 +52,20 @@ Methods: `create_playlist`, `find_playlist`, `find_playlist_mut`, `set_active`, 
 
 ## Persistence
 - Engine state serialized to `signalflow_state.json` via serde
-- Loaded on CLI startup, saved after mutations
-- Player is NOT serialized (created fresh per CLI session)
+- Loaded at app startup, saved after mutations
+- Player is NOT serialized (created fresh per audio runtime thread)
 
 ## Active Context Switching (DONE)
 - `engine.set_active(name)` — sets `active_playlist_id` by name lookup
 - `engine.active_playlist()` / `active_playlist_mut()` — returns reference to active playlist
-- CLI: `playlist activate <name>` — manually set active playlist, persists to state file
+- AppCore: `set_active_playlist(name)` — manually set active playlist, persists to state file
 
 ## Transport Controls (DONE)
 - **Player** (`src/player.rs`) — runtime-only struct wrapping rodio `OutputStream` + `OutputStreamHandle` + default `Sink`
 - `create_sink()` — creates independent sinks on the shared output stream handle
 - Methods: `play_file`, `play_file_new_sink`, `play_file_new_sink_fadein`, `play_file_new_sink_monitored`, `play_file_new_sink_fadein_monitored`, `stop`, `pause`, `resume`, `skip_one`, `try_seek`, `is_empty`, `is_paused`
 - `play_playlist()` — free function that takes player, tracks, and config; auto-advances through playlist with crossfade + silence detection + auto-intros; blocks until done
-- CLI: `play [--track N] [--crossfade N] [--silence-threshold N] [--silence-duration N]`
-- CLI: `stop` — clears `current_index`
-- CLI: `skip` — advances `current_index` to next track
+- AppCore/Tauri transport commands: play (optional track index), stop (clears `current_index`), skip (advances to next track), pause/resume, seek
 
 ## Crossfading (DONE)
 - `Player.create_sink()` creates independent sinks from the shared `OutputStreamHandle` — no persistent sink array
@@ -75,17 +73,17 @@ Methods: `create_playlist`, `find_playlist`, `find_playlist_mut`, `set_active`, 
 - Current sink fades out via `set_volume()` ramp (linear, ~50ms steps)
 - After crossfade completes, old sink is stopped and dropped; new sink becomes current
 - `should_crossfade()` helper handles edge cases: disabled, no next track, track too short (must be > 2x crossfade duration)
-- Engine persists `crossfade_secs` config; CLI: `config crossfade <seconds>` and `play --crossfade <seconds>`
+- Engine persists `crossfade_secs` config; configurable via AppCore/Tauri settings commands
 
 ## Silence Detection (DONE)
 - `SilenceDetector<S: Source>` wraps audio source, measures RMS over ~100ms windows
 - `SilenceMonitor` (Arc<AtomicBool>) — shared flag checked by playback loop
 - When continuous silence exceeds configured duration, flag is set and playback loop auto-skips
 - Config: `silence_threshold` (default 0.01) + `silence_duration_secs` (default 0, disabled)
-- CLI: `config silence set <threshold> <duration>` / `config silence off`
+- Configurable via AppCore/Tauri settings commands
 
 ## Auto-Intro System (DONE)
 - `find_intro(intros_folder, artist)` — case-insensitive filename match for `Artist.*`
 - `play_playlist()` plays intro on its own sink before each track; skips intro for consecutive same-artist tracks
 - `Track.has_intro: bool` — data flag for future GUI indicator
-- CLI: `config intros set <path>` / `config intros off`
+- Configurable via AppCore/Tauri settings commands

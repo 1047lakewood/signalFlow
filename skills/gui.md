@@ -5,7 +5,6 @@
 ```
 signalFlow/
 ├── src/                   # Core Rust library (signal_flow crate)
-├── src/main.rs            # CLI binary
 ├── src-tauri/             # Tauri v2 backend (signalflow-gui crate)
 │   ├── Cargo.toml         # Depends on signal_flow via path = ".."
 │   ├── build.rs           # tauri_build::build()
@@ -32,6 +31,7 @@ signalFlow/
 
 - Root `Cargo.toml` defines `[workspace]` with `members = ["src-tauri"]`
 - Core library (`signal_flow`) remains at root, unchanged
+- Standalone root CLI binary removed; the unified app uses Tauri commands + AppCore for all runtime functionality
 - Tauri binary (`signalflow-gui`) in `src-tauri/` depends on `signal_flow` via path
 
 ## Tauri Backend (DONE)

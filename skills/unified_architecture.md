@@ -1,6 +1,6 @@
 # Unified App Architecture — Design Doc
 
-## Status: STEPS 1+2+3+4 COMPLETE — AppCore + AudioRuntime + Tauri wired + Polling removed + Headless tests
+## Status: STEPS 1+2+3+4+5 COMPLETE — Unified Tauri architecture fully landed (standalone CLI removed)
 
 ## Problem Statement
 
@@ -211,7 +211,7 @@ The `clap` dependency moves out of the core library.
 - Covers: playlists, tracks, config, transport, schedule, ads, RDS, lecture detector, logs, AudioRuntime
 - No GUI needed for any test
 
-#### Step 5: Remove CLI binary
+#### Step 5: Remove CLI binary (DONE)
 - Delete `src/main.rs` (CLI)
 - Remove `clap` from core library dependencies
 - Update Cargo.toml to remove `[[bin]]` section
