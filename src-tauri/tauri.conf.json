@@ -5,8 +5,14 @@
   "build": {
     "frontendDist": "../gui/dist",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": { "script": "npm run dev", "cwd": "../gui" },
-    "beforeBuildCommand": { "script": "npm run build", "cwd": "../gui" }
+    "beforeDevCommand": {
+      "script": "node scripts/tauri-dev-server.mjs",
+      "cwd": "../gui"
+    },
+    "beforeBuildCommand": {
+      "script": "npm run build",
+      "cwd": "../gui"
+    }
   },
   "app": {
     "windows": [

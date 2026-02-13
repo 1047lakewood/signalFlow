@@ -1,4 +1,12 @@
 # signalFlow — Changelog
+## 2026-02-13 — Find Bar, Auto-Advance, and Graceful Dev Shutdown (Phase E2/E3)
+- Completed Phase E2 todos: Find bar and Auto-advance playback
+- Added playlist find bar filtering across row number, artist, title, file path, and duration
+- Added row jump input (row number + Go) that selects and scrolls to the requested row
+- Implemented auto-advance in Tauri runtime callback: on natural track end, call `prepare_skip()` and start next track automatically
+- Completed Phase E3 todo: graceful Vite shutdown to prevent orphan Windows `node.exe`/port 1420 locks
+- Added `gui/scripts/tauri-dev-server.mjs` wrapper and switched `beforeDevCommand` to use it
+
 ## 2026-02-13 — Row Number + File Path Columns (Phase E2)
 - Completed the next two Phase E2 playlist interaction todos: row number column + file path column
 - Playlist table now explicitly includes `#`, `Status`, `Artist`, `Title`, `File Path`, and `Duration`

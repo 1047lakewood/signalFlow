@@ -289,3 +289,22 @@ signalFlow/
 ## Next Steps
 
 - [ ] Waveform display
+
+## Find Bar + Row Jump (DONE)
+
+- Added a find bar above the playlist table to filter rows by any visible text field (row number, artist, title, path, duration)
+- Added a dedicated row-jump input (`Row #` + `Go`) that selects and scrolls to the requested row
+- Row jump clears the active filter automatically when needed so the requested row is visible
+- Added empty-state message for unmatched searches
+
+## Auto-Advance Playback (DONE)
+
+- Implemented automatic next-track playback when the audio runtime emits `AudioEvent::TrackFinished`
+- Tauri callback now calls `AppCore::prepare_skip()` and immediately starts the next track through `AudioHandle::play(...)`
+- End-of-playlist behavior remains unchanged (`__end_of_playlist__` sentinel), while unexpected skip errors are logged
+
+## Graceful Vite Shutdown (DONE)
+
+- Added `gui/scripts/tauri-dev-server.mjs` wrapper to launch Vite and trap shutdown signals
+- On Windows, wrapper kills the full process tree via `taskkill /t /f`, preventing orphan `node.exe` processes from holding port 1420
+- Updated `src-tauri/tauri.conf.json` `beforeDevCommand` to run the wrapper script instead of raw `npm run dev`
