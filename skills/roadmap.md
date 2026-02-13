@@ -1,5 +1,7 @@
 # signalFlow — Feature Roadmap
 
+> Maintenance note (2026-02-13): treat this as a living design record. Verify behavior against current code and tests before implementation decisions.
+
 ## Phase A: Core Audio Engine (Priority 1)
 
 ### Multi-Instance Playback

@@ -1,4 +1,6 @@
 # signalFlow — Changelog
+
+> Maintenance note (2026-02-13): treat this as a living design record. Verify behavior against current code and tests before implementation decisions.
 ## 2026-02-13 — Find Bar, Auto-Advance, and Graceful Dev Shutdown (Phase E2/E3)
 - Completed Phase E2 todos: Find bar and Auto-advance playback
 - Added playlist find bar filtering across row number, artist, title, file path, and duration

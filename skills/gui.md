@@ -1,5 +1,7 @@
 # signalFlow — GUI (Tauri) Design Doc
 
+> Maintenance note (2026-02-13): treat this as a living design record. Verify behavior against current code and tests before implementation decisions.
+
 ## Architecture
 
 ```

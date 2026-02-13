@@ -1,5 +1,7 @@
 # signalFlow — Scheduler
 
+> Maintenance note (2026-02-13): treat this as a living design record. Verify behavior against current code and tests before implementation decisions.
+
 ## Overview
 
 The scheduler system provides time-based event triggers for radio automation. Events fire at configured times and interact with playback via three modes.
