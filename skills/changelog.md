@@ -1,4 +1,12 @@
 # signalFlow — Changelog
+## 2026-02-13 — Row Number + File Path Columns (Phase E2)
+- Completed the next two Phase E2 playlist interaction todos: row number column + file path column
+- Playlist table now explicitly includes `#`, `Status`, `Artist`, `Title`, `File Path`, and `Duration`
+- Added file path cell rendering with full-path tooltip and secondary text styling
+- Extended column resize state to include a dedicated `path` width (default + min widths persisted in `localStorage`)
+- Added independent resize handles for File Path and Duration columns; Title right-edge handle now resizes the File Path boundary
+- Updated skills docs (`skills/gui.md`, `skills/todo.md`) to reflect completed items
+
 ## 2026-02-13 — Resizable Columns (Phase E2)
 - Drag column header edges to resize column widths in the playlist table
 - Resize handles appear as subtle highlights on hover between column headers

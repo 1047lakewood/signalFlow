@@ -13,6 +13,7 @@ interface ColWidths {
   num: number;
   status: number;
   artist: number;
+  path: number;
   duration: number;
 }
 
@@ -24,8 +25,8 @@ interface ResizeState {
 }
 
 const COL_WIDTHS_KEY = "signalflow-col-widths";
-const DEFAULT_COL_WIDTHS: ColWidths = { num: 40, status: 36, artist: 250, duration: 70 };
-const MIN_COL_WIDTHS: ColWidths = { num: 30, status: 24, artist: 60, duration: 50 };
+const DEFAULT_COL_WIDTHS: ColWidths = { num: 40, status: 36, artist: 220, path: 260, duration: 70 };
+const MIN_COL_WIDTHS: ColWidths = { num: 30, status: 24, artist: 60, path: 120, duration: 50 };
 
 interface PlaylistViewProps {
   tracks: TrackInfo[];
@@ -392,9 +393,16 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
             </th>
             <th className="col-title">
               Title
-              <div className="col-resize-handle" onMouseDown={(e) => handleResizeMouseDown(e, "duration", -1)} />
+              <div className="col-resize-handle" onMouseDown={(e) => handleResizeMouseDown(e, "path", -1)} />
             </th>
-            <th className="col-duration" style={{ width: colWidths.duration }}>Duration</th>
+            <th className="col-path" style={{ width: colWidths.path }}>
+              File Path
+              <div className="col-resize-handle" onMouseDown={(e) => handleResizeMouseDown(e, "path")} />
+            </th>
+            <th className="col-duration" style={{ width: colWidths.duration }}>
+              Duration
+              <div className="col-resize-handle" onMouseDown={(e) => handleResizeMouseDown(e, "duration")} />
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -471,6 +479,7 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
                     track.title
                   )}
                 </td>
+                <td className="col-path" title={track.path}>{track.path}</td>
                 <td className="col-duration">{track.duration_display}</td>
               </tr>
             );

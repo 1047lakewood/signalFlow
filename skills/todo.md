@@ -86,8 +86,8 @@
 - [x] Cut/copy/paste via context menu — Right-click cut, copy, paste; paste inserts immediately after the selected row
 - [x] Multi-select — Shift+click for range select, Ctrl+click for toggle individual rows
 - [x] Resizable columns — Drag column header edges to resize column widths
-- [ ] Row number column — Display a sequential row number as the first column
-- [ ] File path column — Show the file path in a dedicated column
+- [x] Row number column — Display a sequential row number as the first column
+- [x] File path column — Show the file path in a dedicated column
 - [ ] Find bar — Search rows by any text field; include a dedicated row-number jump input
 - [ ] Auto-advance playback — Automatically play the next track when the current one ends, respecting crossfade settings
 
