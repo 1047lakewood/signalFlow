@@ -670,6 +670,75 @@ body {
   position: relative;
 }
 
+.playlist-findbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+
+.playlist-find-input {
+  flex: 1;
+  min-width: 160px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  padding: 6px 9px;
+  font-size: 12px;
+}
+
+.playlist-find-input:focus,
+.playlist-jump-input:focus {
+  outline: none;
+  border-color: var(--highlight);
+}
+
+.playlist-jump-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.playlist-jump-input {
+  width: 56px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  padding: 5px 7px;
+  font-size: 12px;
+}
+
+.playlist-jump-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.playlist-jump-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+  background: var(--bg-row-hover);
+}
+
+.playlist-find-empty {
+  padding: 12px 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  border-top: 1px solid var(--border);
+}
+
 /* ── Settings panel overlay ──────────────────────────────────────── */
 
 .settings-overlay {

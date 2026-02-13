@@ -64,8 +64,26 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
   const [editValue, setEditValue] = useState("");
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [anchorIndex, setAnchorIndex] = useState<number | null>(null);
+  const [findQuery, setFindQuery] = useState("");
+  const [jumpRowInput, setJumpRowInput] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const normalizedQuery = findQuery.trim().toLowerCase();
+  const visibleTracks = normalizedQuery
+    ? tracks.filter((track) => {
+        const haystack = [
+          String(track.index + 1),
+          track.artist,
+          track.title,
+          track.path,
+          track.duration_display,
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(normalizedQuery);
+      })
+    : tracks;
 
   // Column resize state
   const [colWidths, setColWidths] = useState<ColWidths>(() => {
@@ -350,6 +368,28 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
     setContextMenu(null);
   }, [contextMenu, onPasteTracks]);
 
+  const handleJumpToRow = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    const row = Number.parseInt(jumpRowInput, 10);
+    if (!Number.isFinite(row) || row < 1) return;
+    const targetIndex = row - 1;
+    const targetExists = tracks.some((track) => track.index === targetIndex);
+    if (!targetExists) return;
+
+    if (normalizedQuery && !visibleTracks.some((track) => track.index === targetIndex)) {
+      setFindQuery("");
+    }
+
+    onSelectTracks(new Set([targetIndex]));
+    setAnchorIndex(targetIndex);
+
+    requestAnimationFrame(() => {
+      containerRef.current
+        ?.querySelector<HTMLElement>(`tr[data-track-index=\"${targetIndex}\"]`)
+        ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  }, [jumpRowInput, tracks, normalizedQuery, visibleTracks, onSelectTracks]);
+
   if (tracks.length === 0) {
     return (
       <div
@@ -377,6 +417,25 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
           <span>Drop audio files to add to playlist</span>
         </div>
       )}
+      <div className="playlist-findbar">
+        <input
+          className="playlist-find-input"
+          value={findQuery}
+          onChange={(e) => setFindQuery(e.target.value)}
+          placeholder="Find in playlist..."
+        />
+        <form className="playlist-jump-form" onSubmit={handleJumpToRow}>
+          <label htmlFor="playlist-jump-row">Row</label>
+          <input
+            id="playlist-jump-row"
+            className="playlist-jump-input"
+            value={jumpRowInput}
+            onChange={(e) => setJumpRowInput(e.target.value.replace(/[^0-9]/g, ""))}
+            placeholder="#"
+          />
+          <button type="submit" className="playlist-jump-btn">Go</button>
+        </form>
+      </div>
       <table className="track-table">
         <thead>
           <tr>
@@ -406,7 +465,7 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
           </tr>
         </thead>
         <tbody>
-          {tracks.map((track) => {
+          {visibleTracks.map((track) => {
             const isCurrent = track.index === currentIndex;
             const isSelected = selectedIndices.has(track.index);
             const isDragging = track.index === dragIndex;
@@ -421,6 +480,7 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
             return (
               <tr
                 key={track.index}
+                data-track-index={track.index}
                 className={className}
                 draggable={!editingCell}
                 onClick={(e) => handleRowClick(e, track.index)}
@@ -486,6 +546,9 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
           })}
         </tbody>
       </table>
+      {normalizedQuery && visibleTracks.length === 0 && (
+        <div className="playlist-find-empty">No tracks match "{findQuery}".</div>
+      )}
       <div className="playlist-toolbar">
         <button className="add-files-btn" onClick={onAddFiles}>
           + Add Files

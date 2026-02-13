@@ -1,12 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use serde::Serialize;
 use signal_flow::app_core::{
-    AppCore, AdData, ConfigData, LogEntry, PlaylistData, RdsConfigData,
-    ScheduleEventData, StatusData, TrackData, TransportData,
+    AdData, AppCore, ConfigData, LogEntry, PlaylistData, RdsConfigData, ScheduleEventData,
+    StatusData, TrackData, TransportData,
 };
 use signal_flow::audio_runtime::{AudioEvent, AudioHandle, spawn_audio_runtime};
 use signal_flow::level_monitor::LevelMonitor;
-use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -58,8 +58,16 @@ fn delete_playlist(state: State<AppState>, name: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn rename_playlist(state: State<AppState>, old_name: String, new_name: String) -> Result<(), String> {
-    state.core.lock().unwrap().rename_playlist(&old_name, new_name)
+fn rename_playlist(
+    state: State<AppState>,
+    old_name: String,
+    new_name: String,
+) -> Result<(), String> {
+    state
+        .core
+        .lock()
+        .unwrap()
+        .rename_playlist(&old_name, new_name)
 }
 
 #[tauri::command]
@@ -80,18 +88,39 @@ fn add_track(state: State<AppState>, playlist: String, path: String) -> Result<u
 }
 
 #[tauri::command]
-fn add_tracks(state: State<AppState>, playlist: String, paths: Vec<String>) -> Result<usize, String> {
+fn add_tracks(
+    state: State<AppState>,
+    playlist: String,
+    paths: Vec<String>,
+) -> Result<usize, String> {
     state.core.lock().unwrap().add_tracks(&playlist, &paths)
 }
 
 #[tauri::command]
-fn remove_tracks(state: State<AppState>, playlist: String, indices: Vec<usize>) -> Result<(), String> {
-    state.core.lock().unwrap().remove_tracks(&playlist, &indices)
+fn remove_tracks(
+    state: State<AppState>,
+    playlist: String,
+    indices: Vec<usize>,
+) -> Result<(), String> {
+    state
+        .core
+        .lock()
+        .unwrap()
+        .remove_tracks(&playlist, &indices)
 }
 
 #[tauri::command]
-fn reorder_track(state: State<AppState>, playlist: String, from: usize, to: usize) -> Result<(), String> {
-    state.core.lock().unwrap().reorder_track(&playlist, from, to)
+fn reorder_track(
+    state: State<AppState>,
+    playlist: String,
+    from: usize,
+    to: usize,
+) -> Result<(), String> {
+    state
+        .core
+        .lock()
+        .unwrap()
+        .reorder_track(&playlist, from, to)
 }
 
 #[tauri::command]
@@ -115,13 +144,22 @@ fn edit_track_metadata(
     artist: Option<String>,
     title: Option<String>,
 ) -> Result<(), String> {
-    state.core.lock().unwrap().edit_track_metadata(&playlist, track_index, artist.as_deref(), title.as_deref())
+    state.core.lock().unwrap().edit_track_metadata(
+        &playlist,
+        track_index,
+        artist.as_deref(),
+        title.as_deref(),
+    )
 }
 
 // ── Transport controls ─────────────────────────────────────────────────────
 
 #[tauri::command]
-fn transport_play(state: State<AppState>, app: AppHandle, track_index: Option<usize>) -> Result<(), String> {
+fn transport_play(
+    state: State<AppState>,
+    app: AppHandle,
+    track_index: Option<usize>,
+) -> Result<(), String> {
     // Lock core: prepare play state (updates engine, playback, logs)
     let (track_path, ..) = {
         let mut core = state.core.lock().unwrap();
@@ -208,7 +246,11 @@ fn transport_skip(state: State<AppState>, app: AppHandle) -> Result<(), String> 
 }
 
 #[tauri::command]
-fn transport_seek(state: State<AppState>, app: AppHandle, position_secs: f64) -> Result<(), String> {
+fn transport_seek(
+    state: State<AppState>,
+    app: AppHandle,
+    position_secs: f64,
+) -> Result<(), String> {
     // Update timing in core
     {
         let mut core = state.core.lock().unwrap();
@@ -262,7 +304,11 @@ fn add_schedule_event(
     label: Option<String>,
     days: Option<Vec<u8>>,
 ) -> Result<u32, String> {
-    state.core.lock().unwrap().add_schedule_event(&time, &mode, &file, priority, label, days)
+    state
+        .core
+        .lock()
+        .unwrap()
+        .add_schedule_event(&time, &mode, &file, priority, label, days)
 }
 
 #[tauri::command]
@@ -288,8 +334,16 @@ fn set_crossfade(state: State<AppState>, secs: f32) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn set_silence_detection(state: State<AppState>, threshold: f32, duration_secs: f32) -> Result<(), String> {
-    state.core.lock().unwrap().set_silence_detection(threshold, duration_secs)
+fn set_silence_detection(
+    state: State<AppState>,
+    threshold: f32,
+    duration_secs: f32,
+) -> Result<(), String> {
+    state
+        .core
+        .lock()
+        .unwrap()
+        .set_silence_detection(threshold, duration_secs)
 }
 
 #[tauri::command]
@@ -298,8 +352,16 @@ fn set_intros_folder(state: State<AppState>, path: Option<String>) -> Result<(),
 }
 
 #[tauri::command]
-fn set_recurring_intro(state: State<AppState>, interval_secs: f32, duck_volume: f32) -> Result<(), String> {
-    state.core.lock().unwrap().set_recurring_intro(interval_secs, duck_volume)
+fn set_recurring_intro(
+    state: State<AppState>,
+    interval_secs: f32,
+    duck_volume: f32,
+) -> Result<(), String> {
+    state
+        .core
+        .lock()
+        .unwrap()
+        .set_recurring_intro(interval_secs, duck_volume)
 }
 
 #[tauri::command]
@@ -345,7 +407,11 @@ fn update_ad(
     days: Vec<String>,
     hours: Vec<u8>,
 ) -> Result<(), String> {
-    state.core.lock().unwrap().update_ad(index, name, enabled, mp3_file, scheduled, days, hours)
+    state
+        .core
+        .lock()
+        .unwrap()
+        .update_ad(index, name, enabled, mp3_file, scheduled, days, hours)
 }
 
 #[tauri::command]
@@ -356,13 +422,24 @@ fn reorder_ad(state: State<AppState>, from: usize, to: usize) -> Result<(), Stri
 // ── Ad Statistics & Reports ──────────────────────────────────────────────────
 
 #[tauri::command]
-fn get_ad_stats(state: State<AppState>, start: Option<String>, end: Option<String>) -> signal_flow::ad_logger::AdStatistics {
-    state.core.lock().unwrap().get_ad_stats(start.as_deref(), end.as_deref())
+fn get_ad_stats(
+    state: State<AppState>,
+    start: Option<String>,
+    end: Option<String>,
+) -> signal_flow::ad_logger::AdStatistics {
+    state
+        .core
+        .lock()
+        .unwrap()
+        .get_ad_stats(start.as_deref(), end.as_deref())
 }
 
 #[tauri::command]
 fn get_ad_daily_counts(state: State<AppState>, ad_name: String) -> Vec<AdDailyCountResponse> {
-    state.core.lock().unwrap()
+    state
+        .core
+        .lock()
+        .unwrap()
         .get_ad_daily_counts(&ad_name)
         .into_iter()
         .map(|(date, count)| AdDailyCountResponse { date, count })
@@ -371,7 +448,10 @@ fn get_ad_daily_counts(state: State<AppState>, ad_name: String) -> Vec<AdDailyCo
 
 #[tauri::command]
 fn get_ad_failures(state: State<AppState>) -> Vec<AdFailureResponse> {
-    state.core.lock().unwrap()
+    state
+        .core
+        .lock()
+        .unwrap()
         .get_ad_failures()
         .into_iter()
         .map(|f| AdFailureResponse {
@@ -391,7 +471,13 @@ fn generate_ad_report(
     ad_name: Option<String>,
     company_name: Option<String>,
 ) -> Result<Vec<String>, String> {
-    state.core.lock().unwrap().generate_ad_report(&start, &end, &output_dir, ad_name.as_deref(), company_name.as_deref())
+    state.core.lock().unwrap().generate_ad_report(
+        &start,
+        &end,
+        &output_dir,
+        ad_name.as_deref(),
+        company_name.as_deref(),
+    )
 }
 
 // ── RDS ─────────────────────────────────────────────────────────────────────
@@ -427,7 +513,11 @@ fn update_rds_message(
     days: Vec<String>,
     hours: Vec<u8>,
 ) -> Result<(), String> {
-    state.core.lock().unwrap().update_rds_message(index, text, enabled, duration, scheduled, days, hours)
+    state
+        .core
+        .lock()
+        .unwrap()
+        .update_rds_message(index, text, enabled, duration, scheduled, days, hours)
 }
 
 #[tauri::command]
@@ -436,8 +526,17 @@ fn reorder_rds_message(state: State<AppState>, from: usize, to: usize) -> Result
 }
 
 #[tauri::command]
-fn update_rds_settings(state: State<AppState>, ip: String, port: u16, default_message: String) -> Result<(), String> {
-    state.core.lock().unwrap().update_rds_settings(ip, port, default_message)
+fn update_rds_settings(
+    state: State<AppState>,
+    ip: String,
+    port: u16,
+    default_message: String,
+) -> Result<(), String> {
+    state
+        .core
+        .lock()
+        .unwrap()
+        .update_rds_settings(ip, port, default_message)
 }
 
 // ── Logs ────────────────────────────────────────────────────────────────────
@@ -466,13 +565,37 @@ fn main() {
         .setup(move |app| {
             let core = Arc::new(Mutex::new(AppCore::new(&state_path)));
             let app_handle = app.handle().clone();
+            let level_monitor_for_audio = level_monitor.clone();
+            let audio_for_callback: Arc<Mutex<Option<AudioHandle>>> = Arc::new(Mutex::new(None));
 
             // Spawn audio runtime with event callback
             let core_for_audio = core.clone();
+            let audio_for_callback_clone = audio_for_callback.clone();
             let audio = spawn_audio_runtime(move |event| {
                 match event {
                     AudioEvent::TrackFinished => {
-                        core_for_audio.lock().unwrap().on_stop();
+                        let next_track = {
+                            let mut core = core_for_audio.lock().unwrap();
+                            core.prepare_skip()
+                        };
+
+                        match next_track {
+                            Ok((track_path, ..)) => {
+                                if let Some(audio) =
+                                    audio_for_callback_clone.lock().unwrap().as_ref()
+                                {
+                                    audio.play(track_path, level_monitor_for_audio.clone());
+                                }
+                            }
+                            Err(ref e) if e == "__end_of_playlist__" => {
+                                // End of playlist is handled in AppCore::prepare_skip.
+                            }
+                            Err(e) => {
+                                let mut core = core_for_audio.lock().unwrap();
+                                core.on_stop();
+                                core.log("error", format!("Auto-advance failed: {}", e));
+                            }
+                        }
                         let _ = app_handle.emit("transport-changed", ());
                         let _ = app_handle.emit("logs-changed", ());
                     }
@@ -492,6 +615,7 @@ fn main() {
                     }
                 }
             });
+            *audio_for_callback.lock().unwrap() = Some(audio.clone());
 
             app.manage(AppState {
                 core,

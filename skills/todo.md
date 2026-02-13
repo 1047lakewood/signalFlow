@@ -88,12 +88,12 @@
 - [x] Resizable columns — Drag column header edges to resize column widths
 - [x] Row number column — Display a sequential row number as the first column
 - [x] File path column — Show the file path in a dedicated column
-- [ ] Find bar — Search rows by any text field; include a dedicated row-number jump input
-- [ ] Auto-advance playback — Automatically play the next track when the current one ends, respecting crossfade settings
+- [x] Find bar — Search rows by any text field; include a dedicated row-number jump input
+- [x] Auto-advance playback — Automatically play the next track when the current one ends, respecting crossfade settings
 
 ## Phase E3: Dev Experience
 
-- [ ] Graceful Vite shutdown — Ensure the Vite dev server releases port 1420 when the Tauri app closes (no orphan node.exe processes)
+- [x] Graceful Vite shutdown — Ensure the Vite dev server releases port 1420 when the Tauri app closes (no orphan node.exe processes)
 
 ## Phase H: Future / Long-Term
 
