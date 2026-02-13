@@ -1,4 +1,11 @@
 # signalFlow — Changelog
+## 2026-02-13 — GUI Right-Click Context Menu
+- Implemented custom right-click context menu on playlist rows in `PlaylistView`
+- Suppressed default browser context menu with `onContextMenu` + `preventDefault()`
+- Right-click now selects the clicked row before opening menu
+- Added basic context action: `Play from here` (invokes existing `onPlayTrack` flow)
+- Menu closes on outside click, Escape key, and after action execution
+- Added context menu styling in `gui/src/styles.css` (dark theme, hover state)
 
 ## 2026-02-12 — Pause/unpause transport behavior (Phase E2)
 - Completed Phase E2 todo item for pause/unpause in playlist interaction

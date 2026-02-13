@@ -142,6 +142,15 @@ signalFlow/
 | `transport_seek` | `position_secs` | `()` | DONE |
 | `transport_status` | none | `TransportState` | DONE |
 
+## Right-Click Context Menu (DONE)
+
+- Implemented custom context menu on playlist rows via `onContextMenu` in `PlaylistView.tsx`
+- Browser default context menu is suppressed with `preventDefault()`
+- Right-click selects the clicked row before showing context actions
+- Added first context action: **Play from here** (uses existing `onPlayTrack` callback path)
+- Menu closes on outside click, Escape key, or after selecting an action
+- Added dedicated styling classes in `styles.css`: `.playlist-context-menu` and `.playlist-context-item`
+
 ## Drag-and-Drop Reordering (DONE)
 
 - HTML5 native drag-and-drop on `<tr>` rows in `PlaylistView`

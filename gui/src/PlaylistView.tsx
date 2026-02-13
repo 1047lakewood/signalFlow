@@ -15,6 +15,12 @@ interface PlaylistViewProps {
   onTracksChanged: () => void;
 }
 
+interface ContextMenuState {
+  x: number;
+  y: number;
+  trackIndex: number;
+}
+
 interface EditingCell {
   trackIndex: number;
   field: "artist" | "title";
@@ -26,6 +32,7 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, onSel
   const [isDroppingFiles, setIsDroppingFiles] = useState(false);
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -75,6 +82,28 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, onSel
       editInputRef.current.select();
     }
   }, [editingCell]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const handleWindowClick = () => {
+      setContextMenu(null);
+    };
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setContextMenu(null);
+      }
+    };
+
+    window.addEventListener("click", handleWindowClick);
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      window.removeEventListener("click", handleWindowClick);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [contextMenu]);
 
   const handleStartEdit = useCallback((trackIndex: number, field: "artist" | "title", currentValue: string) => {
     setEditingCell({ trackIndex, field });
@@ -163,6 +192,18 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, onSel
     }
   }, [dragIndex, onReorder]);
 
+  const handleContextMenu = useCallback((e: React.MouseEvent, trackIndex: number) => {
+    e.preventDefault();
+    onSelectTrack(trackIndex);
+    setContextMenu({ x: e.clientX, y: e.clientY, trackIndex });
+  }, [onSelectTrack]);
+
+  const handleContextMenuPlay = useCallback(() => {
+    if (!contextMenu) return;
+    onPlayTrack(contextMenu.trackIndex);
+    setContextMenu(null);
+  }, [contextMenu, onPlayTrack]);
+
   if (tracks.length === 0) {
     return (
       <div
@@ -231,6 +272,7 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, onSel
                 onDragOver={(e) => handleDragOver(e, track.index)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, track.index)}
+                onContextMenu={(e) => handleContextMenu(e, track.index)}
               >
                 <td className="col-num">{track.index + 1}</td>
                 <td className="col-status">
@@ -284,6 +326,17 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, onSel
           + Add Files
         </button>
       </div>
+      {contextMenu && (
+        <div
+          className="playlist-context-menu"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button className="playlist-context-item" onClick={handleContextMenuPlay}>
+            Play from here
+          </button>
+        </div>
+      )}
     </div>
   );
 }

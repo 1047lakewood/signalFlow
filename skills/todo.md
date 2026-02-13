@@ -81,7 +81,7 @@
 - [x] Row selection — Click a row to highlight/select it visually
 - [x] Play from selection — Double-click or press Play to start playback from the selected row
 - [x] Pause/unpause — Add a Pause button; Play resumes from where it paused instead of restarting
-- [ ] Right-click context menu — Custom context menu on rows (suppress browser default)
+- [x] Right-click context menu — Custom context menu on rows (suppress browser default)
 - [ ] Drag-to-reorder rows — Drag selected row(s) to a new position in the playlist
 - [ ] Cut/copy/paste via context menu — Right-click cut, copy, paste; paste inserts immediately after the selected row
 - [ ] Multi-select — Shift+click for range select, Ctrl+click for toggle individual rows
