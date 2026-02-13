@@ -1,4 +1,17 @@
 # signalFlow — Changelog
+## 2026-02-13 — Cut/Copy/Paste via Context Menu (Phase E2)
+- Added Cut, Copy, Paste actions to the playlist row right-click context menu
+- Copy stores the track's path/index/source playlist in frontend clipboard state
+- Cut stores the same + `isCut` flag; clipboard is cleared after paste
+- Paste inserts the clipboard track(s) immediately after the right-clicked row
+- Added `copy_paste_tracks` IPC command — combines `copy_tracks` + `paste_tracks` in one call (avoids serializing `Track` objects to frontend)
+- Cut operation: `copy_paste_tracks` to insert at target, then `remove_tracks` to remove from source
+- Paste button shows track count and is disabled when clipboard is empty
+- Context menu divider separates Play from clipboard actions
+- Added `.context-menu-divider` and `.playlist-context-item:disabled` CSS styles
+- `ClipboardData` interface exported from `PlaylistView.tsx`
+- 318 tests passing (no new tests — frontend-only clipboard state + thin IPC wiring over tested `copy_tracks`/`paste_tracks`)
+
 ## 2026-02-13 — GUI Right-Click Context Menu
 - Implemented custom right-click context menu on playlist rows in `PlaylistView`
 - Suppressed default browser context menu with `onContextMenu` + `preventDefault()`

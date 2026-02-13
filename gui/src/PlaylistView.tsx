@@ -2,14 +2,25 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { TrackInfo } from "./types";
 
+export interface ClipboardData {
+  paths: string[];
+  sourcePlaylist: string;
+  sourceIndices: number[];
+  isCut: boolean;
+}
+
 interface PlaylistViewProps {
   tracks: TrackInfo[];
   currentIndex: number | null;
   playlistName: string;
   selectedIndex: number | null;
+  clipboard: ClipboardData | null;
   onSelectTrack: (index: number | null) => void;
   onPlayTrack: (index: number) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
+  onCopyTrack: (index: number) => void;
+  onCutTrack: (index: number) => void;
+  onPasteTrack: (afterIndex: number) => void;
   onAddFiles: () => void;
   onFileDrop: (paths: string[]) => void;
   onTracksChanged: () => void;
@@ -26,7 +37,7 @@ interface EditingCell {
   field: "artist" | "title";
 }
 
-function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, onSelectTrack, onPlayTrack, onReorder, onAddFiles, onFileDrop, onTracksChanged }: PlaylistViewProps) {
+function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, clipboard, onSelectTrack, onPlayTrack, onReorder, onCopyTrack, onCutTrack, onPasteTrack, onAddFiles, onFileDrop, onTracksChanged }: PlaylistViewProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
   const [isDroppingFiles, setIsDroppingFiles] = useState(false);
@@ -204,6 +215,24 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, onSel
     setContextMenu(null);
   }, [contextMenu, onPlayTrack]);
 
+  const handleContextMenuCopy = useCallback(() => {
+    if (!contextMenu) return;
+    onCopyTrack(contextMenu.trackIndex);
+    setContextMenu(null);
+  }, [contextMenu, onCopyTrack]);
+
+  const handleContextMenuCut = useCallback(() => {
+    if (!contextMenu) return;
+    onCutTrack(contextMenu.trackIndex);
+    setContextMenu(null);
+  }, [contextMenu, onCutTrack]);
+
+  const handleContextMenuPaste = useCallback(() => {
+    if (!contextMenu) return;
+    onPasteTrack(contextMenu.trackIndex);
+    setContextMenu(null);
+  }, [contextMenu, onPasteTrack]);
+
   if (tracks.length === 0) {
     return (
       <div
@@ -334,6 +363,20 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, onSel
         >
           <button className="playlist-context-item" onClick={handleContextMenuPlay}>
             Play from here
+          </button>
+          <div className="context-menu-divider" />
+          <button className="playlist-context-item" onClick={handleContextMenuCut}>
+            Cut
+          </button>
+          <button className="playlist-context-item" onClick={handleContextMenuCopy}>
+            Copy
+          </button>
+          <button
+            className={`playlist-context-item${!clipboard ? " disabled" : ""}`}
+            onClick={handleContextMenuPaste}
+            disabled={!clipboard}
+          >
+            Paste{clipboard ? ` (${clipboard.paths.length} track${clipboard.paths.length > 1 ? "s" : ""})` : ""}
           </button>
         </div>
       )}

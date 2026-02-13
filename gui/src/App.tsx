@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { PlaylistInfo, TrackInfo } from "./types";
 import PlaylistView from "./PlaylistView";
+import type { ClipboardData } from "./PlaylistView";
 import TransportBar from "./TransportBar";
 import SettingsWindow from "./SettingsWindow";
 import AdConfigWindow from "./AdConfigWindow";
@@ -32,6 +33,7 @@ function App() {
   const [showRdsConfig, setShowRdsConfig] = useState(false);
   const [selectedTrackIndex, setSelectedTrackIndex] = useState<number | null>(null);
   const [showSchedulePane, setShowSchedulePane] = useState(false);
+  const [clipboard, setClipboard] = useState<ClipboardData | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">(getInitialTheme);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
@@ -175,6 +177,65 @@ function App() {
       console.error("Failed to play track:", e);
     }
   }, [loadTracks]);
+
+  const handleCopyTrack = useCallback((trackIndex: number) => {
+    if (!selectedPlaylist) return;
+    const track = tracks.find((t) => t.index === trackIndex);
+    if (!track) return;
+    setClipboard({
+      paths: [track.path],
+      sourcePlaylist: selectedPlaylist,
+      sourceIndices: [trackIndex],
+      isCut: false,
+    });
+  }, [selectedPlaylist, tracks]);
+
+  const handleCutTrack = useCallback((trackIndex: number) => {
+    if (!selectedPlaylist) return;
+    const track = tracks.find((t) => t.index === trackIndex);
+    if (!track) return;
+    setClipboard({
+      paths: [track.path],
+      sourcePlaylist: selectedPlaylist,
+      sourceIndices: [trackIndex],
+      isCut: true,
+    });
+  }, [selectedPlaylist, tracks]);
+
+  const handlePasteTrack = useCallback(async (afterIndex: number) => {
+    if (!selectedPlaylist || !clipboard) return;
+    try {
+      // Insert position is after the clicked row
+      const insertAt = afterIndex + 1;
+      if (clipboard.isCut) {
+        // For cut: copy from source, paste at destination, then remove from source
+        await invoke("copy_paste_tracks", {
+          fromPlaylist: clipboard.sourcePlaylist,
+          indices: clipboard.sourceIndices,
+          toPlaylist: selectedPlaylist,
+          at: insertAt,
+        });
+        // Remove from source (only if same playlist, adjust for insertion)
+        await invoke("remove_tracks", {
+          playlist: clipboard.sourcePlaylist,
+          indices: clipboard.sourceIndices,
+        });
+        setClipboard(null); // Cut is one-time
+      } else {
+        // For copy: just copy and paste
+        await invoke("copy_paste_tracks", {
+          fromPlaylist: clipboard.sourcePlaylist,
+          indices: clipboard.sourceIndices,
+          toPlaylist: selectedPlaylist,
+          at: insertAt,
+        });
+      }
+      await loadTracks();
+      await loadPlaylists();
+    } catch (e) {
+      console.error("Failed to paste tracks:", e);
+    }
+  }, [selectedPlaylist, clipboard, loadTracks, loadPlaylists]);
 
   const handleReorder = useCallback(async (fromIndex: number, toIndex: number) => {
     if (!selectedPlaylist) return;
@@ -326,9 +387,13 @@ function App() {
                 currentIndex={currentIndex}
                 playlistName={selectedPlaylist}
                 selectedIndex={selectedTrackIndex}
+                clipboard={clipboard}
                 onSelectTrack={setSelectedTrackIndex}
                 onPlayTrack={handlePlayTrack}
                 onReorder={handleReorder}
+                onCopyTrack={handleCopyTrack}
+                onCutTrack={handleCutTrack}
+                onPasteTrack={handlePasteTrack}
                 onAddFiles={handleAddFiles}
                 onFileDrop={handleFileDrop}
                 onTracksChanged={loadTracks}

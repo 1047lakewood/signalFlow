@@ -583,8 +583,20 @@ body {
   font-size: 12px;
 }
 
-.playlist-context-item:hover {
+.playlist-context-item:hover:not(:disabled) {
   background: var(--bg-row-hover);
+}
+
+.playlist-context-item.disabled,
+.playlist-context-item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
 }
 
 /* ── Empty playlist CTA ───────────────────────────────────────────── */

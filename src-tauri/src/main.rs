@@ -95,6 +95,19 @@ fn reorder_track(state: State<AppState>, playlist: String, from: usize, to: usiz
 }
 
 #[tauri::command]
+fn copy_paste_tracks(
+    state: State<AppState>,
+    from_playlist: String,
+    indices: Vec<usize>,
+    to_playlist: String,
+    at: Option<usize>,
+) -> Result<(), String> {
+    let mut core = state.core.lock().unwrap();
+    let tracks = core.copy_tracks(&from_playlist, &indices)?;
+    core.paste_tracks(&to_playlist, tracks, at)
+}
+
+#[tauri::command]
 fn edit_track_metadata(
     state: State<AppState>,
     playlist: String,
@@ -503,6 +516,7 @@ fn main() {
             add_tracks,
             remove_tracks,
             reorder_track,
+            copy_paste_tracks,
             edit_track_metadata,
             // Transport
             transport_play,
