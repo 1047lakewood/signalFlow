@@ -127,6 +127,7 @@ signalFlow/
 - `TransportState` response: is_playing, is_paused, elapsed_secs, duration_secs, track_index, track_artist, track_title
 - `transport_status` detects when rodio sink empties (track ended naturally)
 - `TransportBar.tsx` component: Play/Pause toggle, Stop, Skip buttons, seek slider with filled progress, elapsed/remaining time, current track artist/title
+- Pause/unpause behavior: while playing, a dedicated Pause button (`⏸`) is shown; when paused, Play (`▶`) resumes via `transport_pause` toggle (does not restart the track)
 - Polls every 500ms, seek via drag on range input
 - Pinned to bottom of `.app` layout
 

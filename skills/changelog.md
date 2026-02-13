@@ -1,5 +1,10 @@
 # signalFlow — Changelog
 
+## 2026-02-12 — Pause/unpause transport behavior (Phase E2)
+- Completed Phase E2 todo item for pause/unpause in playlist interaction
+- Confirmed `TransportBar` shows a Pause button during playback and uses Play to resume from paused state without restarting
+- Verified existing transport pause/resume coverage in headless/AppCore tests and re-ran `cargo test` + `cargo check`
+
 ## 2026-02-12 — Remove standalone CLI binary (Phase E4)
 - Deleted `src/main.rs` to complete the unified architecture migration (Tauri + AppCore is now the single runtime path)
 - Removed `clap` from root `Cargo.toml` dependencies since no standalone CLI binary remains
