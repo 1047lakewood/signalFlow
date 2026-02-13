@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::PathBuf;
 
+const DAY_NAMES: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
 /// Policy for resolving conflicts between manual playback and scheduled events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -33,7 +35,7 @@ impl fmt::Display for ConflictPolicy {
 impl ConflictPolicy {
     /// Parse a policy from a string (case-insensitive, accepts hyphens or underscores).
     pub fn from_str_loose(s: &str) -> Result<Self, String> {
-        match s.to_lowercase().replace('_', "-").as_str() {
+        match normalize_token(s).as_str() {
             "schedule-wins" | "schedule" => Ok(ConflictPolicy::ScheduleWins),
             "manual-wins" | "manual" => Ok(ConflictPolicy::ManualWins),
             _ => Err(format!(
@@ -48,7 +50,7 @@ impl ConflictPolicy {
     pub fn manual_override_threshold(&self) -> Priority {
         match self {
             ConflictPolicy::ScheduleWins => Priority::LOW, // all events fire
-            ConflictPolicy::ManualWins => Priority(7),      // only high-priority events fire
+            ConflictPolicy::ManualWins => Priority(7),     // only high-priority events fire
         }
     }
 }
@@ -78,7 +80,7 @@ impl fmt::Display for ScheduleMode {
 impl ScheduleMode {
     /// Parse a mode from a string (case-insensitive).
     pub fn from_str_loose(s: &str) -> Result<Self, String> {
-        match s.to_lowercase().as_str() {
+        match normalize_token(s).as_str() {
             "overlay" => Ok(ScheduleMode::Overlay),
             "stop" => Ok(ScheduleMode::Stop),
             "insert" => Ok(ScheduleMode::Insert),
@@ -152,10 +154,9 @@ impl ScheduleEvent {
         if self.days.is_empty() {
             return "daily".to_string();
         }
-        let names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
         self.days
             .iter()
-            .filter_map(|&d| names.get(d as usize))
+            .filter_map(|&d| DAY_NAMES.get(d as usize))
             .copied()
             .collect::<Vec<_>>()
             .join(",")
@@ -163,10 +164,21 @@ impl ScheduleEvent {
 }
 
 /// The schedule — a list of timed events managed by the engine.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Schedule {
     pub events: Vec<ScheduleEvent>,
+    #[serde(default = "default_next_id")]
     next_id: u32,
+}
+
+fn default_next_id() -> u32 {
+    1
+}
+
+impl Default for Schedule {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Schedule {
@@ -323,6 +335,10 @@ pub fn parse_time(s: &str) -> Result<NaiveTime, String> {
         .map_err(|_| format!("Invalid time '{}'. Expected HH:MM or HH:MM:SS", s))
 }
 
+fn normalize_token(s: &str) -> String {
+    s.trim().to_lowercase().replace('_', "-")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -348,9 +364,18 @@ mod tests {
 
     #[test]
     fn schedule_mode_from_str() {
-        assert_eq!(ScheduleMode::from_str_loose("overlay").unwrap(), ScheduleMode::Overlay);
-        assert_eq!(ScheduleMode::from_str_loose("STOP").unwrap(), ScheduleMode::Stop);
-        assert_eq!(ScheduleMode::from_str_loose("Insert").unwrap(), ScheduleMode::Insert);
+        assert_eq!(
+            ScheduleMode::from_str_loose("overlay").unwrap(),
+            ScheduleMode::Overlay
+        );
+        assert_eq!(
+            ScheduleMode::from_str_loose("STOP").unwrap(),
+            ScheduleMode::Stop
+        );
+        assert_eq!(
+            ScheduleMode::from_str_loose("Insert").unwrap(),
+            ScheduleMode::Insert
+        );
         assert!(ScheduleMode::from_str_loose("bogus").is_err());
     }
 
@@ -539,6 +564,29 @@ mod tests {
         let json = r#"{"events":[],"next_id":1}"#;
         let sched: Schedule = serde_json::from_str(json).unwrap();
         assert_eq!(sched.len(), 0);
+    }
+
+    #[test]
+    fn schedule_deserializes_without_next_id_for_backwards_compat() {
+        let json = r#"{"events":[]}"#;
+        let mut sched: Schedule = serde_json::from_str(json).unwrap();
+        let id = sched.add_event(
+            NaiveTime::from_hms_opt(9, 0, 0).unwrap(),
+            ScheduleMode::Overlay,
+            "compat.mp3".into(),
+            Priority::LOW,
+            None,
+            vec![],
+        );
+        assert_eq!(id, 1);
+    }
+
+    #[test]
+    fn schedule_default_matches_new() {
+        let from_default = Schedule::default();
+        let from_new = Schedule::new();
+        assert_eq!(from_default.events.len(), from_new.events.len());
+        assert_eq!(from_default.next_id, from_new.next_id);
     }
 
     // --- Conflict Policy tests ---
