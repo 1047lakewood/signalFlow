@@ -13,14 +13,14 @@ interface PlaylistViewProps {
   tracks: TrackInfo[];
   currentIndex: number | null;
   playlistName: string;
-  selectedIndex: number | null;
+  selectedIndices: Set<number>;
   clipboard: ClipboardData | null;
-  onSelectTrack: (index: number | null) => void;
+  onSelectTracks: (indices: Set<number>) => void;
   onPlayTrack: (index: number) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
-  onCopyTrack: (index: number) => void;
-  onCutTrack: (index: number) => void;
-  onPasteTrack: (afterIndex: number) => void;
+  onCopyTracks: (indices: number[]) => void;
+  onCutTracks: (indices: number[]) => void;
+  onPasteTracks: (afterIndex: number) => void;
   onAddFiles: () => void;
   onFileDrop: (paths: string[]) => void;
   onTracksChanged: () => void;
@@ -37,13 +37,14 @@ interface EditingCell {
   field: "artist" | "title";
 }
 
-function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, clipboard, onSelectTrack, onPlayTrack, onReorder, onCopyTrack, onCutTrack, onPasteTrack, onAddFiles, onFileDrop, onTracksChanged }: PlaylistViewProps) {
+function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, clipboard, onSelectTracks, onPlayTrack, onReorder, onCopyTracks, onCutTracks, onPasteTracks, onAddFiles, onFileDrop, onTracksChanged }: PlaylistViewProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
   const [isDroppingFiles, setIsDroppingFiles] = useState(false);
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [editValue, setEditValue] = useState("");
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [anchorIndex, setAnchorIndex] = useState<number | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -203,11 +204,53 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, clipb
     }
   }, [dragIndex, onReorder]);
 
+  const handleRowClick = useCallback((e: React.MouseEvent, trackIndex: number) => {
+    if (e.shiftKey && anchorIndex !== null) {
+      // Range select from anchor to clicked index
+      const min = Math.min(anchorIndex, trackIndex);
+      const max = Math.max(anchorIndex, trackIndex);
+      const rangeSet = new Set<number>();
+      for (let i = min; i <= max; i++) {
+        // Only include indices that exist in the track list
+        if (tracks.some((t) => t.index === i)) {
+          rangeSet.add(i);
+        }
+      }
+      // If Ctrl is also held, merge with existing selection
+      if (e.ctrlKey || e.metaKey) {
+        const merged = new Set(selectedIndices);
+        for (const i of rangeSet) merged.add(i);
+        onSelectTracks(merged);
+      } else {
+        onSelectTracks(rangeSet);
+      }
+      // Don't update anchor on shift-click
+    } else if (e.ctrlKey || e.metaKey) {
+      // Toggle individual row
+      const next = new Set(selectedIndices);
+      if (next.has(trackIndex)) {
+        next.delete(trackIndex);
+      } else {
+        next.add(trackIndex);
+      }
+      onSelectTracks(next);
+      setAnchorIndex(trackIndex);
+    } else {
+      // Normal click — single select
+      onSelectTracks(new Set([trackIndex]));
+      setAnchorIndex(trackIndex);
+    }
+  }, [anchorIndex, selectedIndices, tracks, onSelectTracks]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent, trackIndex: number) => {
     e.preventDefault();
-    onSelectTrack(trackIndex);
+    // If right-clicked row isn't in current selection, select just that row
+    if (!selectedIndices.has(trackIndex)) {
+      onSelectTracks(new Set([trackIndex]));
+      setAnchorIndex(trackIndex);
+    }
     setContextMenu({ x: e.clientX, y: e.clientY, trackIndex });
-  }, [onSelectTrack]);
+  }, [selectedIndices, onSelectTracks]);
 
   const handleContextMenuPlay = useCallback(() => {
     if (!contextMenu) return;
@@ -217,21 +260,23 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, clipb
 
   const handleContextMenuCopy = useCallback(() => {
     if (!contextMenu) return;
-    onCopyTrack(contextMenu.trackIndex);
+    const indices = selectedIndices.size > 0 ? Array.from(selectedIndices).sort((a, b) => a - b) : [contextMenu.trackIndex];
+    onCopyTracks(indices);
     setContextMenu(null);
-  }, [contextMenu, onCopyTrack]);
+  }, [contextMenu, selectedIndices, onCopyTracks]);
 
   const handleContextMenuCut = useCallback(() => {
     if (!contextMenu) return;
-    onCutTrack(contextMenu.trackIndex);
+    const indices = selectedIndices.size > 0 ? Array.from(selectedIndices).sort((a, b) => a - b) : [contextMenu.trackIndex];
+    onCutTracks(indices);
     setContextMenu(null);
-  }, [contextMenu, onCutTrack]);
+  }, [contextMenu, selectedIndices, onCutTracks]);
 
   const handleContextMenuPaste = useCallback(() => {
     if (!contextMenu) return;
-    onPasteTrack(contextMenu.trackIndex);
+    onPasteTracks(contextMenu.trackIndex);
     setContextMenu(null);
-  }, [contextMenu, onPasteTrack]);
+  }, [contextMenu, onPasteTracks]);
 
   if (tracks.length === 0) {
     return (
@@ -273,7 +318,7 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, clipb
         <tbody>
           {tracks.map((track) => {
             const isCurrent = track.index === currentIndex;
-            const isSelected = track.index === selectedIndex;
+            const isSelected = selectedIndices.has(track.index);
             const isDragging = track.index === dragIndex;
             const isDropTarget = track.index === dropTarget && dropTarget !== dragIndex;
             const isEditingArtist = editingCell?.trackIndex === track.index && editingCell?.field === "artist";
@@ -288,7 +333,7 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, clipb
                 key={track.index}
                 className={className}
                 draggable={!editingCell}
-                onClick={() => onSelectTrack(track.index)}
+                onClick={(e) => handleRowClick(e, track.index)}
                 onDoubleClick={(e) => {
                   // Don't trigger play if double-clicking an editable cell (artist/title handle their own double-click)
                   const target = e.target as HTMLElement;
@@ -366,10 +411,10 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndex, clipb
           </button>
           <div className="context-menu-divider" />
           <button className="playlist-context-item" onClick={handleContextMenuCut}>
-            Cut
+            Cut{selectedIndices.size > 1 ? ` (${selectedIndices.size})` : ""}
           </button>
           <button className="playlist-context-item" onClick={handleContextMenuCopy}>
-            Copy
+            Copy{selectedIndices.size > 1 ? ` (${selectedIndices.size})` : ""}
           </button>
           <button
             className={`playlist-context-item${!clipboard ? " disabled" : ""}`}

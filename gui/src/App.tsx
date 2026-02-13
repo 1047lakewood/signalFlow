@@ -31,7 +31,7 @@ function App() {
   const [showAdConfig, setShowAdConfig] = useState(false);
   const [showAdStats, setShowAdStats] = useState(false);
   const [showRdsConfig, setShowRdsConfig] = useState(false);
-  const [selectedTrackIndex, setSelectedTrackIndex] = useState<number | null>(null);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const [showSchedulePane, setShowSchedulePane] = useState(false);
   const [clipboard, setClipboard] = useState<ClipboardData | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">(getInitialTheme);
@@ -97,7 +97,7 @@ function App() {
 
   const handlePlaylistSelect = async (name: string) => {
     setSelectedPlaylist(name);
-    setSelectedTrackIndex(null);
+    setSelectedIndices(new Set());
     try {
       await invoke("set_active_playlist", { name });
     } catch (e) {
@@ -178,26 +178,32 @@ function App() {
     }
   }, [loadTracks]);
 
-  const handleCopyTrack = useCallback((trackIndex: number) => {
+  const handleCopyTracks = useCallback((indices: number[]) => {
     if (!selectedPlaylist) return;
-    const track = tracks.find((t) => t.index === trackIndex);
-    if (!track) return;
+    const paths = indices
+      .map((i) => tracks.find((t) => t.index === i))
+      .filter((t): t is TrackInfo => t !== undefined)
+      .map((t) => t.path);
+    if (paths.length === 0) return;
     setClipboard({
-      paths: [track.path],
+      paths,
       sourcePlaylist: selectedPlaylist,
-      sourceIndices: [trackIndex],
+      sourceIndices: indices,
       isCut: false,
     });
   }, [selectedPlaylist, tracks]);
 
-  const handleCutTrack = useCallback((trackIndex: number) => {
+  const handleCutTracks = useCallback((indices: number[]) => {
     if (!selectedPlaylist) return;
-    const track = tracks.find((t) => t.index === trackIndex);
-    if (!track) return;
+    const paths = indices
+      .map((i) => tracks.find((t) => t.index === i))
+      .filter((t): t is TrackInfo => t !== undefined)
+      .map((t) => t.path);
+    if (paths.length === 0) return;
     setClipboard({
-      paths: [track.path],
+      paths,
       sourcePlaylist: selectedPlaylist,
-      sourceIndices: [trackIndex],
+      sourceIndices: indices,
       isCut: true,
     });
   }, [selectedPlaylist, tracks]);
@@ -386,14 +392,14 @@ function App() {
                 tracks={tracks}
                 currentIndex={currentIndex}
                 playlistName={selectedPlaylist}
-                selectedIndex={selectedTrackIndex}
+                selectedIndices={selectedIndices}
                 clipboard={clipboard}
-                onSelectTrack={setSelectedTrackIndex}
+                onSelectTracks={setSelectedIndices}
                 onPlayTrack={handlePlayTrack}
                 onReorder={handleReorder}
-                onCopyTrack={handleCopyTrack}
-                onCutTrack={handleCutTrack}
-                onPasteTrack={handlePasteTrack}
+                onCopyTracks={handleCopyTracks}
+                onCutTracks={handleCutTracks}
+                onPasteTracks={handlePasteTrack}
                 onAddFiles={handleAddFiles}
                 onFileDrop={handleFileDrop}
                 onTracksChanged={loadTracks}
@@ -412,7 +418,7 @@ function App() {
           )}
         </div>
       </main>
-      <TransportBar onTrackChange={loadTracks} selectedTrackIndex={selectedTrackIndex} onPlayingIndexChange={handlePlayingIndexChange} />
+      <TransportBar onTrackChange={loadTracks} selectedTrackIndex={selectedIndices.size > 0 ? Math.min(...selectedIndices) : null} onPlayingIndexChange={handlePlayingIndexChange} />
       {showSettings && (
         <SettingsWindow onClose={() => setShowSettings(false)} />
       )}

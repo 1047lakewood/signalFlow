@@ -1,4 +1,17 @@
 # signalFlow — Changelog
+## 2026-02-13 — Multi-Select (Phase E2)
+- Changed single-row selection (`selectedIndex: number | null`) to multi-row selection (`selectedIndices: Set<number>`)
+- Shift+click selects a contiguous range from the last anchor to the clicked row
+- Ctrl+click (or Cmd+click on Mac) toggles individual rows in/out of the selection
+- Shift+Ctrl+click merges a range into the existing selection
+- Plain click still selects a single row (clears others) and sets the anchor
+- Right-click on an unselected row selects just that row; right-click on a selected row preserves the multi-selection
+- Cut/Copy context menu actions now operate on all selected rows (show count when >1)
+- Paste still inserts after the right-clicked row
+- TransportBar receives the lowest selected index for Play-from-selection behavior
+- Selection resets when switching playlists
+- 318 tests passing (no new tests — frontend-only multi-select state changes)
+
 ## 2026-02-13 — Cut/Copy/Paste via Context Menu (Phase E2)
 - Added Cut, Copy, Paste actions to the playlist row right-click context menu
 - Copy stores the track's path/index/source playlist in frontend clipboard state
