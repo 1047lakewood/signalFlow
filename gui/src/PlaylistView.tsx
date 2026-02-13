@@ -9,6 +9,24 @@ export interface ClipboardData {
   isCut: boolean;
 }
 
+interface ColWidths {
+  num: number;
+  status: number;
+  artist: number;
+  duration: number;
+}
+
+interface ResizeState {
+  colKey: keyof ColWidths;
+  startX: number;
+  startWidth: number;
+  sign: number;
+}
+
+const COL_WIDTHS_KEY = "signalflow-col-widths";
+const DEFAULT_COL_WIDTHS: ColWidths = { num: 40, status: 36, artist: 250, duration: 70 };
+const MIN_COL_WIDTHS: ColWidths = { num: 30, status: 24, artist: 60, duration: 50 };
+
 interface PlaylistViewProps {
   tracks: TrackInfo[];
   currentIndex: number | null;
@@ -47,6 +65,59 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
   const [anchorIndex, setAnchorIndex] = useState<number | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Column resize state
+  const [colWidths, setColWidths] = useState<ColWidths>(() => {
+    try {
+      const saved = localStorage.getItem(COL_WIDTHS_KEY);
+      if (saved) return { ...DEFAULT_COL_WIDTHS, ...JSON.parse(saved) };
+    } catch { /* ignore */ }
+    return { ...DEFAULT_COL_WIDTHS };
+  });
+  const [resizeState, setResizeState] = useState<ResizeState | null>(null);
+
+  // Column resize mouse tracking
+  useEffect(() => {
+    if (!resizeState) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const delta = (e.clientX - resizeState.startX) * resizeState.sign;
+      const minWidth = MIN_COL_WIDTHS[resizeState.colKey];
+      const newWidth = Math.max(minWidth, resizeState.startWidth + delta);
+      setColWidths((prev) => ({ ...prev, [resizeState.colKey]: newWidth }));
+    };
+
+    const handleMouseUp = () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      setResizeState(null);
+      setColWidths((prev) => {
+        try { localStorage.setItem(COL_WIDTHS_KEY, JSON.stringify(prev)); } catch { /* ignore */ }
+        return prev;
+      });
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [resizeState]);
+
+  const handleResizeMouseDown = useCallback((e: React.MouseEvent, colKey: keyof ColWidths, sign: number = 1) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setResizeState({
+      colKey,
+      startX: e.clientX,
+      startWidth: colWidths[colKey],
+      sign,
+    });
+  }, [colWidths]);
 
   // Listen for Tauri file drop events
   useEffect(() => {
@@ -308,11 +379,22 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
       <table className="track-table">
         <thead>
           <tr>
-            <th className="col-num">#</th>
-            <th className="col-status"></th>
-            <th className="col-artist">Artist</th>
-            <th className="col-title">Title</th>
-            <th className="col-duration">Duration</th>
+            <th className="col-num" style={{ width: colWidths.num }}>
+              #
+              <div className="col-resize-handle" onMouseDown={(e) => handleResizeMouseDown(e, "num")} />
+            </th>
+            <th className="col-status" style={{ width: colWidths.status }}>
+              <div className="col-resize-handle" onMouseDown={(e) => handleResizeMouseDown(e, "status")} />
+            </th>
+            <th className="col-artist" style={{ width: colWidths.artist }}>
+              Artist
+              <div className="col-resize-handle" onMouseDown={(e) => handleResizeMouseDown(e, "artist")} />
+            </th>
+            <th className="col-title">
+              Title
+              <div className="col-resize-handle" onMouseDown={(e) => handleResizeMouseDown(e, "duration", -1)} />
+            </th>
+            <th className="col-duration" style={{ width: colWidths.duration }}>Duration</th>
           </tr>
         </thead>
         <tbody>

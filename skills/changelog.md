@@ -1,4 +1,15 @@
 # signalFlow — Changelog
+## 2026-02-13 — Resizable Columns (Phase E2)
+- Drag column header edges to resize column widths in the playlist table
+- Resize handles appear as subtle highlights on hover between column headers
+- Columns with explicit widths: # (40px), Status (36px), Artist (250px), Duration (70px); Title takes remaining space
+- Dragging a handle adjusts the column to its left; the Title column absorbs the difference
+- The handle on Title's right edge resizes Duration inversely (dragging right = Duration shrinks, Title grows)
+- Min widths enforced per column (30/24/60/50px) to prevent collapse
+- Column widths persisted to `localStorage` (`signalflow-col-widths` key), restored on load
+- Cursor changes to `col-resize` and text selection disabled during drag for smooth UX
+- 318 tests passing (no new tests — frontend-only column resize state + CSS)
+
 ## 2026-02-13 — Multi-Select (Phase E2)
 - Changed single-row selection (`selectedIndex: number | null`) to multi-row selection (`selectedIndices: Set<number>`)
 - Shift+click selects a contiguous range from the last anchor to the clicked row
