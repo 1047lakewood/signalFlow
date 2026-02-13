@@ -298,6 +298,10 @@ body {
   /* Takes remaining space */
 }
 
+.col-path {
+  color: var(--text-secondary);
+}
+
 .col-duration {
   width: 70px;
   text-align: right;

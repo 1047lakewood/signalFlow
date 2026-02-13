@@ -101,7 +101,7 @@ signalFlow/
 
 ## Main Playlist View (DONE)
 
-- `PlaylistView` component: table with columns #, Status, Artist, Title, Duration
+- `PlaylistView` component: table with columns #, Status, Artist, Title, File Path, Duration
 - Current track highlighted with `--bg-row-current` background and `--highlight` text color
 - Playing indicator (triangle) on current track, intro dot (blue) on tracks with `has_intro`
 - Sticky header, hover highlight, tabular-nums for duration column
@@ -109,6 +109,15 @@ signalFlow/
 - `App.tsx`: loads playlists via `get_playlists`, auto-selects active playlist, loads tracks via `get_playlist_tracks`
 - Playlist tabs in header for quick switching between playlists (preview for Playlist Tabs feature)
 - Empty state messaging for no playlists and empty playlists
+
+
+## Playlist Row Number + File Path Columns (DONE)
+
+- Added dedicated **File Path** column in `PlaylistView` that displays each track's full source path with a hover tooltip
+- Kept sequential row-number `#` as the first column (`track.index + 1`) for quick visual referencing
+- Extended resizable column-width state with `path` width, including defaults/minimums and localStorage persistence
+- Added resize handles for File Path and Duration headers, and updated Title right-edge resize behavior to resize the File Path boundary
+- Styled File Path cells with secondary text color to reduce visual noise while keeping long paths readable via truncation + tooltip
 
 ## Playlist Tabs (DONE)
 
