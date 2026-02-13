@@ -1,3 +1,5 @@
+
+> Maintenance note (2026-02-13): this spec may lag implementation details. Validate assumptions against current source before coding.
 ---
 name: ad-inserter-spec
 description: Complete implementation specification for the ad scheduler, ad inserter service, play logger, report generator, and ad configuration/statistics UI

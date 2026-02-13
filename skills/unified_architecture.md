@@ -1,5 +1,7 @@
 # Unified App Architecture — Design Doc
 
+> Maintenance note (2026-02-13): treat this as a living design record. Verify behavior against current code and tests before implementation decisions.
+
 ## Status: STEPS 1+2+3+4+5 COMPLETE — Unified Tauri architecture fully landed (standalone CLI removed)
 
 ## Problem Statement

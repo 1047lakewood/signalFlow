@@ -1,5 +1,7 @@
 # Auto-Intro System — Design Doc (DONE, incl. Recurring Overlay + GUI Config)
 
+> Maintenance note (2026-02-13): treat this as a living design record. Verify behavior against current code and tests before implementation decisions.
+
 ## Purpose
 Automatically play an artist intro/jingle before tracks by a matching artist. Common in radio automation — e.g., before "Adele - Hello.mp3", play "Adele.mp3" from the intros folder.
 

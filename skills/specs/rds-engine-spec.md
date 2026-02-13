@@ -1,3 +1,5 @@
+
+> Maintenance note (2026-02-13): this spec may lag implementation details. Validate assumptions against current source before coding.
 ---
 name: rds-engine-spec
 description: Complete implementation specification for the RDS engine, message rotation, lecture detection, and RDS config UI

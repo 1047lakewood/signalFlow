@@ -1,5 +1,7 @@
 # Audio Engine — Design Doc
 
+> Maintenance note (2026-02-13): treat this as a living design record. Verify behavior against current code and tests before implementation decisions.
+
 ## Current State (as of 2026-02-06)
 
 All Phase A and Phase B features are implemented. The engine supports full playlist management, audio playback with crossfading, silence detection, and auto-intros.

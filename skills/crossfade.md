@@ -1,5 +1,7 @@
 # Crossfade — Design Doc (DONE)
 
+> Maintenance note (2026-02-13): treat this as a living design record. Verify behavior against current code and tests before implementation decisions.
+
 ## Goal
 Configurable fade duration between tracks. Fade-out of ending track overlaps with fade-in of next track. Linear curve initially.
 
