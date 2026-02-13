@@ -560,6 +560,33 @@ body {
   border-top: 1px solid var(--border);
 }
 
+.playlist-context-menu {
+  position: fixed;
+  min-width: 150px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  padding: 4px;
+  z-index: 50;
+}
+
+.playlist-context-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.playlist-context-item:hover {
+  background: var(--bg-row-hover);
+}
+
 /* ── Empty playlist CTA ───────────────────────────────────────────── */
 
 .empty-content {
