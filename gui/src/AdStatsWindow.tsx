@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { cleanPath } from "./pathUtils";
 import type { AdStatsResponse, AdDailyCount, AdFailure } from "./types";
 
 interface AdStatsWindowProps {
@@ -94,12 +95,13 @@ function AdStatsWindow({ onClose }: AdStatsWindowProps) {
     try {
       const dir = await open({ directory: true, multiple: false });
       if (!dir || typeof dir !== "string") return;
+      const cleanedDir = cleanPath(dir);
       setExporting(true);
       setExportMsg("");
       const files = await invoke<string[]>("generate_ad_report", {
         start: dateFrom,
         end: dateTo,
-        outputDir: dir,
+        outputDir: cleanedDir,
       });
       if (files.length === 0) {
         setExportMsg("No plays found in range");

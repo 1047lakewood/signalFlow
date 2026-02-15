@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { cleanPath } from "./pathUtils";
 import type { AdInfo } from "./types";
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "ogg", "aac", "m4a"];
@@ -108,7 +109,7 @@ function AdConfigWindow({ onClose }: AdConfigWindowProps) {
         filters: [{ name: "Audio Files", extensions: AUDIO_EXTENSIONS }],
       });
       if (selected && typeof selected === "string") {
-        handleUpdate({ mp3_file: selected });
+        handleUpdate({ mp3_file: cleanPath(selected) });
       }
     } catch (e) {
       console.error("Failed to open file dialog:", e);

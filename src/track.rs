@@ -24,8 +24,9 @@ pub struct Track {
 impl Track {
     /// Create a Track by reading metadata from an audio file.
     pub fn from_path(path: &Path) -> Result<Self, String> {
-        let path = path
-            .canonicalize()
+        // Avoid canonicalize — it resolves mapped drives to UNC paths on Windows
+        // (e.g. G:\Music → \\NAS\share\Music), losing the drive letter the user expects.
+        let path = std::path::absolute(path)
             .map_err(|e| format!("Invalid path '{}': {}", path.display(), e))?;
 
         let tagged_file = lofty::read_from_path(&path)

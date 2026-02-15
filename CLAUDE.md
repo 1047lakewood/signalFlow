@@ -50,8 +50,9 @@ Treat **"continue"**, **"next"**, **"keep going"**, or equivalent as:
 5. **LOG**
    - Update `skills/changelog.md` and relevant `skills/*.md` docs.
    - Mark `skills/todo.md` item complete only when docs match code.
-6. **COMMIT**
+6. **COMMIT & PUSH**
    - Commit once checks pass and workspace is clean.
+   - Push to remote after committing.
 
 ---
 

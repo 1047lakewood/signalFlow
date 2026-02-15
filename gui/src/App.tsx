@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { cleanPath } from "./pathUtils";
 import type { PlaylistInfo, TrackInfo } from "./types";
 import PlaylistView from "./PlaylistView";
 import type { ClipboardData } from "./PlaylistView";
@@ -302,7 +303,8 @@ function App() {
       });
       if (!selected) return;
       // open() returns string | string[] | null
-      const paths = Array.isArray(selected) ? selected : [selected];
+      const raw = Array.isArray(selected) ? selected : [selected];
+      const paths = raw.map(cleanPath);
       if (paths.length === 0) return;
       await invoke("add_tracks", { playlist: selectedPlaylist, paths });
       await loadTracks();

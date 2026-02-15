@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { cleanPath } from "./pathUtils";
 import type { ConfigResponse } from "./types";
 
 interface SettingsWindowProps {
@@ -149,7 +150,7 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
     try {
       const selected = await open({ directory: true });
       if (selected && typeof selected === "string") {
-        setIntrosFolder(selected);
+        setIntrosFolder(cleanPath(selected));
       }
     } catch (e) {
       console.error("Failed to open folder dialog:", e);
@@ -198,7 +199,7 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
         filters: [{ name: "XML Files", extensions: ["xml"] }],
       });
       if (selected && typeof selected === "string") {
-        setNowPlayingPath(selected);
+        setNowPlayingPath(cleanPath(selected));
       }
     } catch (e) {
       console.error("Failed to open file dialog:", e);
@@ -265,7 +266,7 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
     try {
       const selected = await open({ directory: true });
       if (selected && typeof selected === "string") {
-        setRecordingOutputDir(selected);
+        setRecordingOutputDir(cleanPath(selected));
       }
     } catch (e) {
       console.error("Failed to browse recording directory:", e);
@@ -306,12 +307,11 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
   const browseAndAddIndexedLocation = async () => {
     try {
       const selected = await open({ directory: true });
-      if (
-        selected &&
-        typeof selected === "string" &&
-        !indexedLocations.includes(selected)
-      ) {
-        setIndexedLocations((prev) => [...prev, selected]);
+      if (selected && typeof selected === "string") {
+        const cleaned = cleanPath(selected);
+        if (!indexedLocations.includes(cleaned)) {
+          setIndexedLocations((prev) => [...prev, cleaned]);
+        }
       }
     } catch (e) {
       console.error("Failed to browse indexed location:", e);
@@ -321,12 +321,11 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
   const browseAndAddFavoriteFolder = async () => {
     try {
       const selected = await open({ directory: true });
-      if (
-        selected &&
-        typeof selected === "string" &&
-        !favoriteFolders.includes(selected)
-      ) {
-        setFavoriteFolders((prev) => [...prev, selected]);
+      if (selected && typeof selected === "string") {
+        const cleaned = cleanPath(selected);
+        if (!favoriteFolders.includes(cleaned)) {
+          setFavoriteFolders((prev) => [...prev, cleaned]);
+        }
       }
     } catch (e) {
       console.error("Failed to browse favorite folder:", e);

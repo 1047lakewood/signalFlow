@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { cleanPath } from "./pathUtils";
 import type { ScheduleEventInfo } from "./types";
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "ogg", "aac", "m4a"];
@@ -65,7 +66,7 @@ function SchedulePane({ onClose }: SchedulePaneProps) {
         }],
       });
       if (selected && typeof selected === "string") {
-        setNewFile(selected);
+        setNewFile(cleanPath(selected));
       }
     } catch (e) {
       console.error("Failed to open file dialog:", e);
