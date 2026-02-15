@@ -177,15 +177,17 @@ function TransportBar({ onTrackChange, selectedTrackIndex, onPlayingIndexChange 
 
       {/* Controls */}
       <div className="transport-controls">
-        {state.is_playing && !state.is_paused ? (
-          <button className="transport-btn" onClick={handlePause} title="Pause">
-            {"\u23F8"}
-          </button>
-        ) : (
-          <button className="transport-btn transport-btn-play" onClick={state.is_paused ? handlePause : handlePlay} title={state.is_paused ? "Resume" : "Play"}>
-            {"\u25B6"}
-          </button>
-        )}
+        <button className="transport-btn transport-btn-play" onClick={handlePlay} title="Play">
+          {"\u25B6"}
+        </button>
+        <button
+          className="transport-btn"
+          onClick={handlePause}
+          title="Pause"
+          disabled={!state.is_playing || state.is_paused}
+        >
+          {"\u23F8"}
+        </button>
         <button className="transport-btn" onClick={handleStop} title="Stop">
           {"\u23F9"}
         </button>

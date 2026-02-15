@@ -27,6 +27,10 @@ export interface StatusResponse {
   silence_duration_secs: number;
   intros_folder: string | null;
   now_playing_path: string | null;
+  stream_output_enabled: boolean;
+  stream_output_url: string;
+  recording_enabled: boolean;
+  recording_output_dir: string | null;
 }
 
 export interface ScheduleEventInfo {
@@ -49,6 +53,10 @@ export interface ConfigResponse {
   recurring_intro_duck_volume: number;
   conflict_policy: string;
   now_playing_path: string | null;
+  stream_output_enabled: boolean;
+  stream_output_url: string;
+  recording_enabled: boolean;
+  recording_output_dir: string | null;
 }
 
 export interface AdInfo {

@@ -8,13 +8,15 @@ interface SettingsWindowProps {
   initialTab?: string;
 }
 
-type TabId = "crossfade" | "silence" | "intro" | "nowplaying" | "conflict";
+type TabId = "crossfade" | "silence" | "intro" | "nowplaying" | "streaming" | "recording" | "conflict";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "crossfade", label: "Crossfade" },
   { id: "silence", label: "Silence Detection" },
   { id: "intro", label: "Auto-Intro" },
   { id: "nowplaying", label: "Now-Playing XML" },
+  { id: "streaming", label: "Streaming" },
+  { id: "recording", label: "Recording" },
   { id: "conflict", label: "Conflict Policy" },
 ];
 
@@ -42,6 +44,14 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
   // Now-Playing
   const [nowPlayingPath, setNowPlayingPath] = useState<string | null>(null);
 
+  // Streaming
+  const [streamOutputEnabled, setStreamOutputEnabled] = useState(false);
+  const [streamOutputUrl, setStreamOutputUrl] = useState("");
+
+  // Recording
+  const [recordingEnabled, setRecordingEnabled] = useState(false);
+  const [recordingOutputDir, setRecordingOutputDir] = useState<string | null>(null);
+
   // Conflict
   const [conflictPolicy, setConflictPolicy] = useState("schedule-wins");
 
@@ -57,6 +67,10 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
         setIntroInterval(String(c.recurring_intro_interval_secs));
         setIntroDuck(String(c.recurring_intro_duck_volume));
         setNowPlayingPath(c.now_playing_path);
+        setStreamOutputEnabled(c.stream_output_enabled);
+        setStreamOutputUrl(c.stream_output_url);
+        setRecordingEnabled(c.recording_enabled);
+        setRecordingOutputDir(c.recording_output_dir);
         setConflictPolicy(c.conflict_policy);
       } catch (e) {
         console.error("Failed to load config:", e);
@@ -199,6 +213,73 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
     }
   };
 
+  const saveStreaming = async () => {
+    setSaving(true);
+    try {
+      await invoke("set_stream_output", {
+        enabled: streamOutputEnabled,
+        endpointUrl: streamOutputUrl,
+      });
+      showSaved();
+    } catch (e) {
+      console.error("Failed to save stream output:", e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const disableStreaming = async () => {
+    setSaving(true);
+    try {
+      await invoke("set_stream_output", { enabled: false, endpointUrl: streamOutputUrl });
+      setStreamOutputEnabled(false);
+      showSaved();
+    } catch (e) {
+      console.error("Failed to disable stream output:", e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const browseRecordingDir = async () => {
+    try {
+      const selected = await open({ directory: true });
+      if (selected && typeof selected === "string") {
+        setRecordingOutputDir(selected);
+      }
+    } catch (e) {
+      console.error("Failed to browse recording directory:", e);
+    }
+  };
+
+  const saveRecording = async () => {
+    setSaving(true);
+    try {
+      await invoke("set_recording", {
+        enabled: recordingEnabled,
+        outputDir: recordingOutputDir,
+      });
+      showSaved();
+    } catch (e) {
+      console.error("Failed to save recording config:", e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const disableRecording = async () => {
+    setSaving(true);
+    try {
+      await invoke("set_recording", { enabled: false, outputDir: recordingOutputDir });
+      setRecordingEnabled(false);
+      showSaved();
+    } catch (e) {
+      console.error("Failed to disable recording:", e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const saveConflict = async () => {
     setSaving(true);
     try {
@@ -219,6 +300,8 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
       case "silence": return saveSilence();
       case "intro": return saveIntro();
       case "nowplaying": return saveNowPlaying();
+      case "streaming": return saveStreaming();
+      case "recording": return saveRecording();
       case "conflict": return saveConflict();
     }
   };
@@ -239,6 +322,12 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
     }
     if (activeTab === "nowplaying" && nowPlayingEnabled) {
       return <button className="settings-btn settings-btn-danger" onClick={disableNowPlaying} disabled={saving}>Disable</button>;
+    }
+    if (activeTab === "streaming" && streamOutputEnabled) {
+      return <button className="settings-btn settings-btn-danger" onClick={disableStreaming} disabled={saving}>Disable</button>;
+    }
+    if (activeTab === "recording" && recordingEnabled) {
+      return <button className="settings-btn settings-btn-danger" onClick={disableRecording} disabled={saving}>Disable</button>;
     }
     return null;
   };
@@ -416,6 +505,74 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
                     </button>
                   </div>
                   <span className="settings-hint">XML file updated with current/next track info</span>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "streaming" && (
+              <div className="settings-body">
+                <div className="settings-status">
+                  Status: <span className={streamOutputEnabled ? "status-enabled" : "status-disabled"}>
+                    {streamOutputEnabled ? "Enabled" : "Disabled"}
+                  </span>
+                </div>
+                <div className="settings-field">
+                  <label className="settings-label">Enable streaming output</label>
+                  <label className="settings-checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={streamOutputEnabled}
+                      onChange={(e) => setStreamOutputEnabled(e.target.checked)}
+                    />
+                    <span>Relay playback to Icecast/Shoutcast endpoint</span>
+                  </label>
+                </div>
+                <div className="settings-field">
+                  <label className="settings-label">Streaming endpoint URL</label>
+                  <input
+                    type="text"
+                    className="settings-input settings-input-path"
+                    value={streamOutputUrl}
+                    onChange={(e) => setStreamOutputUrl(e.target.value)}
+                    placeholder="icecast://source:PASSWORD@host:8000/mount"
+                  />
+                  <span className="settings-hint">Used by the stream relay process when enabled.</span>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "recording" && (
+              <div className="settings-body">
+                <div className="settings-status">
+                  Status: <span className={recordingEnabled ? "status-enabled" : "status-disabled"}>
+                    {recordingEnabled ? "Enabled" : "Disabled"}
+                  </span>
+                </div>
+                <div className="settings-field">
+                  <label className="settings-label">Enable daily recording</label>
+                  <label className="settings-checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={recordingEnabled}
+                      onChange={(e) => setRecordingEnabled(e.target.checked)}
+                    />
+                    <span>Record playback output to one file per calendar day</span>
+                  </label>
+                </div>
+                <div className="settings-field">
+                  <label className="settings-label">Recording output folder</label>
+                  <div className="settings-input-row">
+                    <input
+                      type="text"
+                      className="settings-input settings-input-path"
+                      value={recordingOutputDir ?? ""}
+                      readOnly
+                      placeholder="No folder selected"
+                    />
+                    <button className="settings-btn settings-btn-browse" onClick={browseRecordingDir}>
+                      Browse
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

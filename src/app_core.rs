@@ -13,7 +13,7 @@ use crate::ad_scheduler::AdConfig;
 use crate::auto_intro;
 use crate::engine::Engine;
 use crate::rds::{RdsMessage, RdsSchedule};
-use crate::scheduler::{ConflictPolicy, Priority, ScheduleMode, parse_time};
+use crate::scheduler::{parse_time, ConflictPolicy, Priority, ScheduleMode};
 use chrono::Local;
 use serde::Serialize;
 use std::collections::VecDeque;
@@ -136,6 +136,10 @@ pub struct StatusData {
     pub recurring_intro_interval_secs: f32,
     pub recurring_intro_duck_volume: f32,
     pub now_playing_path: Option<String>,
+    pub stream_output_enabled: bool,
+    pub stream_output_url: String,
+    pub recording_enabled: bool,
+    pub recording_output_dir: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -169,6 +173,10 @@ pub struct ConfigData {
     pub recurring_intro_duck_volume: f32,
     pub conflict_policy: String,
     pub now_playing_path: Option<String>,
+    pub stream_output_enabled: bool,
+    pub stream_output_url: String,
+    pub recording_enabled: bool,
+    pub recording_output_dir: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -275,6 +283,10 @@ impl AppCore {
             recurring_intro_interval_secs: self.engine.recurring_intro_interval_secs,
             recurring_intro_duck_volume: self.engine.recurring_intro_duck_volume,
             now_playing_path: self.engine.now_playing_path.clone(),
+            stream_output_enabled: self.engine.stream_output.enabled,
+            stream_output_url: self.engine.stream_output.endpoint_url.clone(),
+            recording_enabled: self.engine.recording.enabled,
+            recording_output_dir: self.engine.recording.output_dir.clone(),
         }
     }
 
@@ -288,6 +300,10 @@ impl AppCore {
             recurring_intro_duck_volume: self.engine.recurring_intro_duck_volume,
             conflict_policy: self.engine.conflict_policy.to_string(),
             now_playing_path: self.engine.now_playing_path.clone(),
+            stream_output_enabled: self.engine.stream_output.enabled,
+            stream_output_url: self.engine.stream_output.endpoint_url.clone(),
+            recording_enabled: self.engine.recording.enabled,
+            recording_output_dir: self.engine.recording.output_dir.clone(),
         }
     }
 
@@ -434,12 +450,7 @@ impl AppCore {
         Ok(())
     }
 
-    pub fn reorder_track(
-        &mut self,
-        playlist: &str,
-        from: usize,
-        to: usize,
-    ) -> Result<(), String> {
+    pub fn reorder_track(&mut self, playlist: &str, from: usize, to: usize) -> Result<(), String> {
         let pl = self
             .engine
             .find_playlist_mut(playlist)
@@ -462,7 +473,11 @@ impl AppCore {
         Ok(())
     }
 
-    pub fn copy_tracks(&self, from_playlist: &str, indices: &[usize]) -> Result<Vec<crate::track::Track>, String> {
+    pub fn copy_tracks(
+        &self,
+        from_playlist: &str,
+        indices: &[usize],
+    ) -> Result<Vec<crate::track::Track>, String> {
         self.engine.copy_tracks(from_playlist, indices)
     }
 
@@ -586,8 +601,7 @@ impl AppCore {
     /// Update playback state after stopping.
     pub fn on_stop(&mut self) {
         self.playback.reset();
-        self.logs
-            .push("info", "Playback stopped".to_string());
+        self.logs.push("info", "Playback stopped".to_string());
     }
 
     /// Toggle pause state. Returns true if now paused, false if resumed.
@@ -600,14 +614,12 @@ impl AppCore {
             if let Some(ps) = self.playback.pause_start.take() {
                 self.playback.total_paused += ps.elapsed();
             }
-            self.logs
-                .push("info", "Playback resumed".to_string());
+            self.logs.push("info", "Playback resumed".to_string());
             Ok(false)
         } else {
             self.playback.is_paused = true;
             self.playback.pause_start = Some(Instant::now());
-            self.logs
-                .push("info", "Playback paused".to_string());
+            self.logs.push("info", "Playback paused".to_string());
             Ok(true)
         }
     }
@@ -810,6 +822,36 @@ impl AppCore {
         Ok(())
     }
 
+    pub fn set_stream_output(&mut self, enabled: bool, endpoint_url: String) -> Result<(), String> {
+        if enabled && endpoint_url.trim().is_empty() {
+            return Err("Streaming endpoint URL is required when streaming is enabled".to_string());
+        }
+        self.engine.stream_output.enabled = enabled;
+        self.engine.stream_output.endpoint_url = endpoint_url.trim().to_string();
+        self.engine.save()
+    }
+
+    pub fn set_recording(
+        &mut self,
+        enabled: bool,
+        output_dir: Option<String>,
+    ) -> Result<(), String> {
+        if enabled && output_dir.as_deref().unwrap_or("").trim().is_empty() {
+            return Err(
+                "Recording output directory is required when recording is enabled".to_string(),
+            );
+        }
+        self.engine.recording.enabled = enabled;
+        self.engine.recording.output_dir = output_dir.and_then(|p| {
+            let trimmed = p.trim().to_string();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            }
+        });
+        self.engine.save()
+    }
     pub fn set_nowplaying_path(&mut self, path: Option<String>) -> Result<(), String> {
         self.engine.now_playing_path = path;
         self.engine.save()?;
@@ -865,9 +907,11 @@ impl AppCore {
         hours: Vec<u8>,
     ) -> Result<(), String> {
         let len = self.engine.ads.len();
-        let ad = self.engine.ads.get_mut(index).ok_or_else(|| {
-            format!("Ad index {} out of range ({} ads)", index, len)
-        })?;
+        let ad = self
+            .engine
+            .ads
+            .get_mut(index)
+            .ok_or_else(|| format!("Ad index {} out of range ({} ads)", index, len))?;
         ad.name = name;
         ad.enabled = enabled;
         ad.mp3_file = PathBuf::from(mp3_file);
@@ -929,13 +973,15 @@ impl AppCore {
         }
 
         match ad_name {
-            Some(name) => match reporter.generate_single_report(name, start, end, company_name, out_path) {
-                Some(r) => Ok(vec![
-                    r.csv_path.to_string_lossy().to_string(),
-                    r.pdf_path.to_string_lossy().to_string(),
-                ]),
-                None => Ok(vec![]),
-            },
+            Some(name) => {
+                match reporter.generate_single_report(name, start, end, company_name, out_path) {
+                    Some(r) => Ok(vec![
+                        r.csv_path.to_string_lossy().to_string(),
+                        r.pdf_path.to_string_lossy().to_string(),
+                    ]),
+                    None => Ok(vec![]),
+                }
+            }
             None => {
                 let results = reporter.generate_report(start, end, company_name, out_path);
                 Ok(results
@@ -1044,10 +1090,7 @@ impl AppCore {
     pub fn reorder_rds_message(&mut self, from: usize, to: usize) -> Result<(), String> {
         let len = self.engine.rds.messages.len();
         if from >= len || to >= len {
-            return Err(format!(
-                "RDS message index out of range ({} messages)",
-                len
-            ));
+            return Err(format!("RDS message index out of range ({} messages)", len));
         }
         let msg = self.engine.rds.messages.remove(from);
         self.engine.rds.messages.insert(to, msg);
@@ -1071,8 +1114,20 @@ impl AppCore {
     // ── Lecture Detector ────────────────────────────────────────────────
 
     pub fn get_lecture_config(&self) -> LectureConfigData {
-        let mut blacklist: Vec<String> = self.engine.lecture_detector.blacklist.iter().cloned().collect();
-        let mut whitelist: Vec<String> = self.engine.lecture_detector.whitelist.iter().cloned().collect();
+        let mut blacklist: Vec<String> = self
+            .engine
+            .lecture_detector
+            .blacklist
+            .iter()
+            .cloned()
+            .collect();
+        let mut whitelist: Vec<String> = self
+            .engine
+            .lecture_detector
+            .whitelist
+            .iter()
+            .cloned()
+            .collect();
         blacklist.sort();
         whitelist.sort();
         LectureConfigData {
@@ -1280,13 +1335,61 @@ mod tests {
         );
     }
 
+    #[test]
+    fn set_stream_output() {
+        let mut core = make_core();
+        core.set_stream_output(
+            true,
+            "icecast://source:pass@localhost:8000/live".to_string(),
+        )
+        .unwrap();
+        let config = core.get_config();
+        assert!(config.stream_output_enabled);
+        assert_eq!(
+            config.stream_output_url,
+            "icecast://source:pass@localhost:8000/live"
+        );
+    }
+
+    #[test]
+    fn set_stream_output_requires_url_when_enabled() {
+        let mut core = make_core();
+        assert!(core.set_stream_output(true, "   ".to_string()).is_err());
+    }
+
+    #[test]
+    fn set_recording() {
+        let mut core = make_core();
+        core.set_recording(true, Some("/tmp/records".to_string()))
+            .unwrap();
+        let config = core.get_config();
+        assert!(config.recording_enabled);
+        assert_eq!(
+            config.recording_output_dir,
+            Some("/tmp/records".to_string())
+        );
+    }
+
+    #[test]
+    fn set_recording_requires_output_dir_when_enabled() {
+        let mut core = make_core();
+        assert!(core.set_recording(true, None).is_err());
+    }
+
     // -- Schedule --
 
     #[test]
     fn add_and_get_schedule() {
         let mut core = make_core();
         let id = core
-            .add_schedule_event("14:00", "stop", "news.mp3", Some(9), Some("News".to_string()), None)
+            .add_schedule_event(
+                "14:00",
+                "stop",
+                "news.mp3",
+                Some(9),
+                Some("News".to_string()),
+                None,
+            )
             .unwrap();
         assert!(id > 0);
 
@@ -1340,7 +1443,9 @@ mod tests {
     #[test]
     fn add_and_get_ads() {
         let mut core = make_core();
-        let idx = core.add_ad("Test Ad".to_string(), "ad.mp3".to_string()).unwrap();
+        let idx = core
+            .add_ad("Test Ad".to_string(), "ad.mp3".to_string())
+            .unwrap();
         assert_eq!(idx, 0);
 
         let ads = core.get_ads();
@@ -1352,7 +1457,8 @@ mod tests {
     #[test]
     fn remove_ad() {
         let mut core = make_core();
-        core.add_ad("Ad1".to_string(), "ad1.mp3".to_string()).unwrap();
+        core.add_ad("Ad1".to_string(), "ad1.mp3".to_string())
+            .unwrap();
         core.remove_ad(0).unwrap();
         assert!(core.get_ads().is_empty());
     }
@@ -1366,7 +1472,8 @@ mod tests {
     #[test]
     fn toggle_ad() {
         let mut core = make_core();
-        core.add_ad("Ad1".to_string(), "ad1.mp3".to_string()).unwrap();
+        core.add_ad("Ad1".to_string(), "ad1.mp3".to_string())
+            .unwrap();
         let disabled = core.toggle_ad(0).unwrap();
         assert!(!disabled);
         let enabled = core.toggle_ad(0).unwrap();
@@ -1401,8 +1508,10 @@ mod tests {
     #[test]
     fn reorder_ad() {
         let mut core = make_core();
-        core.add_ad("First".to_string(), "1.mp3".to_string()).unwrap();
-        core.add_ad("Second".to_string(), "2.mp3".to_string()).unwrap();
+        core.add_ad("First".to_string(), "1.mp3".to_string())
+            .unwrap();
+        core.add_ad("Second".to_string(), "2.mp3".to_string())
+            .unwrap();
         core.reorder_ad(0, 1).unwrap();
 
         let ads = core.get_ads();

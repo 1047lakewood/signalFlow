@@ -42,6 +42,17 @@ function App() {
     localStorage.setItem("signalflow-theme", theme);
   }, [theme]);
 
+
+  useEffect(() => {
+    const suppressContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+    };
+
+    window.addEventListener("contextmenu", suppressContextMenu);
+    return () => {
+      window.removeEventListener("contextmenu", suppressContextMenu);
+    };
+  }, []);
   const toggleTheme = () => {
     setTheme((t) => (t === "dark" ? "light" : "dark"));
   };
