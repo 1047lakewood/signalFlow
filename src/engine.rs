@@ -162,6 +162,7 @@ impl Engine {
                 Ok(data) => match serde_json::from_str::<Engine>(&data) {
                     Ok(mut engine) => {
                         engine.state_path = Some(path.to_path_buf());
+                        engine.migrate_unc_paths();
                         return engine;
                     }
                     Err(e) => eprintln!("Warning: corrupt state file, starting fresh: {}", e),
@@ -172,6 +173,29 @@ impl Engine {
         let mut engine = Engine::new();
         engine.state_path = Some(path.to_path_buf());
         engine
+    }
+
+    /// Rewrite `\\?\UNC\...` paths in all playlist tracks to use mapped drive
+    /// letters where possible. On Windows, `DirEntry::path()` returns verbatim
+    /// UNC paths for files on mapped network drives, which is confusing in the UI.
+    fn migrate_unc_paths(&mut self) {
+        let mapping = build_unc_to_drive_map();
+        if mapping.is_empty() {
+            return;
+        }
+        let mut changed = false;
+        for pl in &mut self.playlists {
+            for track in &mut pl.tracks {
+                let path_str = track.path.to_string_lossy().to_string();
+                if let Some(rewritten) = rewrite_unc_path(&path_str, &mapping) {
+                    track.path = PathBuf::from(rewritten);
+                    changed = true;
+                }
+            }
+        }
+        if changed {
+            let _ = self.save();
+        }
     }
 
     /// Persist current state to JSON.
@@ -380,6 +404,73 @@ impl Engine {
             .ok_or_else(|| format!("Playlist '{}' not found", to_name))?;
         pl.insert_tracks(tracks, at)
     }
+}
+
+/// Build a map of UNC share roots to drive letters by querying Windows drive mappings.
+/// Returns e.g. `[("\\\\RadioNAS\\104.7", "G:")]`. Empty on non-Windows or if no mapped drives.
+fn build_unc_to_drive_map() -> Vec<(String, String)> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::ffi::OsString;
+        use std::os::windows::ffi::OsStringExt;
+
+        let mut mapping = Vec::new();
+        for letter in b'A'..=b'Z' {
+            let drive = format!("{}:", letter as char);
+            let wide_drive: Vec<u16> = drive.encode_utf16().chain(std::iter::once(0)).collect();
+            let mut buf = vec![0u16; 1024];
+            let mut buf_len: u32 = buf.len() as u32;
+            // WNetGetConnectionW returns the remote UNC name for a mapped drive letter.
+            let result = unsafe {
+                windows_sys::Win32::NetworkManagement::WNet::WNetGetConnectionW(
+                    wide_drive.as_ptr(),
+                    buf.as_mut_ptr(),
+                    &mut buf_len,
+                )
+            };
+            // NO_ERROR = 0 means success
+            if result != 0 {
+                continue;
+            }
+            let end = buf.iter().position(|&c| c == 0).unwrap_or(buf_len as usize);
+            let unc = OsString::from_wide(&buf[..end])
+                .to_string_lossy()
+                .to_string();
+            if unc.starts_with("\\\\") {
+                mapping.push((unc, drive));
+            }
+        }
+        mapping
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Vec::new()
+    }
+}
+
+/// If `path_str` starts with `\\?\UNC\` or `\\`, try to replace the UNC share root
+/// with a mapped drive letter.
+fn rewrite_unc_path(path_str: &str, mapping: &[(String, String)]) -> Option<String> {
+    // Strip verbatim prefix first: \\?\UNC\server\share → \\server\share
+    let normalized = if path_str.starts_with(r"\\?\UNC\") {
+        format!(r"\\{}", &path_str[8..])
+    } else if path_str.starts_with(r"\\") {
+        path_str.to_string()
+    } else {
+        return None;
+    };
+
+    // Try each known UNC→drive mapping (case-insensitive prefix match)
+    let norm_lower = normalized.to_lowercase();
+    for (unc_root, drive) in mapping {
+        let root_lower = unc_root.to_lowercase();
+        if norm_lower.starts_with(&root_lower) {
+            let rest = &normalized[unc_root.len()..];
+            // rest is either empty, or starts with '\' (subfolder)
+            return Some(format!("{}{}", drive, rest));
+        }
+    }
+    None
 }
 
 impl Default for Engine {

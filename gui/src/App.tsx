@@ -393,10 +393,12 @@ function App() {
     async (paths: string[]) => {
       if (!selectedPlaylist || paths.length === 0) return;
       // Filter to audio files only
-      const audioPaths = paths.filter((p) => {
-        const ext = p.split(".").pop()?.toLowerCase() ?? "";
-        return AUDIO_EXTENSIONS.includes(ext);
-      });
+      const audioPaths = paths
+        .map(cleanPath)
+        .filter((p) => {
+          const ext = p.split(".").pop()?.toLowerCase() ?? "";
+          return AUDIO_EXTENSIONS.includes(ext);
+        });
       if (audioPaths.length === 0) return;
       try {
         await invoke("add_tracks", {

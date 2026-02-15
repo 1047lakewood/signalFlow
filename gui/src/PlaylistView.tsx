@@ -41,24 +41,20 @@ const MIN_COL_WIDTHS: ColWidths = {
 };
 
 function formatTrackPathForDisplay(path: string): string {
+  // Strip verbatim UNC prefix: \\?\UNC\server\share\... → \\server\share\...
+  if (path.startsWith("\\\\?\\UNC\\")) {
+    return "\\\\" + path.slice(8);
+  }
+
+  // Strip verbatim local prefix: \\?\C:\... → C:\...
+  if (path.startsWith("\\\\?\\")) {
+    return path.slice(4);
+  }
+
+  // Convert admin shares: \\server\C$\... → C:\...
   const uncAdminShare = path.match(/^\\\\[^\\]+\\([A-Za-z])\$\\(.*)$/);
   if (uncAdminShare) {
     return `${uncAdminShare[1].toUpperCase()}:\\${uncAdminShare[2]}`;
-  }
-
-  if (path.startsWith("\\\\?\\")) {
-    const withoutVerbatimPrefix = path.slice(4);
-
-    const verbatimAdminShare = withoutVerbatimPrefix.match(
-      /^UNC\\[^\\]+\\([A-Za-z])\$\\(.*)$/,
-    );
-    if (verbatimAdminShare) {
-      return `${verbatimAdminShare[1].toUpperCase()}:\\${verbatimAdminShare[2]}`;
-    }
-
-    if (/^[A-Za-z]:\\/.test(withoutVerbatimPrefix)) {
-      return withoutVerbatimPrefix;
-    }
   }
 
   return path;
