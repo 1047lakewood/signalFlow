@@ -3,9 +3,9 @@
 use serde::Serialize;
 use signal_flow::app_core::{
     AdData, AppCore, ConfigData, FileBrowserEntry, FileSearchResult, LogEntry, PlaylistData,
-    RdsConfigData, ScheduleEventData, StatusData, TrackData, TransportData,
+    PlaylistProfileData, RdsConfigData, ScheduleEventData, StatusData, TrackData, TransportData,
 };
-use signal_flow::audio_runtime::{spawn_audio_runtime, AudioEvent, AudioHandle};
+use signal_flow::audio_runtime::{AudioEvent, AudioHandle, spawn_audio_runtime};
 use signal_flow::level_monitor::LevelMonitor;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -73,6 +73,26 @@ fn rename_playlist(
 #[tauri::command]
 fn set_active_playlist(state: State<AppState>, name: String) -> Result<u32, String> {
     state.core.lock().unwrap().set_active_playlist(&name)
+}
+
+#[tauri::command]
+fn get_playlist_profiles(state: State<AppState>) -> Vec<PlaylistProfileData> {
+    state.core.lock().unwrap().get_playlist_profiles()
+}
+
+#[tauri::command]
+fn save_playlist_profile(state: State<AppState>, name: String) -> Result<(), String> {
+    state.core.lock().unwrap().save_playlist_profile(&name)
+}
+
+#[tauri::command]
+fn load_playlist_profile(state: State<AppState>, name: String) -> Result<(), String> {
+    state.core.lock().unwrap().load_playlist_profile(&name)
+}
+
+#[tauri::command]
+fn delete_playlist_profile(state: State<AppState>, name: String) -> Result<(), String> {
+    state.core.lock().unwrap().delete_playlist_profile(&name)
 }
 
 // ── Track operations ────────────────────────────────────────────────────────
@@ -690,6 +710,10 @@ fn main() {
             delete_playlist,
             rename_playlist,
             set_active_playlist,
+            get_playlist_profiles,
+            save_playlist_profile,
+            load_playlist_profile,
+            delete_playlist_profile,
             // Track operations
             get_playlist_tracks,
             add_track,

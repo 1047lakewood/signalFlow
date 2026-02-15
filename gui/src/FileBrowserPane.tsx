@@ -24,6 +24,7 @@ function FileBrowserPane({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<FileSearchResult[]>([]);
   const [favoritesCollapsed, setFavoritesCollapsed] = useState(true);
+  const normalizedQuery = searchQuery.trim();
 
   const loadConfig = useCallback(async () => {
     const cfg = await invoke<ConfigResponse>("get_config");
@@ -57,8 +58,8 @@ function FileBrowserPane({
 
   useEffect(() => {
     const run = async () => {
-      const q = searchQuery.trim();
-      if (!q) {
+      const q = normalizedQuery;
+      if (q.length < 2) {
         setSearchResults([]);
         return;
       }
@@ -69,13 +70,13 @@ function FileBrowserPane({
     };
     const id = setTimeout(
       () => run().catch((e) => console.error("Search failed", e)),
-      120,
+      280,
     );
     return () => clearTimeout(id);
-  }, [searchQuery]);
+  }, [normalizedQuery]);
 
   const visible = useMemo(() => {
-    if (searchQuery.trim()) {
+    if (normalizedQuery.length >= 2) {
       return searchResults.map((r) => ({
         path: r.path,
         name: r.name,
@@ -83,7 +84,7 @@ function FileBrowserPane({
       }));
     }
     return entries;
-  }, [entries, searchQuery, searchResults]);
+  }, [entries, normalizedQuery, searchResults]);
 
   return (
     <aside className="file-browser-pane">
@@ -125,7 +126,7 @@ function FileBrowserPane({
             className="file-browser-search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search indexed files..."
+            placeholder="Search indexed files (2+ chars)..."
           />
         </div>
         <div className="file-browser-list">

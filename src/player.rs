@@ -3,7 +3,8 @@ use crate::silence::{SilenceDetector, SilenceMonitor};
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
 use std::fs::File;
 use std::io::BufReader;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::{Duration, Instant};
 
 /// Runtime audio player wrapping rodio. Not serializable — created fresh per session.
@@ -18,8 +19,8 @@ impl Player {
     pub fn new() -> Result<Self, String> {
         let (stream, handle) = OutputStream::try_default()
             .map_err(|e| format!("Failed to open audio output: {}", e))?;
-        let sink = Sink::try_new(&handle)
-            .map_err(|e| format!("Failed to create audio sink: {}", e))?;
+        let sink =
+            Sink::try_new(&handle).map_err(|e| format!("Failed to create audio sink: {}", e))?;
         Ok(Player {
             _stream: stream,
             stream_handle: handle,
@@ -29,14 +30,13 @@ impl Player {
 
     /// Create a new independent sink on the same audio output.
     pub fn create_sink(&self) -> Result<Sink, String> {
-        Sink::try_new(&self.stream_handle)
-            .map_err(|e| format!("Failed to create sink: {}", e))
+        Sink::try_new(&self.stream_handle).map_err(|e| format!("Failed to create sink: {}", e))
     }
 
     /// Decode and append an audio file to the default sink, starting playback.
     pub fn play_file(&self, path: &Path) -> Result<(), String> {
-        let file = File::open(path)
-            .map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
+        let file =
+            File::open(path).map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
         let source = Decoder::new(BufReader::new(file))
             .map_err(|e| format!("Cannot decode '{}': {}", path.display(), e))?;
         self.sink.append(source);
@@ -47,8 +47,8 @@ impl Player {
     /// Decode and append an audio file to the default sink with level monitoring.
     /// The `LevelMonitor` is updated with the current RMS level as audio plays.
     pub fn play_file_with_level(&self, path: &Path, monitor: LevelMonitor) -> Result<(), String> {
-        let file = File::open(path)
-            .map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
+        let file =
+            File::open(path).map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
         let source = Decoder::new(BufReader::new(file))
             .map_err(|e| format!("Cannot decode '{}': {}", path.display(), e))?;
         let wrapped = LevelSource::new(source.convert_samples::<f32>(), monitor);
@@ -60,7 +60,10 @@ impl Player {
     /// Stop current playback and play a pre-decoded source with level monitoring.
     /// Use `prepare_file_with_level` to create the source outside the lock,
     /// then call this briefly under the lock.
-    pub fn stop_and_play_prepared(&self, source: LevelSource<rodio::source::SamplesConverter<Decoder<BufReader<File>>, f32>>) {
+    pub fn stop_and_play_prepared(
+        &self,
+        source: LevelSource<rodio::source::SamplesConverter<Decoder<BufReader<File>>, f32>>,
+    ) {
         self.sink.stop();
         self.sink.append(source);
         self.sink.play();
@@ -69,19 +72,20 @@ impl Player {
     /// Prepare a file for playback with level monitoring.
     /// Does file I/O and decoding — call this OUTSIDE any lock.
     /// Then pass the result to `stop_and_play_prepared` under the lock.
-    pub fn prepare_file_with_level(path: &Path, monitor: LevelMonitor) -> Result<LevelSource<rodio::source::SamplesConverter<Decoder<BufReader<File>>, f32>>, String> {
-        let file = File::open(path)
-            .map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
-        let source = Decoder::new(BufReader::new(file))
-            .map_err(|e| format!("Cannot decode '{}': {}", path.display(), e))?;
+    pub fn prepare_file_with_level(
+        path: &Path,
+        monitor: LevelMonitor,
+    ) -> Result<LevelSource<rodio::source::SamplesConverter<Decoder<BufReader<File>>, f32>>, String>
+    {
+        let source = decode_with_m4a_fallback(path)?;
         Ok(LevelSource::new(source.convert_samples::<f32>(), monitor))
     }
 
     /// Play an audio file on a new sink, returning ownership of that sink.
     pub fn play_file_new_sink(&self, path: &Path) -> Result<Sink, String> {
         let sink = self.create_sink()?;
-        let file = File::open(path)
-            .map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
+        let file =
+            File::open(path).map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
         let source = Decoder::new(BufReader::new(file))
             .map_err(|e| format!("Cannot decode '{}': {}", path.display(), e))?;
         sink.append(source);
@@ -90,14 +94,10 @@ impl Player {
     }
 
     /// Play an audio file on a new sink with a fade-in applied.
-    pub fn play_file_new_sink_fadein(
-        &self,
-        path: &Path,
-        fade: Duration,
-    ) -> Result<Sink, String> {
+    pub fn play_file_new_sink_fadein(&self, path: &Path, fade: Duration) -> Result<Sink, String> {
         let sink = self.create_sink()?;
-        let file = File::open(path)
-            .map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
+        let file =
+            File::open(path).map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
         let source = Decoder::new(BufReader::new(file))
             .map_err(|e| format!("Cannot decode '{}': {}", path.display(), e))?;
         sink.append(source.fade_in(fade));
@@ -113,8 +113,8 @@ impl Player {
         silence_duration: Duration,
     ) -> Result<(Sink, SilenceMonitor), String> {
         let sink = self.create_sink()?;
-        let file = File::open(path)
-            .map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
+        let file =
+            File::open(path).map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
         let source = Decoder::new(BufReader::new(file))
             .map_err(|e| format!("Cannot decode '{}': {}", path.display(), e))?;
         let monitor = SilenceMonitor::new();
@@ -138,8 +138,8 @@ impl Player {
         silence_duration: Duration,
     ) -> Result<(Sink, SilenceMonitor), String> {
         let sink = self.create_sink()?;
-        let file = File::open(path)
-            .map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
+        let file =
+            File::open(path).map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
         let source = Decoder::new(BufReader::new(file))
             .map_err(|e| format!("Cannot decode '{}': {}", path.display(), e))?;
         let monitor = SilenceMonitor::new();
@@ -210,6 +210,67 @@ impl Player {
             std::thread::sleep(Duration::from_millis(100));
         }
         Ok(())
+    }
+}
+
+fn decode_with_m4a_fallback(path: &Path) -> Result<Decoder<BufReader<File>>, String> {
+    let file = File::open(path).map_err(|e| format!("Cannot open '{}': {}", path.display(), e))?;
+
+    match Decoder::new(BufReader::new(file)) {
+        Ok(source) => Ok(source),
+        Err(decode_error) => {
+            let extension = path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(|ext| ext.to_ascii_lowercase())
+                .unwrap_or_default();
+            if extension != "m4a" {
+                return Err(format!(
+                    "Cannot decode '{}': {}",
+                    path.display(),
+                    decode_error
+                ));
+            }
+
+            let mut wav_path = std::env::temp_dir();
+            let stamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|e| format!("Clock error while transcoding '{}': {}", path.display(), e))?
+                .as_millis();
+            wav_path.push(format!("signalflow-{}-{}.wav", std::process::id(), stamp));
+
+            let status = std::process::Command::new("ffmpeg")
+                .arg("-y")
+                .arg("-i")
+                .arg(path)
+                .arg("-vn")
+                .arg("-acodec")
+                .arg("pcm_s16le")
+                .arg("-f")
+                .arg("wav")
+                .arg(&wav_path)
+                .status()
+                .map_err(|e| format!("Failed to run ffmpeg for '{}': {}", path.display(), e))?;
+
+            if !status.success() {
+                return Err(format!(
+                    "Cannot decode '{}': {} (m4a fallback via ffmpeg failed)",
+                    path.display(),
+                    decode_error
+                ));
+            }
+
+            let wav_file = File::open(&wav_path).map_err(|e| {
+                format!("Cannot open transcoded wav '{}': {}", wav_path.display(), e)
+            })?;
+            Decoder::new(BufReader::new(wav_file)).map_err(|e| {
+                format!(
+                    "Cannot decode transcoded wav for '{}': {}",
+                    path.display(),
+                    e
+                )
+            })
+        }
     }
 }
 
@@ -363,7 +424,11 @@ pub fn play_playlist(
 
         // Start playback if not already playing via crossfade
         let (sink, monitor, start_time) = if let Some(s) = current_sink.take() {
-            (s, current_monitor.take(), current_start_time.take().unwrap_or_else(Instant::now))
+            (
+                s,
+                current_monitor.take(),
+                current_start_time.take().unwrap_or_else(Instant::now),
+            )
         } else {
             match start_track(player, &track.path, &silence) {
                 Ok(pair) => (pair.0, pair.1, Instant::now()),
@@ -600,20 +665,29 @@ mod tests {
 
     #[test]
     fn silence_config_enabled() {
-        let cfg = SilenceConfig { threshold: 0.01, duration_secs: 3.0 };
+        let cfg = SilenceConfig {
+            threshold: 0.01,
+            duration_secs: 3.0,
+        };
         assert!(cfg.enabled());
         assert_eq!(cfg.duration(), Duration::from_secs(3));
     }
 
     #[test]
     fn silence_config_disabled_when_zero_duration() {
-        let cfg = SilenceConfig { threshold: 0.01, duration_secs: 0.0 };
+        let cfg = SilenceConfig {
+            threshold: 0.01,
+            duration_secs: 0.0,
+        };
         assert!(!cfg.enabled());
     }
 
     #[test]
     fn silence_config_disabled_when_zero_threshold() {
-        let cfg = SilenceConfig { threshold: 0.0, duration_secs: 3.0 };
+        let cfg = SilenceConfig {
+            threshold: 0.0,
+            duration_secs: 3.0,
+        };
         assert!(!cfg.enabled());
     }
 
@@ -641,14 +715,20 @@ mod tests {
 
     #[test]
     fn recurring_intro_config_enabled() {
-        let cfg = RecurringIntroConfig { interval_secs: 900.0, duck_volume: 0.3 };
+        let cfg = RecurringIntroConfig {
+            interval_secs: 900.0,
+            duck_volume: 0.3,
+        };
         assert!(cfg.enabled());
         assert_eq!(cfg.interval(), Duration::from_secs(900));
     }
 
     #[test]
     fn recurring_intro_config_disabled_when_zero() {
-        let cfg = RecurringIntroConfig { interval_secs: 0.0, duck_volume: 0.3 };
+        let cfg = RecurringIntroConfig {
+            interval_secs: 0.0,
+            duck_volume: 0.3,
+        };
         assert!(!cfg.enabled());
     }
 

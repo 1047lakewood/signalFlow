@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { cleanPath } from "./pathUtils";
-import type { PlaylistInfo, TrackInfo } from "./types";
+import type { PlaylistInfo, PlaylistProfileInfo, TrackInfo } from "./types";
 import PlaylistView from "./PlaylistView";
 import type { ClipboardData } from "./PlaylistView";
 import TransportBar from "./TransportBar";
@@ -41,6 +41,9 @@ function App() {
   const [fileSearchSeed, setFileSearchSeed] = useState("");
   const [clipboard, setClipboard] = useState<ClipboardData | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">(getInitialTheme);
+  const [profiles, setProfiles] = useState<PlaylistProfileInfo[]>([]);
+  const [selectedProfile, setSelectedProfile] = useState<string>("");
+  const [findRequestToken, setFindRequestToken] = useState(0);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -62,6 +65,47 @@ function App() {
     setTheme((t) => (t === "dark" ? "light" : "dark"));
   };
 
+  const requestOpenFind = useCallback(() => {
+    setFindRequestToken((v) => v + 1);
+  }, []);
+
+  const loadProfiles = useCallback(async () => {
+    try {
+      const rows = await invoke<PlaylistProfileInfo[]>("get_playlist_profiles");
+      setProfiles(rows);
+      setSelectedProfile((prev) => {
+        if (!rows.length) return "";
+        if (prev && rows.some((p) => p.name === prev)) return prev;
+        return rows[0].name;
+      });
+    } catch (e) {
+      console.error("Failed to load playlist profiles:", e);
+    }
+  }, []);
+
+  const handleSaveProfile = useCallback(async () => {
+    const name = prompt("Profile name:", selectedProfile || "");
+    if (!name || !name.trim()) return;
+    try {
+      await invoke("save_playlist_profile", { name: name.trim() });
+      await loadProfiles();
+      setSelectedProfile(name.trim());
+    } catch (e) {
+      console.error("Failed to save profile:", e);
+    }
+  }, [loadProfiles, selectedProfile]);
+
+  const handleDeleteProfile = useCallback(async () => {
+    if (!selectedProfile) return;
+    if (!confirm(`Delete profile "${selectedProfile}"?`)) return;
+    try {
+      await invoke("delete_playlist_profile", { name: selectedProfile });
+      await loadProfiles();
+    } catch (e) {
+      console.error("Failed to delete profile:", e);
+    }
+  }, [selectedProfile, loadProfiles]);
+
   const loadPlaylists = useCallback(async () => {
     try {
       const pls = await invoke<PlaylistInfo[]>("get_playlists");
@@ -69,12 +113,18 @@ function App() {
       // Auto-select active playlist, or first, or null
       const active = pls.find((p) => p.is_active);
       const target = active ?? pls[0];
-      if (target && selectedPlaylist === null) {
+      const hasCurrentSelection =
+        selectedPlaylist !== null &&
+        pls.some((playlist) => playlist.name === selectedPlaylist);
+      if (target && !hasCurrentSelection) {
         setSelectedPlaylist(target.name);
         // If no playlist was active on the backend, activate the auto-selected one
         if (!active) {
           await invoke("set_active_playlist", { name: target.name });
         }
+      }
+      if (!target) {
+        setSelectedPlaylist(null);
       }
     } catch (e) {
       console.error("Failed to load playlists:", e);
@@ -99,7 +149,8 @@ function App() {
 
   useEffect(() => {
     loadPlaylists();
-  }, [loadPlaylists]);
+    loadProfiles();
+  }, [loadPlaylists, loadProfiles]);
 
   useEffect(() => {
     loadTracks();
@@ -111,6 +162,30 @@ function App() {
       renameInputRef.current.select();
     }
   }, [renamingTab]);
+
+  const handleLoadProfile = useCallback(async () => {
+    if (!selectedProfile) return;
+    try {
+      await invoke("load_playlist_profile", { name: selectedProfile });
+      setSelectedIndices(new Set());
+      setSelectedPlaylist(null);
+      await loadPlaylists();
+    } catch (e) {
+      console.error("Failed to load profile:", e);
+    }
+  }, [selectedProfile, loadPlaylists]);
+
+  useEffect(() => {
+    const onGlobalKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        requestOpenFind();
+      }
+    };
+
+    window.addEventListener("keydown", onGlobalKeyDown, true);
+    return () => window.removeEventListener("keydown", onGlobalKeyDown, true);
+  }, [requestOpenFind]);
 
   const handlePlaylistSelect = async (name: string) => {
     setSelectedPlaylist(name);
@@ -391,6 +466,43 @@ function App() {
             +
           </button>
         </div>
+        <div className="header-actions">
+          <select
+            className="profile-select"
+            value={selectedProfile}
+            onChange={(e) => setSelectedProfile(e.target.value)}
+            title="Saved profiles"
+          >
+            <option value="">Profiles</option>
+            {profiles.map((profile) => (
+              <option key={profile.name} value={profile.name}>
+                {profile.name}
+              </option>
+            ))}
+          </select>
+          <button className="header-btn" onClick={handleSaveProfile} title="Save profile">
+            Save Profile
+          </button>
+          <button
+            className="header-btn"
+            onClick={handleLoadProfile}
+            disabled={!selectedProfile}
+            title="Load profile"
+          >
+            Load
+          </button>
+          <button
+            className="header-btn"
+            onClick={handleDeleteProfile}
+            disabled={!selectedProfile}
+            title="Delete selected profile"
+          >
+            Delete
+          </button>
+          <button className="header-btn" onClick={toggleTheme} title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}>
+            {theme === "dark" ? "☀" : "🌙"}
+          </button>
+        </div>
       </header>
       <main className="main">
         <div
@@ -434,14 +546,10 @@ function App() {
             </button>
             <button
               className="sidebar-btn"
-              onClick={toggleTheme}
-              title={
-                theme === "dark"
-                  ? "Switch to light theme"
-                  : "Switch to dark theme"
-              }
+              onClick={requestOpenFind}
+              title="Find in playlist (Ctrl+F)"
             >
-              {theme === "dark" ? "☀" : "🌙"}
+              🔍
             </button>
             <button
               className="sidebar-btn"
@@ -476,6 +584,7 @@ function App() {
                 onFileDrop={handleFileDrop}
                 onTracksChanged={loadTracks}
                 onSearchFilename={handleSearchFilename}
+                findRequestToken={findRequestToken}
               />
             ) : (
               <div className="no-playlist">

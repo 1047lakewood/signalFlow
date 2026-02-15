@@ -140,3 +140,8 @@ export interface FileSearchResult {
   path: string;
   name: string;
 }
+
+export interface PlaylistProfileInfo {
+  name: string;
+  playlist_names: string[];
+}
