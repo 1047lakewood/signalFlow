@@ -127,15 +127,15 @@
 
 ## Phase O: File Browser Enhancements
 
-- [ ] Instant file search — Add a fast search/filter bar to the file browser for real-time filename matching across indexed locations
-- [ ] Context-menu filename search — Right-click a track (in playlist or file browser) to search for its filename across all indexed locations
-- [ ] External drive indexing — Allow adding external/removable drives to the file search index so they are included in instant search results
-- [ ] Favorite folders pane — Add a collapsible favorites sidebar in the file browser; when collapsed, show only folder icons; expand on hover to reveal full folder names/paths
+- [x] Instant file search — Add a fast search/filter bar to the file browser for real-time filename matching across indexed locations
+- [x] Context-menu filename search — Right-click a track (in playlist or file browser) to search for its filename across all indexed locations
+- [x] External drive indexing — Allow adding external/removable drives to the file search index so they are included in instant search results
+- [x] Favorite folders pane — Add a collapsible favorites sidebar in the file browser; when collapsed, show only folder icons; expand on hover to reveal full folder names/paths
 
 ## Phase P: Settings & Layout
 
-- [ ] Options/settings window — Add a centralized settings/configuration window (discuss and confirm which settings to include before implementing)
-- [ ] Header bar declutter — Reduce button density on the header bar by relocating actions to the left sidebar pane; discuss exact layout and grouping before implementing
+- [x] Options/settings window — Add a centralized settings/configuration window (discuss and confirm which settings to include before implementing)
+- [x] Header bar declutter — Reduce button density on the header bar by relocating actions to the left sidebar pane; discuss exact layout and grouping before implementing
 
 ## Phase Z: Future / Long-Term
 

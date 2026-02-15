@@ -11,6 +11,7 @@ import AdStatsWindow from "./AdStatsWindow";
 import RdsConfigWindow from "./RdsConfigWindow";
 import SchedulePane from "./SchedulePane";
 import LogPane from "./LogPane";
+import FileBrowserPane from "./FileBrowserPane";
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "ogg", "aac", "m4a"];
 
@@ -31,8 +32,12 @@ function App() {
   const [showAdConfig, setShowAdConfig] = useState(false);
   const [showAdStats, setShowAdStats] = useState(false);
   const [showRdsConfig, setShowRdsConfig] = useState(false);
-  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
+    new Set(),
+  );
   const [showSchedulePane, setShowSchedulePane] = useState(false);
+  const [showFileBrowser, setShowFileBrowser] = useState(true);
+  const [fileSearchSeed, setFileSearchSeed] = useState("");
   const [clipboard, setClipboard] = useState<ClipboardData | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">(getInitialTheme);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -41,7 +46,6 @@ function App() {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("signalflow-theme", theme);
   }, [theme]);
-
 
   useEffect(() => {
     const suppressContextMenu = (event: MouseEvent) => {
@@ -82,7 +86,9 @@ function App() {
       return;
     }
     try {
-      const t = await invoke<TrackInfo[]>("get_playlist_tracks", { name: selectedPlaylist });
+      const t = await invoke<TrackInfo[]>("get_playlist_tracks", {
+        name: selectedPlaylist,
+      });
       setTracks(t);
     } catch (e) {
       console.error("Failed to load tracks:", e);
@@ -104,7 +110,6 @@ function App() {
       renameInputRef.current.select();
     }
   }, [renamingTab]);
-
 
   const handlePlaylistSelect = async (name: string) => {
     setSelectedPlaylist(name);
@@ -179,100 +184,121 @@ function App() {
     setCurrentIndex(index);
   }, []);
 
-  const handlePlayTrack = useCallback(async (trackIndex: number) => {
-    try {
-      await invoke("transport_play", { trackIndex });
-      setCurrentIndex(trackIndex);
-      await loadTracks();
-    } catch (e) {
-      console.error("Failed to play track:", e);
-    }
-  }, [loadTracks]);
-
-  const handleCopyTracks = useCallback((indices: number[]) => {
-    if (!selectedPlaylist) return;
-    const paths = indices
-      .map((i) => tracks.find((t) => t.index === i))
-      .filter((t): t is TrackInfo => t !== undefined)
-      .map((t) => t.path);
-    if (paths.length === 0) return;
-    setClipboard({
-      paths,
-      sourcePlaylist: selectedPlaylist,
-      sourceIndices: indices,
-      isCut: false,
-    });
-  }, [selectedPlaylist, tracks]);
-
-  const handleCutTracks = useCallback((indices: number[]) => {
-    if (!selectedPlaylist) return;
-    const paths = indices
-      .map((i) => tracks.find((t) => t.index === i))
-      .filter((t): t is TrackInfo => t !== undefined)
-      .map((t) => t.path);
-    if (paths.length === 0) return;
-    setClipboard({
-      paths,
-      sourcePlaylist: selectedPlaylist,
-      sourceIndices: indices,
-      isCut: true,
-    });
-  }, [selectedPlaylist, tracks]);
-
-  const handlePasteTrack = useCallback(async (afterIndex: number) => {
-    if (!selectedPlaylist || !clipboard) return;
-    try {
-      // Insert position is after the clicked row
-      const insertAt = afterIndex + 1;
-      if (clipboard.isCut) {
-        // For cut: copy from source, paste at destination, then remove from source
-        await invoke("copy_paste_tracks", {
-          fromPlaylist: clipboard.sourcePlaylist,
-          indices: clipboard.sourceIndices,
-          toPlaylist: selectedPlaylist,
-          at: insertAt,
-        });
-        // Remove from source (only if same playlist, adjust for insertion)
-        await invoke("remove_tracks", {
-          playlist: clipboard.sourcePlaylist,
-          indices: clipboard.sourceIndices,
-        });
-        setClipboard(null); // Cut is one-time
-      } else {
-        // For copy: just copy and paste
-        await invoke("copy_paste_tracks", {
-          fromPlaylist: clipboard.sourcePlaylist,
-          indices: clipboard.sourceIndices,
-          toPlaylist: selectedPlaylist,
-          at: insertAt,
-        });
+  const handlePlayTrack = useCallback(
+    async (trackIndex: number) => {
+      try {
+        await invoke("transport_play", { trackIndex });
+        setCurrentIndex(trackIndex);
+        await loadTracks();
+      } catch (e) {
+        console.error("Failed to play track:", e);
       }
-      await loadTracks();
-      await loadPlaylists();
-    } catch (e) {
-      console.error("Failed to paste tracks:", e);
-    }
-  }, [selectedPlaylist, clipboard, loadTracks, loadPlaylists]);
+    },
+    [loadTracks],
+  );
 
-  const handleReorder = useCallback(async (fromIndex: number, toIndex: number) => {
-    if (!selectedPlaylist) return;
-    try {
-      await invoke("reorder_track", { playlist: selectedPlaylist, from: fromIndex, to: toIndex });
-      await loadTracks();
-    } catch (e) {
-      console.error("Failed to reorder track:", e);
-    }
-  }, [selectedPlaylist, loadTracks]);
+  const handleCopyTracks = useCallback(
+    (indices: number[]) => {
+      if (!selectedPlaylist) return;
+      const paths = indices
+        .map((i) => tracks.find((t) => t.index === i))
+        .filter((t): t is TrackInfo => t !== undefined)
+        .map((t) => t.path);
+      if (paths.length === 0) return;
+      setClipboard({
+        paths,
+        sourcePlaylist: selectedPlaylist,
+        sourceIndices: indices,
+        isCut: false,
+      });
+    },
+    [selectedPlaylist, tracks],
+  );
+
+  const handleCutTracks = useCallback(
+    (indices: number[]) => {
+      if (!selectedPlaylist) return;
+      const paths = indices
+        .map((i) => tracks.find((t) => t.index === i))
+        .filter((t): t is TrackInfo => t !== undefined)
+        .map((t) => t.path);
+      if (paths.length === 0) return;
+      setClipboard({
+        paths,
+        sourcePlaylist: selectedPlaylist,
+        sourceIndices: indices,
+        isCut: true,
+      });
+    },
+    [selectedPlaylist, tracks],
+  );
+
+  const handlePasteTrack = useCallback(
+    async (afterIndex: number) => {
+      if (!selectedPlaylist || !clipboard) return;
+      try {
+        // Insert position is after the clicked row
+        const insertAt = afterIndex + 1;
+        if (clipboard.isCut) {
+          // For cut: copy from source, paste at destination, then remove from source
+          await invoke("copy_paste_tracks", {
+            fromPlaylist: clipboard.sourcePlaylist,
+            indices: clipboard.sourceIndices,
+            toPlaylist: selectedPlaylist,
+            at: insertAt,
+          });
+          // Remove from source (only if same playlist, adjust for insertion)
+          await invoke("remove_tracks", {
+            playlist: clipboard.sourcePlaylist,
+            indices: clipboard.sourceIndices,
+          });
+          setClipboard(null); // Cut is one-time
+        } else {
+          // For copy: just copy and paste
+          await invoke("copy_paste_tracks", {
+            fromPlaylist: clipboard.sourcePlaylist,
+            indices: clipboard.sourceIndices,
+            toPlaylist: selectedPlaylist,
+            at: insertAt,
+          });
+        }
+        await loadTracks();
+        await loadPlaylists();
+      } catch (e) {
+        console.error("Failed to paste tracks:", e);
+      }
+    },
+    [selectedPlaylist, clipboard, loadTracks, loadPlaylists],
+  );
+
+  const handleReorder = useCallback(
+    async (fromIndex: number, toIndex: number) => {
+      if (!selectedPlaylist) return;
+      try {
+        await invoke("reorder_track", {
+          playlist: selectedPlaylist,
+          from: fromIndex,
+          to: toIndex,
+        });
+        await loadTracks();
+      } catch (e) {
+        console.error("Failed to reorder track:", e);
+      }
+    },
+    [selectedPlaylist, loadTracks],
+  );
 
   const handleAddFiles = useCallback(async () => {
     if (!selectedPlaylist) return;
     try {
       const selected = await open({
         multiple: true,
-        filters: [{
-          name: "Audio Files",
-          extensions: AUDIO_EXTENSIONS,
-        }],
+        filters: [
+          {
+            name: "Audio Files",
+            extensions: AUDIO_EXTENSIONS,
+          },
+        ],
       });
       if (!selected) return;
       // open() returns string | string[] | null
@@ -286,22 +312,33 @@ function App() {
     }
   }, [selectedPlaylist, loadTracks, loadPlaylists]);
 
-  const handleFileDrop = useCallback(async (paths: string[]) => {
-    if (!selectedPlaylist || paths.length === 0) return;
-    // Filter to audio files only
-    const audioPaths = paths.filter((p) => {
-      const ext = p.split(".").pop()?.toLowerCase() ?? "";
-      return AUDIO_EXTENSIONS.includes(ext);
-    });
-    if (audioPaths.length === 0) return;
-    try {
-      await invoke("add_tracks", { playlist: selectedPlaylist, paths: audioPaths });
-      await loadTracks();
-      await loadPlaylists();
-    } catch (e) {
-      console.error("Failed to add dropped files:", e);
-    }
-  }, [selectedPlaylist, loadTracks, loadPlaylists]);
+  const handleFileDrop = useCallback(
+    async (paths: string[]) => {
+      if (!selectedPlaylist || paths.length === 0) return;
+      // Filter to audio files only
+      const audioPaths = paths.filter((p) => {
+        const ext = p.split(".").pop()?.toLowerCase() ?? "";
+        return AUDIO_EXTENSIONS.includes(ext);
+      });
+      if (audioPaths.length === 0) return;
+      try {
+        await invoke("add_tracks", {
+          playlist: selectedPlaylist,
+          paths: audioPaths,
+        });
+        await loadTracks();
+        await loadPlaylists();
+      } catch (e) {
+        console.error("Failed to add dropped files:", e);
+      }
+    },
+    [selectedPlaylist, loadTracks, loadPlaylists],
+  );
+
+  const handleSearchFilename = useCallback((filename: string) => {
+    setShowFileBrowser(true);
+    setFileSearchSeed(filename);
+  }, []);
 
   return (
     <div className="app">
@@ -352,51 +389,73 @@ function App() {
             +
           </button>
         </div>
-        <button
-            className={`header-schedule-btn ${showSchedulePane ? "active" : ""}`}
-            onClick={() => setShowSchedulePane((v) => !v)}
-            title="Toggle schedule"
-          >
-            {"\u23F0"}
-          </button>
-        <button
-          className="header-schedule-btn"
-          onClick={() => setShowAdConfig(true)}
-          title="Ad Configuration"
-        >
-          {"\uD83D\uDCE2"}
-        </button>
-        <button
-          className="header-schedule-btn"
-          onClick={() => setShowAdStats(true)}
-          title="Ad Statistics"
-        >
-          {"\uD83D\uDCCA"}
-        </button>
-        <button
-          className="header-schedule-btn"
-          onClick={() => setShowRdsConfig(true)}
-          title="RDS Configuration"
-        >
-          {"\uD83D\uDCFB"}
-        </button>
-        <button
-          className="header-theme-btn"
-          onClick={toggleTheme}
-          title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-        >
-          {theme === "dark" ? "\u2600" : "\uD83C\uDF19"}
-        </button>
-        <button
-          className="header-settings-btn"
-          onClick={() => setShowSettings(true)}
-          title="Settings"
-        >
-          {"\u2699"}
-        </button>
       </header>
       <main className="main">
-        <div className={`main-content ${showSchedulePane ? "with-schedule" : ""}`}>
+        <div
+          className={`main-content ${showSchedulePane ? "with-schedule" : ""}`}
+        >
+          <aside className="left-sidebar">
+            <button
+              className={`sidebar-btn ${showFileBrowser ? "active" : ""}`}
+              onClick={() => setShowFileBrowser((v) => !v)}
+              title="Toggle file browser"
+            >
+              📂
+            </button>
+            <button
+              className={`sidebar-btn ${showSchedulePane ? "active" : ""}`}
+              onClick={() => setShowSchedulePane((v) => !v)}
+              title="Toggle schedule"
+            >
+              ⏰
+            </button>
+            <button
+              className="sidebar-btn"
+              onClick={() => setShowAdConfig(true)}
+              title="Ad Configuration"
+            >
+              📢
+            </button>
+            <button
+              className="sidebar-btn"
+              onClick={() => setShowAdStats(true)}
+              title="Ad Statistics"
+            >
+              📊
+            </button>
+            <button
+              className="sidebar-btn"
+              onClick={() => setShowRdsConfig(true)}
+              title="RDS Configuration"
+            >
+              📻
+            </button>
+            <button
+              className="sidebar-btn"
+              onClick={toggleTheme}
+              title={
+                theme === "dark"
+                  ? "Switch to light theme"
+                  : "Switch to dark theme"
+              }
+            >
+              {theme === "dark" ? "☀" : "🌙"}
+            </button>
+            <button
+              className="sidebar-btn"
+              onClick={() => setShowSettings(true)}
+              title="Options / Settings"
+            >
+              ⚙
+            </button>
+          </aside>
+          {showFileBrowser && (
+            <FileBrowserPane
+              onAddFiles={handleFileDrop}
+              onSearchFilename={handleSearchFilename}
+              searchSeed={fileSearchSeed}
+            />
+          )}
           <div className="playlist-area">
             {selectedPlaylist ? (
               <PlaylistView
@@ -414,6 +473,7 @@ function App() {
                 onAddFiles={handleAddFiles}
                 onFileDrop={handleFileDrop}
                 onTracksChanged={loadTracks}
+                onSearchFilename={handleSearchFilename}
               />
             ) : (
               <div className="no-playlist">
@@ -429,16 +489,20 @@ function App() {
           )}
         </div>
       </main>
-      <TransportBar onTrackChange={loadTracks} selectedTrackIndex={selectedIndices.size > 0 ? Math.min(...selectedIndices) : null} onPlayingIndexChange={handlePlayingIndexChange} />
+      <TransportBar
+        onTrackChange={loadTracks}
+        selectedTrackIndex={
+          selectedIndices.size > 0 ? Math.min(...selectedIndices) : null
+        }
+        onPlayingIndexChange={handlePlayingIndexChange}
+      />
       {showSettings && (
         <SettingsWindow onClose={() => setShowSettings(false)} />
       )}
       {showAdConfig && (
         <AdConfigWindow onClose={() => setShowAdConfig(false)} />
       )}
-      {showAdStats && (
-        <AdStatsWindow onClose={() => setShowAdStats(false)} />
-      )}
+      {showAdStats && <AdStatsWindow onClose={() => setShowAdStats(false)} />}
       {showRdsConfig && (
         <RdsConfigWindow onClose={() => setShowRdsConfig(false)} />
       )}

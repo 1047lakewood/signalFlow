@@ -1,3 +1,17 @@
+## 2026-02-15 — Phase O/P file-browser + layout completion
+- Added indexed-location/favorites persistence to engine config (`indexed_locations`, `favorite_folders`) with new AppCore/Tauri setters.
+- Implemented file browser APIs for directory listing and indexed filename search (`list_directory`, `search_indexed_files`).
+- Added a new `FileBrowserPane` with:
+  - instant indexed search,
+  - collapsible hover-expand favorites rail (icons when collapsed),
+  - indexed root selector,
+  - double-click add to playlist + quick add action,
+  - filename-search action from browser rows.
+- Added playlist context-menu action: “Search filename across index” to trigger indexed search from an existing track.
+- Expanded settings window with a **Library** tab for managing indexed locations (including external drives) and favorite folders.
+- Decluttered the top header by moving operational buttons to a new left sidebar action rail (file browser, schedule, ads, stats, RDS, theme, settings).
+- Added AppCore tests for indexed/favorite folder setters (trim + dedupe behavior).
+
 ## 2026-02-15 — Phase M/N UI + config plumbing
 - Playlist table: added right padding on the last column to avoid edge-clipped header/cell text in tight layouts.
 - Transport controls: replaced conditional Play/Resume toggle with distinct Play and Pause buttons; Pause is disabled when not applicable.

@@ -97,6 +97,12 @@ pub struct Engine {
     /// Daily playback recording output settings.
     #[serde(default)]
     pub recording: RecordingConfig,
+    /// Folders indexed by the file browser search.
+    #[serde(default)]
+    pub indexed_locations: Vec<String>,
+    /// User-pinned favorite folders shown in the file browser pane.
+    #[serde(default)]
+    pub favorite_folders: Vec<String>,
     /// Runtime-only: path to the state file. Not serialized.
     #[serde(skip)]
     state_path: Option<PathBuf>,
@@ -123,6 +129,8 @@ impl Engine {
             rds: RdsConfig::default(),
             stream_output: StreamOutputConfig::default(),
             recording: RecordingConfig::default(),
+            indexed_locations: Vec::new(),
+            favorite_folders: Vec::new(),
             state_path: None,
         }
     }
