@@ -566,6 +566,12 @@ function App() {
               searchSeed={fileSearchSeed}
             />
           )}
+          {showSchedulePane && (
+            <div className="side-pane side-pane-left">
+              <SchedulePane onClose={() => setShowSchedulePane(false)} />
+              <LogPane />
+            </div>
+          )}
           <div className="playlist-area">
             {selectedPlaylist ? (
               <PlaylistView
@@ -592,12 +598,6 @@ function App() {
               </div>
             )}
           </div>
-          {showSchedulePane && (
-            <div className="side-pane">
-              <SchedulePane onClose={() => setShowSchedulePane(false)} />
-              <LogPane />
-            </div>
-          )}
         </div>
       </main>
       <TransportBar

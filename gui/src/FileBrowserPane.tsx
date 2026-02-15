@@ -24,6 +24,7 @@ function FileBrowserPane({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<FileSearchResult[]>([]);
   const [favoritesCollapsed, setFavoritesCollapsed] = useState(true);
+  const [favoritesDropActive, setFavoritesDropActive] = useState(false);
   const normalizedQuery = searchQuery.trim();
 
   const loadConfig = useCallback(async () => {
@@ -86,11 +87,43 @@ function FileBrowserPane({
     return entries;
   }, [entries, normalizedQuery, searchResults]);
 
+  const persistFavorites = useCallback(async (nextFolders: string[]) => {
+    await invoke("set_favorite_folders", { folders: nextFolders });
+    setFavoriteFolders(nextFolders);
+  }, []);
+
+  const handleFavoriteDrop = useCallback(
+    async (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      setFavoritesDropActive(false);
+      const droppedPath = event.dataTransfer.getData("text/signalflow-folder-path");
+      if (!droppedPath) return;
+      const normalized = droppedPath.trim();
+      if (!normalized) return;
+      const alreadyFavorite = favoriteFolders.includes(normalized);
+      if (alreadyFavorite) return;
+      const nextFolders = [...favoriteFolders, normalized];
+      try {
+        await persistFavorites(nextFolders);
+      } catch (e) {
+        console.error("Failed to add favorite folder", e);
+      }
+    },
+    [favoriteFolders, persistFavorites],
+  );
+
   return (
     <aside className="file-browser-pane">
       <div
-        className={`favorites-pane ${favoritesCollapsed ? "collapsed" : ""}`}
+        className={`favorites-pane ${favoritesCollapsed ? "collapsed" : ""} ${favoritesDropActive ? "drop-active" : ""}`}
         onMouseLeave={() => setFavoritesCollapsed(true)}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setFavoritesCollapsed(false);
+          setFavoritesDropActive(true);
+        }}
+        onDragLeave={() => setFavoritesDropActive(false)}
+        onDrop={handleFavoriteDrop}
       >
         <div className="favorites-title">★</div>
         {favoriteFolders.map((folder) => (
@@ -134,6 +167,12 @@ function FileBrowserPane({
             <div
               key={entry.path}
               className="file-row"
+              draggable={entry.is_dir}
+              onDragStart={(event) => {
+                if (!entry.is_dir) return;
+                event.dataTransfer.setData("text/signalflow-folder-path", entry.path);
+                event.dataTransfer.effectAllowed = "copy";
+              }}
               onDoubleClick={() =>
                 entry.is_dir
                   ? setCurrentPath(entry.path)
