@@ -14,6 +14,12 @@ fn default_duck_volume() -> f32 {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlaylistProfile {
+    pub name: String,
+    pub playlist_names: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamOutputConfig {
     #[serde(default)]
     pub enabled: bool,
@@ -103,6 +109,9 @@ pub struct Engine {
     /// User-pinned favorite folders shown in the file browser pane.
     #[serde(default)]
     pub favorite_folders: Vec<String>,
+    /// Saved named profiles of open playlists.
+    #[serde(default)]
+    pub playlist_profiles: Vec<PlaylistProfile>,
     /// Runtime-only: path to the state file. Not serialized.
     #[serde(skip)]
     state_path: Option<PathBuf>,
@@ -131,6 +140,7 @@ impl Engine {
             recording: RecordingConfig::default(),
             indexed_locations: Vec::new(),
             favorite_folders: Vec::new(),
+            playlist_profiles: Vec::new(),
             state_path: None,
         }
     }
@@ -565,9 +575,11 @@ mod tests {
     #[test]
     fn paste_tracks_bad_name_errors() {
         let mut engine = Engine::new();
-        assert!(engine
-            .paste_tracks("Ghost", vec![make_track("A")], None)
-            .is_err());
+        assert!(
+            engine
+                .paste_tracks("Ghost", vec![make_track("A")], None)
+                .is_err()
+        );
     }
 
     #[test]

@@ -13,7 +13,7 @@ use crate::ad_scheduler::AdConfig;
 use crate::auto_intro;
 use crate::engine::Engine;
 use crate::rds::{RdsMessage, RdsSchedule};
-use crate::scheduler::{parse_time, ConflictPolicy, Priority, ScheduleMode};
+use crate::scheduler::{ConflictPolicy, Priority, ScheduleMode, parse_time};
 use chrono::Local;
 use serde::Serialize;
 use std::collections::VecDeque;
@@ -257,6 +257,12 @@ pub struct FileBrowserEntry {
 pub struct FileSearchResult {
     pub path: String,
     pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PlaylistProfileData {
+    pub name: String,
+    pub playlist_names: Vec<String>,
 }
 
 // ── AppCore ─────────────────────────────────────────────────────────────────
@@ -937,7 +943,7 @@ impl AppCore {
 
     pub fn search_indexed_files(&self, query: &str) -> Result<Vec<FileSearchResult>, String> {
         let trimmed = query.trim().to_lowercase();
-        if trimmed.is_empty() {
+        if trimmed.len() < 2 {
             return Ok(Vec::new());
         }
 
@@ -948,12 +954,94 @@ impl AppCore {
                 continue;
             }
             collect_matches(root_path, &trimmed, &mut results, 0);
-            if results.len() >= 300 {
+            if results.len() >= 120 {
                 break;
             }
         }
 
         Ok(results)
+    }
+
+    pub fn get_playlist_profiles(&self) -> Vec<PlaylistProfileData> {
+        self.engine
+            .playlist_profiles
+            .iter()
+            .map(|p| PlaylistProfileData {
+                name: p.name.clone(),
+                playlist_names: p.playlist_names.clone(),
+            })
+            .collect()
+    }
+
+    pub fn save_playlist_profile(&mut self, name: &str) -> Result<(), String> {
+        let profile_name = name.trim();
+        if profile_name.is_empty() {
+            return Err("Profile name is required".to_string());
+        }
+
+        let playlist_names = self
+            .engine
+            .playlists
+            .iter()
+            .map(|p| p.name.clone())
+            .collect::<Vec<_>>();
+
+        if let Some(existing) = self
+            .engine
+            .playlist_profiles
+            .iter_mut()
+            .find(|p| p.name.eq_ignore_ascii_case(profile_name))
+        {
+            existing.name = profile_name.to_string();
+            existing.playlist_names = playlist_names;
+        } else {
+            self.engine
+                .playlist_profiles
+                .push(crate::engine::PlaylistProfile {
+                    name: profile_name.to_string(),
+                    playlist_names,
+                });
+            self.engine
+                .playlist_profiles
+                .sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        }
+
+        self.engine.save()
+    }
+
+    pub fn load_playlist_profile(&mut self, name: &str) -> Result<(), String> {
+        let profile = self
+            .engine
+            .playlist_profiles
+            .iter()
+            .find(|p| p.name.eq_ignore_ascii_case(name))
+            .cloned()
+            .ok_or_else(|| format!("Profile '{}' not found", name))?;
+
+        self.engine.playlists.clear();
+        self.engine.active_playlist_id = None;
+
+        for playlist_name in profile.playlist_names {
+            self.engine.create_playlist(playlist_name);
+        }
+
+        if let Some(first_name) = self.engine.playlists.first().map(|p| p.name.clone()) {
+            self.engine.set_active(&first_name)?;
+        }
+
+        self.playback.reset();
+        self.engine.save()
+    }
+
+    pub fn delete_playlist_profile(&mut self, name: &str) -> Result<(), String> {
+        let profile_index = self
+            .engine
+            .playlist_profiles
+            .iter()
+            .position(|p| p.name.eq_ignore_ascii_case(name))
+            .ok_or_else(|| format!("Profile '{}' not found", name))?;
+        self.engine.playlist_profiles.remove(profile_index);
+        self.engine.save()
     }
 
     // ── Ads ─────────────────────────────────────────────────────────────
@@ -1288,7 +1376,7 @@ fn is_audio_file(path: &Path) -> bool {
 }
 
 fn collect_matches(path: &Path, query: &str, out: &mut Vec<FileSearchResult>, depth: usize) {
-    if depth > 6 || out.len() >= 300 {
+    if depth > 5 || out.len() >= 120 {
         return;
     }
     let read = match fs::read_dir(path) {
@@ -1296,7 +1384,7 @@ fn collect_matches(path: &Path, query: &str, out: &mut Vec<FileSearchResult>, de
         Err(_) => return,
     };
     for entry in read.flatten() {
-        if out.len() >= 300 {
+        if out.len() >= 120 {
             return;
         }
         let p = entry.path();
@@ -1568,17 +1656,19 @@ mod tests {
     #[test]
     fn add_schedule_event_bad_time_errors() {
         let mut core = make_core();
-        assert!(core
-            .add_schedule_event("25:00", "stop", "x.mp3", None, None, None)
-            .is_err());
+        assert!(
+            core.add_schedule_event("25:00", "stop", "x.mp3", None, None, None)
+                .is_err()
+        );
     }
 
     #[test]
     fn add_schedule_event_bad_mode_errors() {
         let mut core = make_core();
-        assert!(core
-            .add_schedule_event("14:00", "bogus", "x.mp3", None, None, None)
-            .is_err());
+        assert!(
+            core.add_schedule_event("14:00", "bogus", "x.mp3", None, None, None)
+                .is_err()
+        );
     }
 
     #[test]
@@ -1948,5 +2038,33 @@ mod tests {
         core.paste_tracks("Dest", copied, None).unwrap();
         let tracks = core.engine.find_playlist("Dest").unwrap();
         assert_eq!(tracks.track_count(), 1);
+    }
+    #[test]
+    fn search_ignores_single_character_query() {
+        let core = make_core();
+        assert!(core.search_indexed_files("a").unwrap().is_empty());
+    }
+
+    #[test]
+    fn playlist_profiles_roundtrip() {
+        let mut core = make_core();
+        core.create_playlist("News".to_string()).unwrap();
+        core.create_playlist("Music".to_string()).unwrap();
+
+        core.save_playlist_profile("Morning").unwrap();
+        assert_eq!(core.get_playlist_profiles().len(), 1);
+
+        core.delete_playlist("News").unwrap();
+        core.delete_playlist("Music").unwrap();
+        assert!(core.get_playlists().is_empty());
+
+        core.load_playlist_profile("Morning").unwrap();
+        let playlists = core.get_playlists();
+        assert_eq!(playlists.len(), 2);
+        assert!(playlists.iter().any(|p| p.name == "News"));
+        assert!(playlists.iter().any(|p| p.name == "Music"));
+
+        core.delete_playlist_profile("Morning").unwrap();
+        assert!(core.get_playlist_profiles().is_empty());
     }
 }

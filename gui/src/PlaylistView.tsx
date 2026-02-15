@@ -80,6 +80,7 @@ interface PlaylistViewProps {
   onFileDrop: (paths: string[]) => void;
   onTracksChanged: () => void;
   onSearchFilename: (filename: string) => void;
+  findRequestToken: number;
 }
 
 interface ContextMenuState {
@@ -109,6 +110,7 @@ function PlaylistView({
   onFileDrop,
   onTracksChanged,
   onSearchFilename,
+  findRequestToken,
 }: PlaylistViewProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
@@ -522,20 +524,11 @@ function PlaylistView({
     setFindCurrentMatch(0);
   }, []);
 
-  // Ctrl+F to open find bar, Escape to close
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
-        e.preventDefault();
-        setFindBarOpen(true);
-        requestAnimationFrame(() => findInputRef.current?.focus());
-      }
-    };
-    container.addEventListener("keydown", handleKeyDown);
-    return () => container.removeEventListener("keydown", handleKeyDown);
-  }, []);
+    if (findRequestToken === 0) return;
+    setFindBarOpen(true);
+    requestAnimationFrame(() => findInputRef.current?.focus());
+  }, [findRequestToken]);
 
   if (tracks.length === 0) {
     return (

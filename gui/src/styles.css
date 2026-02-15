@@ -71,6 +71,41 @@ body {
   display: flex;
   gap: 2px;
   overflow-x: auto;
+  flex: 1;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-select,
+.header-btn {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  height: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.profile-select {
+  min-width: 130px;
+}
+
+.header-btn {
+  cursor: pointer;
+}
+
+.header-btn:hover:not(:disabled) {
+  background: var(--bg-row-hover);
+}
+
+.header-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .playlist-tab {
