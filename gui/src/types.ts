@@ -31,6 +31,8 @@ export interface StatusResponse {
   stream_output_url: string;
   recording_enabled: boolean;
   recording_output_dir: string | null;
+  indexed_locations: string[];
+  favorite_folders: string[];
 }
 
 export interface ScheduleEventInfo {
@@ -57,6 +59,8 @@ export interface ConfigResponse {
   stream_output_url: string;
   recording_enabled: boolean;
   recording_output_dir: string | null;
+  indexed_locations: string[];
+  favorite_folders: string[];
 }
 
 export interface AdInfo {
@@ -124,4 +128,15 @@ export interface TransportState {
   next_artist: string | null;
   next_title: string | null;
   track_path: string | null;
+}
+
+export interface FileBrowserEntry {
+  path: string;
+  name: string;
+  is_dir: boolean;
+}
+
+export interface FileSearchResult {
+  path: string;
+  name: string;
 }

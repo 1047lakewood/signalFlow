@@ -8,9 +8,18 @@ interface SettingsWindowProps {
   initialTab?: string;
 }
 
-type TabId = "crossfade" | "silence" | "intro" | "nowplaying" | "streaming" | "recording" | "conflict";
+type TabId =
+  | "library"
+  | "crossfade"
+  | "silence"
+  | "intro"
+  | "nowplaying"
+  | "streaming"
+  | "recording"
+  | "conflict";
 
 const TABS: { id: TabId; label: string }[] = [
+  { id: "library", label: "Library" },
   { id: "crossfade", label: "Crossfade" },
   { id: "silence", label: "Silence Detection" },
   { id: "intro", label: "Auto-Intro" },
@@ -22,7 +31,7 @@ const TABS: { id: TabId; label: string }[] = [
 
 function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
   const [activeTab, setActiveTab] = useState<TabId>(
-    (initialTab as TabId) || "crossfade"
+    (initialTab as TabId) || "library",
   );
   const [config, setConfig] = useState<ConfigResponse | null>(null);
   const [saving, setSaving] = useState(false);
@@ -50,10 +59,16 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
 
   // Recording
   const [recordingEnabled, setRecordingEnabled] = useState(false);
-  const [recordingOutputDir, setRecordingOutputDir] = useState<string | null>(null);
+  const [recordingOutputDir, setRecordingOutputDir] = useState<string | null>(
+    null,
+  );
 
   // Conflict
   const [conflictPolicy, setConflictPolicy] = useState("schedule-wins");
+
+  // Library
+  const [indexedLocations, setIndexedLocations] = useState<string[]>([]);
+  const [favoriteFolders, setFavoriteFolders] = useState<string[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -72,6 +87,8 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
         setRecordingEnabled(c.recording_enabled);
         setRecordingOutputDir(c.recording_output_dir);
         setConflictPolicy(c.conflict_policy);
+        setIndexedLocations(c.indexed_locations || []);
+        setFavoriteFolders(c.favorite_folders || []);
       } catch (e) {
         console.error("Failed to load config:", e);
       }
@@ -231,7 +248,10 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
   const disableStreaming = async () => {
     setSaving(true);
     try {
-      await invoke("set_stream_output", { enabled: false, endpointUrl: streamOutputUrl });
+      await invoke("set_stream_output", {
+        enabled: false,
+        endpointUrl: streamOutputUrl,
+      });
       setStreamOutputEnabled(false);
       showSaved();
     } catch (e) {
@@ -270,11 +290,57 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
   const disableRecording = async () => {
     setSaving(true);
     try {
-      await invoke("set_recording", { enabled: false, outputDir: recordingOutputDir });
+      await invoke("set_recording", {
+        enabled: false,
+        outputDir: recordingOutputDir,
+      });
       setRecordingEnabled(false);
       showSaved();
     } catch (e) {
       console.error("Failed to disable recording:", e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const browseAndAddIndexedLocation = async () => {
+    try {
+      const selected = await open({ directory: true });
+      if (
+        selected &&
+        typeof selected === "string" &&
+        !indexedLocations.includes(selected)
+      ) {
+        setIndexedLocations((prev) => [...prev, selected]);
+      }
+    } catch (e) {
+      console.error("Failed to browse indexed location:", e);
+    }
+  };
+
+  const browseAndAddFavoriteFolder = async () => {
+    try {
+      const selected = await open({ directory: true });
+      if (
+        selected &&
+        typeof selected === "string" &&
+        !favoriteFolders.includes(selected)
+      ) {
+        setFavoriteFolders((prev) => [...prev, selected]);
+      }
+    } catch (e) {
+      console.error("Failed to browse favorite folder:", e);
+    }
+  };
+
+  const saveLibrary = async () => {
+    setSaving(true);
+    try {
+      await invoke("set_indexed_locations", { locations: indexedLocations });
+      await invoke("set_favorite_folders", { folders: favoriteFolders });
+      showSaved();
+    } catch (e) {
+      console.error("Failed to save library settings:", e);
     } finally {
       setSaving(false);
     }
@@ -296,38 +362,89 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
 
   const handleSave = () => {
     switch (activeTab) {
-      case "crossfade": return saveCrossfade();
-      case "silence": return saveSilence();
-      case "intro": return saveIntro();
-      case "nowplaying": return saveNowPlaying();
-      case "streaming": return saveStreaming();
-      case "recording": return saveRecording();
-      case "conflict": return saveConflict();
+      case "library":
+        return saveLibrary();
+      case "crossfade":
+        return saveCrossfade();
+      case "silence":
+        return saveSilence();
+      case "intro":
+        return saveIntro();
+      case "nowplaying":
+        return saveNowPlaying();
+      case "streaming":
+        return saveStreaming();
+      case "recording":
+        return saveRecording();
+      case "conflict":
+        return saveConflict();
     }
   };
 
   // ── Tab content renderers ──
 
-  const silenceEnabled = parseFloat(silenceDuration) > 0 && parseFloat(silenceThreshold) > 0;
+  const silenceEnabled =
+    parseFloat(silenceDuration) > 0 && parseFloat(silenceThreshold) > 0;
   const introEnabled = introsFolder !== null && introsFolder.length > 0;
   const introRecurring = parseFloat(introInterval) > 0;
-  const nowPlayingEnabled = nowPlayingPath !== null && nowPlayingPath.length > 0;
+  const nowPlayingEnabled =
+    nowPlayingPath !== null && nowPlayingPath.length > 0;
 
   const renderDisableButton = () => {
     if (activeTab === "silence" && silenceEnabled) {
-      return <button className="settings-btn settings-btn-danger" onClick={disableSilence} disabled={saving}>Disable</button>;
+      return (
+        <button
+          className="settings-btn settings-btn-danger"
+          onClick={disableSilence}
+          disabled={saving}
+        >
+          Disable
+        </button>
+      );
     }
     if (activeTab === "intro" && introEnabled) {
-      return <button className="settings-btn settings-btn-danger" onClick={disableIntro} disabled={saving}>Disable</button>;
+      return (
+        <button
+          className="settings-btn settings-btn-danger"
+          onClick={disableIntro}
+          disabled={saving}
+        >
+          Disable
+        </button>
+      );
     }
     if (activeTab === "nowplaying" && nowPlayingEnabled) {
-      return <button className="settings-btn settings-btn-danger" onClick={disableNowPlaying} disabled={saving}>Disable</button>;
+      return (
+        <button
+          className="settings-btn settings-btn-danger"
+          onClick={disableNowPlaying}
+          disabled={saving}
+        >
+          Disable
+        </button>
+      );
     }
     if (activeTab === "streaming" && streamOutputEnabled) {
-      return <button className="settings-btn settings-btn-danger" onClick={disableStreaming} disabled={saving}>Disable</button>;
+      return (
+        <button
+          className="settings-btn settings-btn-danger"
+          onClick={disableStreaming}
+          disabled={saving}
+        >
+          Disable
+        </button>
+      );
     }
     if (activeTab === "recording" && recordingEnabled) {
-      return <button className="settings-btn settings-btn-danger" onClick={disableRecording} disabled={saving}>Disable</button>;
+      return (
+        <button
+          className="settings-btn settings-btn-danger"
+          onClick={disableRecording}
+          disabled={saving}
+        >
+          Disable
+        </button>
+      );
     }
     return null;
   };
@@ -337,10 +454,15 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
       <div className="settings-overlay" onClick={onClose}>
         <div className="settings-window" onClick={(e) => e.stopPropagation()}>
           <div className="settings-header">
-            <h2>Settings</h2>
-            <button className="settings-close" onClick={onClose}>{"\u00D7"}</button>
+            <h2>Options / Settings</h2>
+            <button className="settings-close" onClick={onClose}>
+              {"\u00D7"}
+            </button>
           </div>
-          <div className="settings-body" style={{ padding: 32, textAlign: "center" }}>
+          <div
+            className="settings-body"
+            style={{ padding: 32, textAlign: "center" }}
+          >
             Loading...
           </div>
         </div>
@@ -352,8 +474,10 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
     <div className="settings-overlay" onClick={onClose}>
       <div className="settings-window" onClick={(e) => e.stopPropagation()}>
         <div className="settings-header">
-          <h2>Settings</h2>
-          <button className="settings-close" onClick={onClose}>{"\u00D7"}</button>
+          <h2>Options / Settings</h2>
+          <button className="settings-close" onClick={onClose}>
+            {"\u00D7"}
+          </button>
         </div>
         <div className="settings-window-body">
           <nav className="settings-tabs">
@@ -361,22 +485,91 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
               <button
                 key={tab.id}
                 className={`settings-tab ${activeTab === tab.id ? "active" : ""}`}
-                onClick={() => { setActiveTab(tab.id); setSaved(false); }}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setSaved(false);
+                }}
               >
                 {tab.label}
               </button>
             ))}
           </nav>
           <div className="settings-content">
+            {activeTab === "library" && (
+              <div className="settings-body">
+                <div className="settings-field">
+                  <label className="settings-label">
+                    Indexed locations (instant search scope)
+                  </label>
+                  <div className="settings-list">
+                    {indexedLocations.map((path) => (
+                      <div key={path} className="settings-list-row">
+                        <span>{path}</span>
+                        <button
+                          className="settings-btn settings-btn-danger"
+                          onClick={() =>
+                            setIndexedLocations((prev) =>
+                              prev.filter((p) => p !== path),
+                            )
+                          }
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    className="settings-btn settings-btn-browse"
+                    onClick={browseAndAddIndexedLocation}
+                  >
+                    Add folder/drive
+                  </button>
+                </div>
+
+                <div className="settings-field">
+                  <label className="settings-label">
+                    Favorite folders (file browser sidebar)
+                  </label>
+                  <div className="settings-list">
+                    {favoriteFolders.map((path) => (
+                      <div key={path} className="settings-list-row">
+                        <span>{path}</span>
+                        <button
+                          className="settings-btn settings-btn-danger"
+                          onClick={() =>
+                            setFavoriteFolders((prev) =>
+                              prev.filter((p) => p !== path),
+                            )
+                          }
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    className="settings-btn settings-btn-browse"
+                    onClick={browseAndAddFavoriteFolder}
+                  >
+                    Add favorite folder
+                  </button>
+                </div>
+              </div>
+            )}
+
             {activeTab === "crossfade" && (
               <div className="settings-body">
                 <div className="settings-field">
-                  <label className="settings-label">Fade Duration (seconds)</label>
+                  <label className="settings-label">
+                    Fade Duration (seconds)
+                  </label>
                   <div className="settings-input-row">
                     <input
                       type="number"
                       className="settings-input"
-                      min={0} max={30} step={0.5}
+                      min={0}
+                      max={30}
+                      step={0.5}
                       value={fadeSecs}
                       onChange={(e) => setFadeSecs(e.target.value)}
                     />
@@ -385,10 +578,16 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
                 </div>
                 <div className="settings-field">
                   <label className="settings-label">Curve Type</label>
-                  <select className="settings-select" value={curveType} disabled>
+                  <select
+                    className="settings-select"
+                    value={curveType}
+                    disabled
+                  >
                     <option value="linear">Linear</option>
                   </select>
-                  <span className="settings-hint">More curve types coming soon</span>
+                  <span className="settings-hint">
+                    More curve types coming soon
+                  </span>
                 </div>
               </div>
             )}
@@ -396,7 +595,12 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
             {activeTab === "silence" && (
               <div className="settings-body">
                 <div className="settings-status">
-                  Status: <span className={silenceEnabled ? "status-enabled" : "status-disabled"}>
+                  Status:{" "}
+                  <span
+                    className={
+                      silenceEnabled ? "status-enabled" : "status-disabled"
+                    }
+                  >
                     {silenceEnabled ? "Enabled" : "Disabled"}
                   </span>
                 </div>
@@ -406,11 +610,15 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
                     <input
                       type="number"
                       className="settings-input"
-                      min={0} max={1} step={0.005}
+                      min={0}
+                      max={1}
+                      step={0.005}
                       value={silenceThreshold}
                       onChange={(e) => setSilenceThreshold(e.target.value)}
                     />
-                    <span className="settings-hint">RMS amplitude (0–1), e.g. 0.01</span>
+                    <span className="settings-hint">
+                      RMS amplitude (0–1), e.g. 0.01
+                    </span>
                   </div>
                 </div>
                 <div className="settings-field">
@@ -419,7 +627,9 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
                     <input
                       type="number"
                       className="settings-input"
-                      min={0} max={300} step={1}
+                      min={0}
+                      max={300}
+                      step={1}
                       value={silenceDuration}
                       onChange={(e) => setSilenceDuration(e.target.value)}
                     />
@@ -432,7 +642,12 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
             {activeTab === "intro" && (
               <div className="settings-body">
                 <div className="settings-status">
-                  Status: <span className={introEnabled ? "status-enabled" : "status-disabled"}>
+                  Status:{" "}
+                  <span
+                    className={
+                      introEnabled ? "status-enabled" : "status-disabled"
+                    }
+                  >
                     {introEnabled ? "Enabled" : "Disabled"}
                   </span>
                 </div>
@@ -446,24 +661,35 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
                       readOnly
                       placeholder="No folder selected"
                     />
-                    <button className="settings-btn settings-btn-browse" onClick={browseIntrosFolder}>
+                    <button
+                      className="settings-btn settings-btn-browse"
+                      onClick={browseIntrosFolder}
+                    >
                       Browse
                     </button>
                   </div>
-                  <span className="settings-hint">Folder containing Artist.mp3 intro files</span>
+                  <span className="settings-hint">
+                    Folder containing Artist.mp3 intro files
+                  </span>
                 </div>
                 <div className="settings-field">
-                  <label className="settings-label">Recurring Interval (seconds)</label>
+                  <label className="settings-label">
+                    Recurring Interval (seconds)
+                  </label>
                   <div className="settings-input-row">
                     <input
                       type="number"
                       className="settings-input"
-                      min={0} max={3600} step={1}
+                      min={0}
+                      max={3600}
+                      step={1}
                       value={introInterval}
                       onChange={(e) => setIntroInterval(e.target.value)}
                     />
                     <span className="settings-hint">
-                      {introRecurring ? `Re-play intro every ${introInterval}s` : "0 = disabled"}
+                      {introRecurring
+                        ? `Re-play intro every ${introInterval}s`
+                        : "0 = disabled"}
                     </span>
                   </div>
                 </div>
@@ -473,11 +699,15 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
                     <input
                       type="number"
                       className="settings-input"
-                      min={0} max={1} step={0.05}
+                      min={0}
+                      max={1}
+                      step={0.05}
                       value={introDuck}
                       onChange={(e) => setIntroDuck(e.target.value)}
                     />
-                    <span className="settings-hint">Main track volume during recurring intro (0–1)</span>
+                    <span className="settings-hint">
+                      Main track volume during recurring intro (0–1)
+                    </span>
                   </div>
                 </div>
               </div>
@@ -486,7 +716,12 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
             {activeTab === "nowplaying" && (
               <div className="settings-body">
                 <div className="settings-status">
-                  Status: <span className={nowPlayingEnabled ? "status-enabled" : "status-disabled"}>
+                  Status:{" "}
+                  <span
+                    className={
+                      nowPlayingEnabled ? "status-enabled" : "status-disabled"
+                    }
+                  >
                     {nowPlayingEnabled ? "Enabled" : "Disabled"}
                   </span>
                 </div>
@@ -500,11 +735,16 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
                       readOnly
                       placeholder="No path set"
                     />
-                    <button className="settings-btn settings-btn-browse" onClick={browseNowPlaying}>
+                    <button
+                      className="settings-btn settings-btn-browse"
+                      onClick={browseNowPlaying}
+                    >
                       Browse
                     </button>
                   </div>
-                  <span className="settings-hint">XML file updated with current/next track info</span>
+                  <span className="settings-hint">
+                    XML file updated with current/next track info
+                  </span>
                 </div>
               </div>
             )}
@@ -512,12 +752,19 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
             {activeTab === "streaming" && (
               <div className="settings-body">
                 <div className="settings-status">
-                  Status: <span className={streamOutputEnabled ? "status-enabled" : "status-disabled"}>
+                  Status:{" "}
+                  <span
+                    className={
+                      streamOutputEnabled ? "status-enabled" : "status-disabled"
+                    }
+                  >
                     {streamOutputEnabled ? "Enabled" : "Disabled"}
                   </span>
                 </div>
                 <div className="settings-field">
-                  <label className="settings-label">Enable streaming output</label>
+                  <label className="settings-label">
+                    Enable streaming output
+                  </label>
                   <label className="settings-checkbox-row">
                     <input
                       type="checkbox"
@@ -528,7 +775,9 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
                   </label>
                 </div>
                 <div className="settings-field">
-                  <label className="settings-label">Streaming endpoint URL</label>
+                  <label className="settings-label">
+                    Streaming endpoint URL
+                  </label>
                   <input
                     type="text"
                     className="settings-input settings-input-path"
@@ -536,7 +785,9 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
                     onChange={(e) => setStreamOutputUrl(e.target.value)}
                     placeholder="icecast://source:PASSWORD@host:8000/mount"
                   />
-                  <span className="settings-hint">Used by the stream relay process when enabled.</span>
+                  <span className="settings-hint">
+                    Used by the stream relay process when enabled.
+                  </span>
                 </div>
               </div>
             )}
@@ -544,23 +795,34 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
             {activeTab === "recording" && (
               <div className="settings-body">
                 <div className="settings-status">
-                  Status: <span className={recordingEnabled ? "status-enabled" : "status-disabled"}>
+                  Status:{" "}
+                  <span
+                    className={
+                      recordingEnabled ? "status-enabled" : "status-disabled"
+                    }
+                  >
                     {recordingEnabled ? "Enabled" : "Disabled"}
                   </span>
                 </div>
                 <div className="settings-field">
-                  <label className="settings-label">Enable daily recording</label>
+                  <label className="settings-label">
+                    Enable daily recording
+                  </label>
                   <label className="settings-checkbox-row">
                     <input
                       type="checkbox"
                       checked={recordingEnabled}
                       onChange={(e) => setRecordingEnabled(e.target.checked)}
                     />
-                    <span>Record playback output to one file per calendar day</span>
+                    <span>
+                      Record playback output to one file per calendar day
+                    </span>
                   </label>
                 </div>
                 <div className="settings-field">
-                  <label className="settings-label">Recording output folder</label>
+                  <label className="settings-label">
+                    Recording output folder
+                  </label>
                   <div className="settings-input-row">
                     <input
                       type="text"
@@ -569,7 +831,10 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
                       readOnly
                       placeholder="No folder selected"
                     />
-                    <button className="settings-btn settings-btn-browse" onClick={browseRecordingDir}>
+                    <button
+                      className="settings-btn settings-btn-browse"
+                      onClick={browseRecordingDir}
+                    >
                       Browse
                     </button>
                   </div>
@@ -580,7 +845,9 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
             {activeTab === "conflict" && (
               <div className="settings-body">
                 <div className="settings-field">
-                  <label className="settings-label">Conflict Resolution Policy</label>
+                  <label className="settings-label">
+                    Conflict Resolution Policy
+                  </label>
                   <select
                     className="settings-select"
                     value={conflictPolicy}
@@ -601,10 +868,16 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
         </div>
         <div className="settings-footer">
           {renderDisableButton()}
-          <button className="settings-btn settings-btn-save" onClick={handleSave} disabled={saving}>
+          <button
+            className="settings-btn settings-btn-save"
+            onClick={handleSave}
+            disabled={saving}
+          >
             {saved ? "Saved!" : saving ? "Saving..." : "Save"}
           </button>
-          <button className="settings-btn" onClick={onClose}>Close</button>
+          <button className="settings-btn" onClick={onClose}>
+            Close
+          </button>
         </div>
       </div>
     </div>

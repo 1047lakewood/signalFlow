@@ -17,6 +17,7 @@ use crate::scheduler::{parse_time, ConflictPolicy, Priority, ScheduleMode};
 use chrono::Local;
 use serde::Serialize;
 use std::collections::VecDeque;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -140,6 +141,8 @@ pub struct StatusData {
     pub stream_output_url: String,
     pub recording_enabled: bool,
     pub recording_output_dir: Option<String>,
+    pub indexed_locations: Vec<String>,
+    pub favorite_folders: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -177,6 +180,8 @@ pub struct ConfigData {
     pub stream_output_url: String,
     pub recording_enabled: bool,
     pub recording_output_dir: Option<String>,
+    pub indexed_locations: Vec<String>,
+    pub favorite_folders: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -241,6 +246,19 @@ pub struct LectureConfigData {
     pub whitelist: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct FileBrowserEntry {
+    pub path: String,
+    pub name: String,
+    pub is_dir: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FileSearchResult {
+    pub path: String,
+    pub name: String,
+}
+
 // ── AppCore ─────────────────────────────────────────────────────────────────
 
 pub struct AppCore {
@@ -287,6 +305,8 @@ impl AppCore {
             stream_output_url: self.engine.stream_output.endpoint_url.clone(),
             recording_enabled: self.engine.recording.enabled,
             recording_output_dir: self.engine.recording.output_dir.clone(),
+            indexed_locations: self.engine.indexed_locations.clone(),
+            favorite_folders: self.engine.favorite_folders.clone(),
         }
     }
 
@@ -304,6 +324,8 @@ impl AppCore {
             stream_output_url: self.engine.stream_output.endpoint_url.clone(),
             recording_enabled: self.engine.recording.enabled,
             recording_output_dir: self.engine.recording.output_dir.clone(),
+            indexed_locations: self.engine.indexed_locations.clone(),
+            favorite_folders: self.engine.favorite_folders.clone(),
         }
     }
 
@@ -852,10 +874,86 @@ impl AppCore {
         });
         self.engine.save()
     }
+
+    pub fn set_indexed_locations(&mut self, locations: Vec<String>) -> Result<(), String> {
+        self.engine.indexed_locations = locations
+            .into_iter()
+            .map(|path| path.trim().to_string())
+            .filter(|path| !path.is_empty())
+            .collect();
+        self.engine.indexed_locations.sort();
+        self.engine.indexed_locations.dedup();
+        self.engine.save()
+    }
+
+    pub fn set_favorite_folders(&mut self, folders: Vec<String>) -> Result<(), String> {
+        self.engine.favorite_folders = folders
+            .into_iter()
+            .map(|path| path.trim().to_string())
+            .filter(|path| !path.is_empty())
+            .collect();
+        self.engine.favorite_folders.sort();
+        self.engine.favorite_folders.dedup();
+        self.engine.save()
+    }
+
     pub fn set_nowplaying_path(&mut self, path: Option<String>) -> Result<(), String> {
         self.engine.now_playing_path = path;
         self.engine.save()?;
         Ok(())
+    }
+
+    pub fn list_directory(&self, path: Option<String>) -> Result<Vec<FileBrowserEntry>, String> {
+        let target = path
+            .map(PathBuf::from)
+            .or_else(|| self.engine.indexed_locations.first().map(PathBuf::from))
+            .unwrap_or_else(|| PathBuf::from("."));
+
+        let mut entries = Vec::new();
+        let dir_entries = fs::read_dir(&target)
+            .map_err(|e| format!("Failed to read directory '{}': {}", target.display(), e))?;
+
+        for entry in dir_entries.flatten() {
+            let path = entry.path();
+            let file_type = match entry.file_type() {
+                Ok(ft) => ft,
+                Err(_) => continue,
+            };
+            let is_dir = file_type.is_dir();
+            if !is_dir && !is_audio_file(&path) {
+                continue;
+            }
+            let name = entry.file_name().to_string_lossy().to_string();
+            entries.push(FileBrowserEntry {
+                path: path.to_string_lossy().to_string(),
+                name,
+                is_dir,
+            });
+        }
+
+        entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        Ok(entries)
+    }
+
+    pub fn search_indexed_files(&self, query: &str) -> Result<Vec<FileSearchResult>, String> {
+        let trimmed = query.trim().to_lowercase();
+        if trimmed.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut results = Vec::new();
+        for root in &self.engine.indexed_locations {
+            let root_path = Path::new(root);
+            if !root_path.exists() {
+                continue;
+            }
+            collect_matches(root_path, &trimmed, &mut results, 0);
+            if results.len() >= 300 {
+                break;
+            }
+        }
+
+        Ok(results)
     }
 
     // ── Ads ─────────────────────────────────────────────────────────────
@@ -1181,6 +1279,44 @@ impl AppCore {
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
+fn is_audio_file(path: &Path) -> bool {
+    const AUDIO_EXTENSIONS: &[&str] = &["mp3", "wav", "flac", "ogg", "aac", "m4a"];
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| AUDIO_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()))
+        .unwrap_or(false)
+}
+
+fn collect_matches(path: &Path, query: &str, out: &mut Vec<FileSearchResult>, depth: usize) {
+    if depth > 6 || out.len() >= 300 {
+        return;
+    }
+    let read = match fs::read_dir(path) {
+        Ok(r) => r,
+        Err(_) => return,
+    };
+    for entry in read.flatten() {
+        if out.len() >= 300 {
+            return;
+        }
+        let p = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+        if p.is_dir() {
+            collect_matches(&p, query, out, depth + 1);
+            continue;
+        }
+        if !is_audio_file(&p) {
+            continue;
+        }
+        if name.to_lowercase().contains(query) {
+            out.push(FileSearchResult {
+                path: p.to_string_lossy().to_string(),
+                name,
+            });
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1284,6 +1420,8 @@ mod tests {
         assert_eq!(config.silence_duration_secs, 0.0);
         assert!(config.intros_folder.is_none());
         assert_eq!(config.conflict_policy, "schedule-wins");
+        assert!(config.indexed_locations.is_empty());
+        assert!(config.favorite_folders.is_empty());
     }
 
     #[test]
@@ -1322,6 +1460,33 @@ mod tests {
     fn set_conflict_policy_invalid_errors() {
         let mut core = make_core();
         assert!(core.set_conflict_policy("bogus").is_err());
+    }
+
+    #[test]
+    fn set_indexed_locations_deduplicates_and_trims() {
+        let mut core = make_core();
+        core.set_indexed_locations(vec![
+            "  /music/a  ".to_string(),
+            "/music/a".to_string(),
+            "".to_string(),
+            " /music/b".to_string(),
+        ])
+        .unwrap();
+        let config = core.get_config();
+        assert_eq!(config.indexed_locations, vec!["/music/a", "/music/b"]);
+    }
+
+    #[test]
+    fn set_favorite_folders_deduplicates_and_trims() {
+        let mut core = make_core();
+        core.set_favorite_folders(vec![
+            " /music/news ".to_string(),
+            "/music/news".to_string(),
+            " /music/ads".to_string(),
+        ])
+        .unwrap();
+        let config = core.get_config();
+        assert_eq!(config.favorite_folders, vec!["/music/ads", "/music/news"]);
     }
 
     #[test]

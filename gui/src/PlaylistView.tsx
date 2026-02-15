@@ -25,8 +25,20 @@ interface ResizeState {
 }
 
 const COL_WIDTHS_KEY = "signalflow-col-widths";
-const DEFAULT_COL_WIDTHS: ColWidths = { num: 40, status: 36, artist: 220, path: 260, duration: 70 };
-const MIN_COL_WIDTHS: ColWidths = { num: 30, status: 24, artist: 60, path: 120, duration: 50 };
+const DEFAULT_COL_WIDTHS: ColWidths = {
+  num: 40,
+  status: 36,
+  artist: 220,
+  path: 260,
+  duration: 70,
+};
+const MIN_COL_WIDTHS: ColWidths = {
+  num: 30,
+  status: 24,
+  artist: 60,
+  path: 120,
+  duration: 50,
+};
 
 function formatTrackPathForDisplay(path: string): string {
   const uncAdminShare = path.match(/^\\\\[^\\]+\\([A-Za-z])\$\\(.*)$/);
@@ -37,7 +49,9 @@ function formatTrackPathForDisplay(path: string): string {
   if (path.startsWith("\\\\?\\")) {
     const withoutVerbatimPrefix = path.slice(4);
 
-    const verbatimAdminShare = withoutVerbatimPrefix.match(/^UNC\\[^\\]+\\([A-Za-z])\$\\(.*)$/);
+    const verbatimAdminShare = withoutVerbatimPrefix.match(
+      /^UNC\\[^\\]+\\([A-Za-z])\$\\(.*)$/,
+    );
     if (verbatimAdminShare) {
       return `${verbatimAdminShare[1].toUpperCase()}:\\${verbatimAdminShare[2]}`;
     }
@@ -65,6 +79,7 @@ interface PlaylistViewProps {
   onAddFiles: () => void;
   onFileDrop: (paths: string[]) => void;
   onTracksChanged: () => void;
+  onSearchFilename: (filename: string) => void;
 }
 
 interface ContextMenuState {
@@ -78,7 +93,23 @@ interface EditingCell {
   field: "artist" | "title";
 }
 
-function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, clipboard, onSelectTracks, onPlayTrack, onReorder, onCopyTracks, onCutTracks, onPasteTracks, onAddFiles, onFileDrop, onTracksChanged }: PlaylistViewProps) {
+function PlaylistView({
+  tracks,
+  currentIndex,
+  playlistName,
+  selectedIndices,
+  clipboard,
+  onSelectTracks,
+  onPlayTrack,
+  onReorder,
+  onCopyTracks,
+  onCutTracks,
+  onPasteTracks,
+  onAddFiles,
+  onFileDrop,
+  onTracksChanged,
+  onSearchFilename,
+}: PlaylistViewProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
   const [isDroppingFiles, setIsDroppingFiles] = useState(false);
@@ -113,7 +144,9 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
     try {
       const saved = localStorage.getItem(COL_WIDTHS_KEY);
       if (saved) return { ...DEFAULT_COL_WIDTHS, ...JSON.parse(saved) };
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return { ...DEFAULT_COL_WIDTHS };
   });
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
@@ -134,7 +167,11 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
       document.body.style.userSelect = "";
       setResizeState(null);
       setColWidths((prev) => {
-        try { localStorage.setItem(COL_WIDTHS_KEY, JSON.stringify(prev)); } catch { /* ignore */ }
+        try {
+          localStorage.setItem(COL_WIDTHS_KEY, JSON.stringify(prev));
+        } catch {
+          /* ignore */
+        }
         return prev;
       });
     };
@@ -150,16 +187,19 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
     };
   }, [resizeState]);
 
-  const handleResizeMouseDown = useCallback((e: React.MouseEvent, colKey: keyof ColWidths, sign: number = 1) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setResizeState({
-      colKey,
-      startX: e.clientX,
-      startWidth: colWidths[colKey],
-      sign,
-    });
-  }, [colWidths]);
+  const handleResizeMouseDown = useCallback(
+    (e: React.MouseEvent, colKey: keyof ColWidths, sign: number = 1) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setResizeState({
+        colKey,
+        startX: e.clientX,
+        startWidth: colWidths[colKey],
+        sign,
+      });
+    },
+    [colWidths],
+  );
 
   // Listen for Tauri file drop events
   useEffect(() => {
@@ -169,12 +209,15 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
       try {
         const { listen } = await import("@tauri-apps/api/event");
 
-        const unlistenDrop = await listen<{ paths: string[] }>("tauri://drag-drop", (event) => {
-          setIsDroppingFiles(false);
-          if (event.payload.paths && event.payload.paths.length > 0) {
-            onFileDrop(event.payload.paths);
-          }
-        });
+        const unlistenDrop = await listen<{ paths: string[] }>(
+          "tauri://drag-drop",
+          (event) => {
+            setIsDroppingFiles(false);
+            if (event.payload.paths && event.payload.paths.length > 0) {
+              onFileDrop(event.payload.paths);
+            }
+          },
+        );
 
         const unlistenHover = await listen("tauri://drag-enter", () => {
           setIsDroppingFiles(true);
@@ -230,10 +273,13 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
     };
   }, [contextMenu]);
 
-  const handleStartEdit = useCallback((trackIndex: number, field: "artist" | "title", currentValue: string) => {
-    setEditingCell({ trackIndex, field });
-    setEditValue(currentValue);
-  }, []);
+  const handleStartEdit = useCallback(
+    (trackIndex: number, field: "artist" | "title", currentValue: string) => {
+      setEditingCell({ trackIndex, field });
+      setEditValue(currentValue);
+    },
+    [],
+  );
 
   const handleCancelEdit = useCallback(() => {
     setEditingCell(null);
@@ -248,13 +294,19 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
       handleCancelEdit();
       return;
     }
-    const oldValue = editingCell.field === "artist" ? track.artist : track.title;
+    const oldValue =
+      editingCell.field === "artist" ? track.artist : track.title;
     if (!newValue || newValue === oldValue) {
       handleCancelEdit();
       return;
     }
     try {
-      const params: { playlist: string; trackIndex: number; artist?: string; title?: string } = {
+      const params: {
+        playlist: string;
+        trackIndex: number;
+        artist?: string;
+        title?: string;
+      } = {
         playlist: playlistName,
         trackIndex: editingCell.trackIndex,
       };
@@ -270,15 +322,25 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
     }
     setEditingCell(null);
     setEditValue("");
-  }, [editingCell, editValue, tracks, playlistName, onTracksChanged, handleCancelEdit]);
+  }, [
+    editingCell,
+    editValue,
+    tracks,
+    playlistName,
+    onTracksChanged,
+    handleCancelEdit,
+  ]);
 
-  const handleEditKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleCommitEdit();
-    } else if (e.key === "Escape") {
-      handleCancelEdit();
-    }
-  }, [handleCommitEdit, handleCancelEdit]);
+  const handleEditKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") {
+        handleCommitEdit();
+      } else if (e.key === "Escape") {
+        handleCancelEdit();
+      }
+    },
+    [handleCommitEdit, handleCancelEdit],
+  );
 
   const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
     setDragIndex(index);
@@ -307,63 +369,72 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
     setDropTarget(null);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent, toIndex: number) => {
-    e.preventDefault();
-    const fromIndex = dragIndex;
-    setDragIndex(null);
-    setDropTarget(null);
-    if (fromIndex !== null && fromIndex !== toIndex) {
-      onReorder(fromIndex, toIndex);
-    }
-  }, [dragIndex, onReorder]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent, toIndex: number) => {
+      e.preventDefault();
+      const fromIndex = dragIndex;
+      setDragIndex(null);
+      setDropTarget(null);
+      if (fromIndex !== null && fromIndex !== toIndex) {
+        onReorder(fromIndex, toIndex);
+      }
+    },
+    [dragIndex, onReorder],
+  );
 
-  const handleRowClick = useCallback((e: React.MouseEvent, trackIndex: number) => {
-    if (e.shiftKey && anchorIndex !== null) {
-      // Range select from anchor to clicked index
-      const min = Math.min(anchorIndex, trackIndex);
-      const max = Math.max(anchorIndex, trackIndex);
-      const rangeSet = new Set<number>();
-      for (let i = min; i <= max; i++) {
-        // Only include indices that exist in the track list
-        if (tracks.some((t) => t.index === i)) {
-          rangeSet.add(i);
+  const handleRowClick = useCallback(
+    (e: React.MouseEvent, trackIndex: number) => {
+      if (e.shiftKey && anchorIndex !== null) {
+        // Range select from anchor to clicked index
+        const min = Math.min(anchorIndex, trackIndex);
+        const max = Math.max(anchorIndex, trackIndex);
+        const rangeSet = new Set<number>();
+        for (let i = min; i <= max; i++) {
+          // Only include indices that exist in the track list
+          if (tracks.some((t) => t.index === i)) {
+            rangeSet.add(i);
+          }
         }
-      }
-      // If Ctrl is also held, merge with existing selection
-      if (e.ctrlKey || e.metaKey) {
-        const merged = new Set(selectedIndices);
-        for (const i of rangeSet) merged.add(i);
-        onSelectTracks(merged);
+        // If Ctrl is also held, merge with existing selection
+        if (e.ctrlKey || e.metaKey) {
+          const merged = new Set(selectedIndices);
+          for (const i of rangeSet) merged.add(i);
+          onSelectTracks(merged);
+        } else {
+          onSelectTracks(rangeSet);
+        }
+        // Don't update anchor on shift-click
+      } else if (e.ctrlKey || e.metaKey) {
+        // Toggle individual row
+        const next = new Set(selectedIndices);
+        if (next.has(trackIndex)) {
+          next.delete(trackIndex);
+        } else {
+          next.add(trackIndex);
+        }
+        onSelectTracks(next);
+        setAnchorIndex(trackIndex);
       } else {
-        onSelectTracks(rangeSet);
+        // Normal click — single select
+        onSelectTracks(new Set([trackIndex]));
+        setAnchorIndex(trackIndex);
       }
-      // Don't update anchor on shift-click
-    } else if (e.ctrlKey || e.metaKey) {
-      // Toggle individual row
-      const next = new Set(selectedIndices);
-      if (next.has(trackIndex)) {
-        next.delete(trackIndex);
-      } else {
-        next.add(trackIndex);
-      }
-      onSelectTracks(next);
-      setAnchorIndex(trackIndex);
-    } else {
-      // Normal click — single select
-      onSelectTracks(new Set([trackIndex]));
-      setAnchorIndex(trackIndex);
-    }
-  }, [anchorIndex, selectedIndices, tracks, onSelectTracks]);
+    },
+    [anchorIndex, selectedIndices, tracks, onSelectTracks],
+  );
 
-  const handleContextMenu = useCallback((e: React.MouseEvent, trackIndex: number) => {
-    e.preventDefault();
-    // If right-clicked row isn't in current selection, select just that row
-    if (!selectedIndices.has(trackIndex)) {
-      onSelectTracks(new Set([trackIndex]));
-      setAnchorIndex(trackIndex);
-    }
-    setContextMenu({ x: e.clientX, y: e.clientY, trackIndex });
-  }, [selectedIndices, onSelectTracks]);
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, trackIndex: number) => {
+      e.preventDefault();
+      // If right-clicked row isn't in current selection, select just that row
+      if (!selectedIndices.has(trackIndex)) {
+        onSelectTracks(new Set([trackIndex]));
+        setAnchorIndex(trackIndex);
+      }
+      setContextMenu({ x: e.clientX, y: e.clientY, trackIndex });
+    },
+    [selectedIndices, onSelectTracks],
+  );
 
   const handleContextMenuPlay = useCallback(() => {
     if (!contextMenu) return;
@@ -373,14 +444,20 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
 
   const handleContextMenuCopy = useCallback(() => {
     if (!contextMenu) return;
-    const indices = selectedIndices.size > 0 ? Array.from(selectedIndices).sort((a, b) => a - b) : [contextMenu.trackIndex];
+    const indices =
+      selectedIndices.size > 0
+        ? Array.from(selectedIndices).sort((a, b) => a - b)
+        : [contextMenu.trackIndex];
     onCopyTracks(indices);
     setContextMenu(null);
   }, [contextMenu, selectedIndices, onCopyTracks]);
 
   const handleContextMenuCut = useCallback(() => {
     if (!contextMenu) return;
-    const indices = selectedIndices.size > 0 ? Array.from(selectedIndices).sort((a, b) => a - b) : [contextMenu.trackIndex];
+    const indices =
+      selectedIndices.size > 0
+        ? Array.from(selectedIndices).sort((a, b) => a - b)
+        : [contextMenu.trackIndex];
     onCutTracks(indices);
     setContextMenu(null);
   }, [contextMenu, selectedIndices, onCutTracks]);
@@ -391,27 +468,44 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
     setContextMenu(null);
   }, [contextMenu, onPasteTracks]);
 
-  const handleJumpToRow = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    const row = Number.parseInt(jumpRowInput, 10);
-    if (!Number.isFinite(row) || row < 1) return;
-    const targetIndex = row - 1;
-    const targetExists = tracks.some((track) => track.index === targetIndex);
-    if (!targetExists) return;
+  const handleContextMenuSearchFilename = useCallback(() => {
+    if (!contextMenu) return;
+    const track = tracks.find((t) => t.index === contextMenu.trackIndex);
+    if (!track) return;
+    const filename = track.path.split(/[/\\]/).pop() ?? track.title;
+    onSearchFilename(filename);
+    setContextMenu(null);
+  }, [contextMenu, tracks, onSearchFilename]);
 
-    if (normalizedQuery && !visibleTracks.some((track) => track.index === targetIndex)) {
-      setFindQuery("");
-    }
+  const handleJumpToRow = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      const row = Number.parseInt(jumpRowInput, 10);
+      if (!Number.isFinite(row) || row < 1) return;
+      const targetIndex = row - 1;
+      const targetExists = tracks.some((track) => track.index === targetIndex);
+      if (!targetExists) return;
 
-    onSelectTracks(new Set([targetIndex]));
-    setAnchorIndex(targetIndex);
+      if (
+        normalizedQuery &&
+        !visibleTracks.some((track) => track.index === targetIndex)
+      ) {
+        setFindQuery("");
+      }
 
-    requestAnimationFrame(() => {
-      containerRef.current
-        ?.querySelector<HTMLElement>(`tr[data-track-index=\"${targetIndex}\"]`)
-        ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    });
-  }, [jumpRowInput, tracks, normalizedQuery, visibleTracks, onSelectTracks]);
+      onSelectTracks(new Set([targetIndex]));
+      setAnchorIndex(targetIndex);
+
+      requestAnimationFrame(() => {
+        containerRef.current
+          ?.querySelector<HTMLElement>(
+            `tr[data-track-index=\"${targetIndex}\"]`,
+          )
+          ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      });
+    },
+    [jumpRowInput, tracks, normalizedQuery, visibleTracks, onSelectTracks],
+  );
 
   if (tracks.length === 0) {
     return (
@@ -453,10 +547,14 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
             id="playlist-jump-row"
             className="playlist-jump-input"
             value={jumpRowInput}
-            onChange={(e) => setJumpRowInput(e.target.value.replace(/[^0-9]/g, ""))}
+            onChange={(e) =>
+              setJumpRowInput(e.target.value.replace(/[^0-9]/g, ""))
+            }
             placeholder="#"
           />
-          <button type="submit" className="playlist-jump-btn">Go</button>
+          <button type="submit" className="playlist-jump-btn">
+            Go
+          </button>
         </form>
       </div>
       <table className="track-table">
@@ -464,26 +562,44 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
           <tr>
             <th className="col-num" style={{ width: colWidths.num }}>
               #
-              <div className="col-resize-handle" onMouseDown={(e) => handleResizeMouseDown(e, "num")} />
+              <div
+                className="col-resize-handle"
+                onMouseDown={(e) => handleResizeMouseDown(e, "num")}
+              />
             </th>
             <th className="col-status" style={{ width: colWidths.status }}>
-              <div className="col-resize-handle" onMouseDown={(e) => handleResizeMouseDown(e, "status")} />
+              <div
+                className="col-resize-handle"
+                onMouseDown={(e) => handleResizeMouseDown(e, "status")}
+              />
             </th>
             <th className="col-artist" style={{ width: colWidths.artist }}>
               Artist
-              <div className="col-resize-handle" onMouseDown={(e) => handleResizeMouseDown(e, "artist")} />
+              <div
+                className="col-resize-handle"
+                onMouseDown={(e) => handleResizeMouseDown(e, "artist")}
+              />
             </th>
             <th className="col-title">
               Title
-              <div className="col-resize-handle" onMouseDown={(e) => handleResizeMouseDown(e, "path", -1)} />
+              <div
+                className="col-resize-handle"
+                onMouseDown={(e) => handleResizeMouseDown(e, "path", -1)}
+              />
             </th>
             <th className="col-path" style={{ width: colWidths.path }}>
               File Path
-              <div className="col-resize-handle" onMouseDown={(e) => handleResizeMouseDown(e, "path")} />
+              <div
+                className="col-resize-handle"
+                onMouseDown={(e) => handleResizeMouseDown(e, "path")}
+              />
             </th>
             <th className="col-duration" style={{ width: colWidths.duration }}>
               Duration
-              <div className="col-resize-handle" onMouseDown={(e) => handleResizeMouseDown(e, "duration")} />
+              <div
+                className="col-resize-handle"
+                onMouseDown={(e) => handleResizeMouseDown(e, "duration")}
+              />
             </th>
           </tr>
         </thead>
@@ -492,9 +608,14 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
             const isCurrent = track.index === currentIndex;
             const isSelected = selectedIndices.has(track.index);
             const isDragging = track.index === dragIndex;
-            const isDropTarget = track.index === dropTarget && dropTarget !== dragIndex;
-            const isEditingArtist = editingCell?.trackIndex === track.index && editingCell?.field === "artist";
-            const isEditingTitle = editingCell?.trackIndex === track.index && editingCell?.field === "title";
+            const isDropTarget =
+              track.index === dropTarget && dropTarget !== dragIndex;
+            const isEditingArtist =
+              editingCell?.trackIndex === track.index &&
+              editingCell?.field === "artist";
+            const isEditingTitle =
+              editingCell?.trackIndex === track.index &&
+              editingCell?.field === "title";
             const displayPath = formatTrackPathForDisplay(track.path);
             let className = "track-row";
             if (isSelected) className += " selected";
@@ -524,12 +645,20 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
               >
                 <td className="col-num">{track.index + 1}</td>
                 <td className="col-status">
-                  {isCurrent && <span className="playing-indicator">{"\u25B6"}</span>}
-                  {track.has_intro && <span className="intro-dot" title="Has intro">{"\u2022"}</span>}
+                  {isCurrent && (
+                    <span className="playing-indicator">{"\u25B6"}</span>
+                  )}
+                  {track.has_intro && (
+                    <span className="intro-dot" title="Has intro">
+                      {"\u2022"}
+                    </span>
+                  )}
                 </td>
                 <td
                   className="col-artist editable-cell"
-                  onDoubleClick={() => handleStartEdit(track.index, "artist", track.artist)}
+                  onDoubleClick={() =>
+                    handleStartEdit(track.index, "artist", track.artist)
+                  }
                 >
                   {isEditingArtist ? (
                     <input
@@ -547,7 +676,9 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
                 </td>
                 <td
                   className="col-title editable-cell"
-                  onDoubleClick={() => handleStartEdit(track.index, "title", track.title)}
+                  onDoubleClick={() =>
+                    handleStartEdit(track.index, "title", track.title)
+                  }
                 >
                   {isEditingTitle ? (
                     <input
@@ -563,7 +694,9 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
                     track.title
                   )}
                 </td>
-                <td className="col-path" title={displayPath}>{displayPath}</td>
+                <td className="col-path" title={displayPath}>
+                  {displayPath}
+                </td>
                 <td className="col-duration">{track.duration_display}</td>
               </tr>
             );
@@ -571,7 +704,9 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
         </tbody>
       </table>
       {normalizedQuery && visibleTracks.length === 0 && (
-        <div className="playlist-find-empty">No tracks match "{findQuery}".</div>
+        <div className="playlist-find-empty">
+          No tracks match "{findQuery}".
+        </div>
       )}
       <div className="playlist-toolbar">
         <button className="add-files-btn" onClick={onAddFiles}>
@@ -584,14 +719,23 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button className="playlist-context-item" onClick={handleContextMenuPlay}>
+          <button
+            className="playlist-context-item"
+            onClick={handleContextMenuPlay}
+          >
             Play from here
           </button>
           <div className="context-menu-divider" />
-          <button className="playlist-context-item" onClick={handleContextMenuCut}>
+          <button
+            className="playlist-context-item"
+            onClick={handleContextMenuCut}
+          >
             Cut{selectedIndices.size > 1 ? ` (${selectedIndices.size})` : ""}
           </button>
-          <button className="playlist-context-item" onClick={handleContextMenuCopy}>
+          <button
+            className="playlist-context-item"
+            onClick={handleContextMenuCopy}
+          >
             Copy{selectedIndices.size > 1 ? ` (${selectedIndices.size})` : ""}
           </button>
           <button
@@ -599,7 +743,17 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
             onClick={handleContextMenuPaste}
             disabled={!clipboard}
           >
-            Paste{clipboard ? ` (${clipboard.paths.length} track${clipboard.paths.length > 1 ? "s" : ""})` : ""}
+            Paste
+            {clipboard
+              ? ` (${clipboard.paths.length} track${clipboard.paths.length > 1 ? "s" : ""})`
+              : ""}
+          </button>
+          <div className="context-menu-divider" />
+          <button
+            className="playlist-context-item"
+            onClick={handleContextMenuSearchFilename}
+          >
+            Search filename across index
           </button>
         </div>
       )}

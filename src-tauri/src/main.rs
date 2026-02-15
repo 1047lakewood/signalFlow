@@ -2,8 +2,8 @@
 
 use serde::Serialize;
 use signal_flow::app_core::{
-    AdData, AppCore, ConfigData, LogEntry, PlaylistData, RdsConfigData, ScheduleEventData,
-    StatusData, TrackData, TransportData,
+    AdData, AppCore, ConfigData, FileBrowserEntry, FileSearchResult, LogEntry, PlaylistData,
+    RdsConfigData, ScheduleEventData, StatusData, TrackData, TransportData,
 };
 use signal_flow::audio_runtime::{spawn_audio_runtime, AudioEvent, AudioHandle};
 use signal_flow::level_monitor::LevelMonitor;
@@ -150,6 +150,24 @@ fn edit_track_metadata(
         artist.as_deref(),
         title.as_deref(),
     )
+}
+
+// ── File browser / search ───────────────────────────────────────────────
+
+#[tauri::command]
+fn list_directory(
+    state: State<AppState>,
+    path: Option<String>,
+) -> Result<Vec<FileBrowserEntry>, String> {
+    state.core.lock().unwrap().list_directory(path)
+}
+
+#[tauri::command]
+fn search_indexed_files(
+    state: State<AppState>,
+    query: String,
+) -> Result<Vec<FileSearchResult>, String> {
+    state.core.lock().unwrap().search_indexed_files(&query)
 }
 
 // ── Transport controls ─────────────────────────────────────────────────────
@@ -393,6 +411,16 @@ fn set_recording(
         .lock()
         .unwrap()
         .set_recording(enabled, output_dir)
+}
+
+#[tauri::command]
+fn set_indexed_locations(state: State<AppState>, locations: Vec<String>) -> Result<(), String> {
+    state.core.lock().unwrap().set_indexed_locations(locations)
+}
+
+#[tauri::command]
+fn set_favorite_folders(state: State<AppState>, folders: Vec<String>) -> Result<(), String> {
+    state.core.lock().unwrap().set_favorite_folders(folders)
 }
 
 #[tauri::command]
@@ -668,6 +696,8 @@ fn main() {
             reorder_track,
             copy_paste_tracks,
             edit_track_metadata,
+            list_directory,
+            search_indexed_files,
             // Transport
             transport_play,
             transport_stop,
@@ -714,6 +744,8 @@ fn main() {
             set_conflict_policy,
             set_stream_output,
             set_recording,
+            set_indexed_locations,
+            set_favorite_folders,
             set_nowplaying_path,
         ])
         .run(tauri::generate_context!())
