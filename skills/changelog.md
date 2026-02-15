@@ -1,3 +1,8 @@
+## 2026-02-15 — Fix UNC paths showing instead of mapped drive letters
+- `list_directory()` and `collect_matches()` now use `parent.join(entry.file_name())` instead of `entry.path()`, preserving the user-provided drive letter on Windows mapped drives.
+- `normalize_input_path()` strips `\\?\UNC\` verbatim prefix as a safety net.
+- Frontend `cleanPath()` also handles `\\?\UNC\` → `\\` conversion.
+
 ## 2026-02-15 — Fix window freeze during waveform generation
 - Replaced full-file `collect()` in `generate_peaks()` with streaming iteration — memory drops from ~100MB to ~1KB per track.
 - Added disk cache for waveform peaks (`<data_dir>/signalFlow/waveform_cache/`), keyed by path+size+mtime. 800 bytes per cached track.

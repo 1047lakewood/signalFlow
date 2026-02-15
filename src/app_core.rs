@@ -920,7 +920,10 @@ impl AppCore {
             .map_err(|e| format!("Failed to read directory '{}': {}", target.display(), e))?;
 
         for entry in dir_entries.flatten() {
-            let path = entry.path();
+            // Use target.join(file_name) instead of entry.path() to preserve
+            // the user-provided drive letter on Windows mapped drives.
+            // entry.path() resolves to \\?\UNC\... on mapped drives.
+            let path = target.join(entry.file_name());
             let file_type = match entry.file_type() {
                 Ok(ft) => ft,
                 Err(_) => continue,
@@ -1387,7 +1390,9 @@ fn collect_matches(path: &Path, query: &str, out: &mut Vec<FileSearchResult>, de
         if out.len() >= 120 {
             return;
         }
-        let p = entry.path();
+        // Use path.join(file_name) instead of entry.path() to preserve
+        // the user-provided drive letter on Windows mapped drives.
+        let p = path.join(entry.file_name());
         let name = entry.file_name().to_string_lossy().to_string();
         if p.is_dir() {
             collect_matches(&p, query, out, depth + 1);

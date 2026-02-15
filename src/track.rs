@@ -121,6 +121,15 @@ fn normalize_input_path(path: &Path) -> Result<PathBuf, String> {
     // (e.g. G:\Music → \\NAS\share\Music), losing the drive letter the user expects.
     // Also avoid `absolute` for already-absolute paths, because on Windows it can expand
     // mapped drive letters into verbatim UNC form (\\?\UNC\...), which leaks into the UI.
+
+    // Safety net: strip verbatim UNC prefix if present (\\?\UNC\host\share → \\host\share).
+    // This won't recover the drive letter, but prevents the worst prefix from leaking through.
+    let path_str = path.to_string_lossy();
+    if path_str.starts_with(r"\\?\UNC\") {
+        let stripped = format!(r"\\{}", &path_str[8..]);
+        return Ok(PathBuf::from(stripped));
+    }
+
     if path.is_absolute() {
         return Ok(path.to_path_buf());
     }
