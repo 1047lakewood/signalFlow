@@ -11,6 +11,24 @@ function formatTime(secs: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function formatPlaytime(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  }).formatToParts(date);
+
+  const weekday = parts.find((p) => p.type === "weekday")?.value ?? "";
+  const hour = parts.find((p) => p.type === "hour")?.value ?? "0";
+  const minute = parts.find((p) => p.type === "minute")?.value ?? "00";
+  const second = parts.find((p) => p.type === "second")?.value ?? "00";
+  const dayPeriod = parts.find((p) => p.type === "dayPeriod")?.value ?? "";
+
+  return `${weekday} ${hour}:${minute}:${second} ${dayPeriod}`.trim();
+}
+
 interface TransportBarProps {
   onTrackChange?: () => void;
   selectedTrackIndex?: number | null;
@@ -35,6 +53,7 @@ function TransportBar({ onTrackChange, selectedTrackIndex, onPlayingIndexChange 
   // Elapsed time interpolation: store base values from last status fetch
   const baseElapsed = useRef(0);
   const baseTimestamp = useRef(0);
+  const baseWallClock = useRef(Date.now());
   const [displayElapsed, setDisplayElapsed] = useState(0);
 
   const fetchStatus = useCallback(async () => {
@@ -44,6 +63,7 @@ function TransportBar({ onTrackChange, selectedTrackIndex, onPlayingIndexChange 
       // Update interpolation base
       baseElapsed.current = s.elapsed_secs;
       baseTimestamp.current = performance.now();
+      baseWallClock.current = Date.now() - s.elapsed_secs * 1000;
       // Report playing track index back to parent
       const newIndex = s.is_playing ? (s.track_index ?? null) : null;
       if (newIndex !== lastReportedIndex.current) {
@@ -139,6 +159,7 @@ function TransportBar({ onTrackChange, selectedTrackIndex, onPlayingIndexChange 
   const elapsed = displayElapsed;
   const remaining = Math.max(0, state.duration_secs - elapsed);
   const hasTrack = state.track_artist || state.track_title;
+  const displayPlaytime = formatPlaytime(new Date(baseWallClock.current + elapsed * 1000));
 
   return (
     <div className="transport-bar">
@@ -175,7 +196,7 @@ function TransportBar({ onTrackChange, selectedTrackIndex, onPlayingIndexChange 
 
       {/* Seek / progress with waveform */}
       <div className="transport-seek">
-        <span className="transport-time">{formatTime(elapsed)}</span>
+        <span className="transport-time" title="Track playtime">{displayPlaytime}</span>
         <WaveformDisplay
           trackPath={state.track_path}
           elapsed={elapsed}

@@ -114,7 +114,7 @@
 
 ## Phase M: UI Polish & Transport Fixes
 
-- [ ] Playtime format — Display playtime as `Sun 4:54:25 PM` (day-of-week + 12-hour clock) instead of raw elapsed time
+- [x] Playtime format — Display playtime as `Sun 4:54:25 PM` (day-of-week + 12-hour clock) instead of raw elapsed time
 - [ ] File path display — Show drive-letter paths (`D:\Music\...`) instead of UNC paths (`\\UNC\...`) in the file path column
 - [ ] Playlist right-margin padding — Add padding to the last column so text (e.g. "DURATION") doesn't touch the panel edge
 - [ ] Separate Play and Pause buttons — Replace the combined play/pause toggle with distinct Play and Pause buttons; Play should start playback of the currently selected track (even while another track is playing), Pause should pause the current track

@@ -1,6 +1,12 @@
 # signalFlow — Changelog
 
 > Maintenance note (2026-02-13): treat this as a living design record. Verify behavior against current code and tests before implementation decisions.
+## 2026-02-15 — Playtime Format (Phase M)
+- Completed Phase M todo item for playtime formatting in transport
+- Replaced raw elapsed time text in the transport bar with a playtime clock string formatted as `Sun 4:54:25 PM`
+- Playtime is derived from the current track start wall-clock time plus interpolated elapsed playback for smooth updates during playback
+- Remaining time display (`-m:ss`) is preserved on the right side of the waveform
+
 ## 2026-02-13 — Find Bar, Auto-Advance, and Graceful Dev Shutdown (Phase E2/E3)
 - Completed Phase E2 todos: Find bar and Auto-advance playback
 - Added playlist find bar filtering across row number, artist, title, file path, and duration
