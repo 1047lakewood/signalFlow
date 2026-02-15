@@ -39,7 +39,11 @@
       "Bash(cargo doc:*)",
       "Bash(dir:*)",
       "Bash(git status:*)",
-      "Bash(ls -la \"G:\\\\Misc\\\\Dev\\\\signalFlow\\\\gui\\\\src\"\" | grep -i \".tsx|.ts \")"
+      "Bash(ls -la \"G:\\\\Misc\\\\Dev\\\\signalFlow\\\\gui\\\\src\"\" | grep -i \".tsx|.ts \")",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(cargo metadata:*)",
+      "Bash(python:*)"
     ]
   }
 }

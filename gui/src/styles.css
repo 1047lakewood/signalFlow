@@ -698,70 +698,80 @@ body {
 .playlist-findbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
+  gap: 8px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
   background: var(--bg-primary);
 }
 
 .playlist-find-input {
   flex: 1;
-  min-width: 160px;
+  min-width: 140px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 4px;
   color: var(--text-primary);
-  padding: 6px 9px;
+  padding: 5px 9px;
   font-size: 12px;
 }
 
-.playlist-find-input:focus,
-.playlist-jump-input:focus {
+.playlist-find-input:focus {
   outline: none;
   border-color: var(--highlight);
 }
 
-.playlist-jump-form {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.find-match-count {
   color: var(--text-secondary);
   font-size: 11px;
-  text-transform: uppercase;
+  white-space: nowrap;
+  min-width: 70px;
+  text-align: center;
 }
 
-.playlist-jump-input {
-  width: 56px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text-primary);
-  padding: 5px 7px;
-  font-size: 12px;
-}
-
-.playlist-jump-btn {
+.find-nav-btn,
+.find-close-btn {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-secondary);
   border-radius: 4px;
-  padding: 5px 10px;
+  padding: 3px 8px;
   font-size: 12px;
   cursor: pointer;
+  line-height: 1;
 }
 
-.playlist-jump-btn:hover {
+.find-nav-btn:hover,
+.find-close-btn:hover {
   color: var(--text-primary);
   border-color: var(--text-secondary);
   background: var(--bg-row-hover);
 }
 
-.playlist-find-empty {
-  padding: 12px 10px;
+.find-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.find-nav-btn:disabled:hover {
   color: var(--text-secondary);
-  font-size: 12px;
-  border-top: 1px solid var(--border);
+  border-color: var(--border);
+  background: transparent;
+}
+
+.track-row.find-match {
+  background: rgba(202, 138, 4, 0.12);
+}
+
+.track-row.find-match.selected {
+  background: rgba(202, 138, 4, 0.22);
+}
+
+.track-row.find-current {
+  background: rgba(202, 138, 4, 0.30);
+}
+
+.track-row.find-current.selected {
+  background: rgba(202, 138, 4, 0.38);
 }
 
 /* ── Settings panel overlay ──────────────────────────────────────── */

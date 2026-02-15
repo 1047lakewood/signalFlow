@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { TrackInfo } from "./types";
 
@@ -118,13 +118,17 @@ function PlaylistView({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [anchorIndex, setAnchorIndex] = useState<number | null>(null);
   const [findQuery, setFindQuery] = useState("");
-  const [jumpRowInput, setJumpRowInput] = useState("");
+  const [findBarOpen, setFindBarOpen] = useState(false);
+  const [findCurrentMatch, setFindCurrentMatch] = useState(0);
   const editInputRef = useRef<HTMLInputElement>(null);
+  const findInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const normalizedQuery = findQuery.trim().toLowerCase();
-  const visibleTracks = normalizedQuery
-    ? tracks.filter((track) => {
+  const findMatchIndices = useMemo(() => {
+    if (!normalizedQuery) return [];
+    return tracks
+      .filter((track) => {
         const haystack = [
           String(track.index + 1),
           track.artist,
@@ -137,7 +141,8 @@ function PlaylistView({
           .toLowerCase();
         return haystack.includes(normalizedQuery);
       })
-    : tracks;
+      .map((track) => track.index);
+  }, [tracks, normalizedQuery]);
 
   // Column resize state
   const [colWidths, setColWidths] = useState<ColWidths>(() => {
@@ -477,35 +482,60 @@ function PlaylistView({
     setContextMenu(null);
   }, [contextMenu, tracks, onSearchFilename]);
 
-  const handleJumpToRow = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      const row = Number.parseInt(jumpRowInput, 10);
-      if (!Number.isFinite(row) || row < 1) return;
-      const targetIndex = row - 1;
-      const targetExists = tracks.some((track) => track.index === targetIndex);
-      if (!targetExists) return;
+  const scrollToTrackIndex = useCallback((trackIndex: number) => {
+    requestAnimationFrame(() => {
+      containerRef.current
+        ?.querySelector<HTMLElement>(
+          `tr[data-track-index="${trackIndex}"]`,
+        )
+        ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  }, []);
 
-      if (
-        normalizedQuery &&
-        !visibleTracks.some((track) => track.index === targetIndex)
-      ) {
-        setFindQuery("");
+  // When query changes, reset to first match and scroll there
+  useEffect(() => {
+    setFindCurrentMatch(0);
+    if (findMatchIndices.length > 0) {
+      scrollToTrackIndex(findMatchIndices[0]);
+    }
+  }, [findMatchIndices, scrollToTrackIndex]);
+
+  const handleFindNext = useCallback(() => {
+    if (findMatchIndices.length === 0) return;
+    const next = (findCurrentMatch + 1) % findMatchIndices.length;
+    setFindCurrentMatch(next);
+    scrollToTrackIndex(findMatchIndices[next]);
+  }, [findMatchIndices, findCurrentMatch, scrollToTrackIndex]);
+
+  const handleFindPrev = useCallback(() => {
+    if (findMatchIndices.length === 0) return;
+    const prev =
+      (findCurrentMatch - 1 + findMatchIndices.length) %
+      findMatchIndices.length;
+    setFindCurrentMatch(prev);
+    scrollToTrackIndex(findMatchIndices[prev]);
+  }, [findMatchIndices, findCurrentMatch, scrollToTrackIndex]);
+
+  const handleFindClose = useCallback(() => {
+    setFindBarOpen(false);
+    setFindQuery("");
+    setFindCurrentMatch(0);
+  }, []);
+
+  // Ctrl+F to open find bar, Escape to close
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+        e.preventDefault();
+        setFindBarOpen(true);
+        requestAnimationFrame(() => findInputRef.current?.focus());
       }
-
-      onSelectTracks(new Set([targetIndex]));
-      setAnchorIndex(targetIndex);
-
-      requestAnimationFrame(() => {
-        containerRef.current
-          ?.querySelector<HTMLElement>(
-            `tr[data-track-index=\"${targetIndex}\"]`,
-          )
-          ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      });
-    },
-    [jumpRowInput, tracks, normalizedQuery, visibleTracks, onSelectTracks],
-  );
+    };
+    container.addEventListener("keydown", handleKeyDown);
+    return () => container.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   if (tracks.length === 0) {
     return (
@@ -528,35 +558,13 @@ function PlaylistView({
     <div
       ref={containerRef}
       className={`playlist-view${isDroppingFiles ? " drop-zone-active" : ""}`}
+      tabIndex={-1}
     >
       {isDroppingFiles && (
         <div className="drop-overlay">
           <span>Drop audio files to add to playlist</span>
         </div>
       )}
-      <div className="playlist-findbar">
-        <input
-          className="playlist-find-input"
-          value={findQuery}
-          onChange={(e) => setFindQuery(e.target.value)}
-          placeholder="Find in playlist..."
-        />
-        <form className="playlist-jump-form" onSubmit={handleJumpToRow}>
-          <label htmlFor="playlist-jump-row">Row</label>
-          <input
-            id="playlist-jump-row"
-            className="playlist-jump-input"
-            value={jumpRowInput}
-            onChange={(e) =>
-              setJumpRowInput(e.target.value.replace(/[^0-9]/g, ""))
-            }
-            placeholder="#"
-          />
-          <button type="submit" className="playlist-jump-btn">
-            Go
-          </button>
-        </form>
-      </div>
       <table className="track-table">
         <thead>
           <tr>
@@ -604,7 +612,7 @@ function PlaylistView({
           </tr>
         </thead>
         <tbody>
-          {visibleTracks.map((track) => {
+          {tracks.map((track) => {
             const isCurrent = track.index === currentIndex;
             const isSelected = selectedIndices.has(track.index);
             const isDragging = track.index === dragIndex;
@@ -617,11 +625,16 @@ function PlaylistView({
               editingCell?.trackIndex === track.index &&
               editingCell?.field === "title";
             const displayPath = formatTrackPathForDisplay(track.path);
+            const matchPos = findMatchIndices.indexOf(track.index);
+            const isFindMatch = matchPos !== -1;
+            const isFindCurrent = isFindMatch && matchPos === findCurrentMatch;
             let className = "track-row";
             if (isSelected) className += " selected";
             if (isCurrent) className += " current";
             if (isDragging) className += " dragging";
             if (isDropTarget) className += " drop-target";
+            if (isFindMatch) className += " find-match";
+            if (isFindCurrent) className += " find-current";
             return (
               <tr
                 key={track.index}
@@ -703,16 +716,61 @@ function PlaylistView({
           })}
         </tbody>
       </table>
-      {normalizedQuery && visibleTracks.length === 0 && (
-        <div className="playlist-find-empty">
-          No tracks match "{findQuery}".
-        </div>
-      )}
       <div className="playlist-toolbar">
         <button className="add-files-btn" onClick={onAddFiles}>
           + Add Files
         </button>
       </div>
+      {findBarOpen && (
+        <div className="playlist-findbar">
+          <input
+            ref={findInputRef}
+            className="playlist-find-input"
+            value={findQuery}
+            onChange={(e) => setFindQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (e.shiftKey) handleFindPrev();
+                else handleFindNext();
+              } else if (e.key === "Escape") {
+                handleFindClose();
+              }
+            }}
+            placeholder="Find in playlist..."
+          />
+          <span className="find-match-count">
+            {normalizedQuery
+              ? findMatchIndices.length > 0
+                ? `${findCurrentMatch + 1} of ${findMatchIndices.length}`
+                : "No matches"
+              : ""}
+          </span>
+          <button
+            className="find-nav-btn"
+            onClick={handleFindPrev}
+            disabled={findMatchIndices.length === 0}
+            title="Previous match (Shift+Enter)"
+          >
+            {"\u25B2"}
+          </button>
+          <button
+            className="find-nav-btn"
+            onClick={handleFindNext}
+            disabled={findMatchIndices.length === 0}
+            title="Next match (Enter)"
+          >
+            {"\u25BC"}
+          </button>
+          <button
+            className="find-close-btn"
+            onClick={handleFindClose}
+            title="Close (Escape)"
+          >
+            {"\u2715"}
+          </button>
+        </div>
+      )}
       {contextMenu && (
         <div
           className="playlist-context-menu"
