@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { cleanPath } from "./pathUtils";
 import type { PlaylistInfo, PlaylistProfileInfo, TrackInfo } from "./types";
 import PlaylistView from "./PlaylistView";
@@ -416,13 +416,66 @@ function App() {
 
   const handleSearchFilename = useCallback((filename: string) => {
     setShowFileBrowser(true);
-    setFileSearchSeed(filename);
+    setFileSearchSeed(filename.replace(/\.[^.]+$/, ""));
   }, []);
+
+  const handleOpenPlaylistFile = useCallback(async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: "Playlist Files", extensions: ["m3u", "m3u8"] }],
+      });
+      if (!selected || Array.isArray(selected)) return;
+      const importedName = await invoke<string>("import_m3u_playlist", {
+        filePath: cleanPath(selected),
+      });
+      await loadPlaylists();
+      setSelectedPlaylist(importedName);
+    } catch (e) {
+      console.error("Failed to open playlist file:", e);
+    }
+  }, [loadPlaylists]);
+
+  const handleSavePlaylistFile = useCallback(async () => {
+    if (!selectedPlaylist) return;
+    try {
+      await invoke<string>("export_playlist_to_m3u", {
+        playlistName: selectedPlaylist,
+        filePath: null,
+      });
+      await loadPlaylists();
+    } catch (e) {
+      console.error("Failed to save playlist file:", e);
+    }
+  }, [selectedPlaylist, loadPlaylists]);
+
+  const handleSavePlaylistFileAs = useCallback(async () => {
+    if (!selectedPlaylist) return;
+    try {
+      const target = await save({
+        filters: [{ name: "Playlist Files", extensions: ["m3u", "m3u8"] }],
+        defaultPath: `${selectedPlaylist}.m3u8`,
+      });
+      if (!target) return;
+      await invoke<string>("export_playlist_to_m3u", {
+        playlistName: selectedPlaylist,
+        filePath: cleanPath(target),
+      });
+      await loadPlaylists();
+    } catch (e) {
+      console.error("Failed to save playlist as:", e);
+    }
+  }, [selectedPlaylist, loadPlaylists]);
 
   return (
     <div className="app">
       <header className="header">
         <h1>signalFlow</h1>
+        <nav className="menu-bar" aria-label="Main menu">
+          <button className="menu-btn" onClick={handleOpenPlaylistFile}>Open Playlist…</button>
+          <button className="menu-btn" onClick={handleSavePlaylistFile} disabled={!selectedPlaylist}>Save Playlist</button>
+          <button className="menu-btn" onClick={handleSavePlaylistFileAs} disabled={!selectedPlaylist}>Save Playlist As…</button>
+        </nav>
         <div className="playlist-selector">
           {playlists.map((pl) => (
             <button
@@ -516,49 +569,49 @@ function App() {
               onClick={() => setShowFileBrowser((v) => !v)}
               title="Toggle file browser"
             >
-              📂
+              <span className="sidebar-icon">📂</span><span className="sidebar-label">Files</span>
             </button>
             <button
               className={`sidebar-btn ${showSchedulePane ? "active" : ""}`}
               onClick={() => setShowSchedulePane((v) => !v)}
               title="Toggle schedule"
             >
-              ⏰
+              <span className="sidebar-icon">⏰</span><span className="sidebar-label">Schedule</span>
             </button>
             <button
               className="sidebar-btn"
               onClick={() => setShowAdConfig(true)}
               title="Ad Configuration"
             >
-              📢
+              <span className="sidebar-icon">📢</span><span className="sidebar-label">Ads</span>
             </button>
             <button
               className="sidebar-btn"
               onClick={() => setShowAdStats(true)}
               title="Ad Statistics"
             >
-              📊
+              <span className="sidebar-icon">📊</span><span className="sidebar-label">Stats</span>
             </button>
             <button
               className="sidebar-btn"
               onClick={() => setShowRdsConfig(true)}
               title="RDS Configuration"
             >
-              📻
+              <span className="sidebar-icon">📻</span><span className="sidebar-label">RDS</span>
             </button>
             <button
               className="sidebar-btn"
               onClick={requestOpenFind}
               title="Find in playlist (Ctrl+F)"
             >
-              🔍
+              <span className="sidebar-icon">🔍</span><span className="sidebar-label">Find</span>
             </button>
             <button
               className="sidebar-btn"
               onClick={() => setShowSettings(true)}
               title="Options / Settings"
             >
-              ⚙
+              <span className="sidebar-icon">⚙</span><span className="sidebar-label">Settings</span>
             </button>
           </aside>
           {showFileBrowser && (
