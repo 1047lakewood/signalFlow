@@ -28,6 +28,28 @@ const COL_WIDTHS_KEY = "signalflow-col-widths";
 const DEFAULT_COL_WIDTHS: ColWidths = { num: 40, status: 36, artist: 220, path: 260, duration: 70 };
 const MIN_COL_WIDTHS: ColWidths = { num: 30, status: 24, artist: 60, path: 120, duration: 50 };
 
+function formatTrackPathForDisplay(path: string): string {
+  const uncAdminShare = path.match(/^\\\\[^\\]+\\([A-Za-z])\$\\(.*)$/);
+  if (uncAdminShare) {
+    return `${uncAdminShare[1].toUpperCase()}:\\${uncAdminShare[2]}`;
+  }
+
+  if (path.startsWith("\\\\?\\")) {
+    const withoutVerbatimPrefix = path.slice(4);
+
+    const verbatimAdminShare = withoutVerbatimPrefix.match(/^UNC\\[^\\]+\\([A-Za-z])\$\\(.*)$/);
+    if (verbatimAdminShare) {
+      return `${verbatimAdminShare[1].toUpperCase()}:\\${verbatimAdminShare[2]}`;
+    }
+
+    if (/^[A-Za-z]:\\/.test(withoutVerbatimPrefix)) {
+      return withoutVerbatimPrefix;
+    }
+  }
+
+  return path;
+}
+
 interface PlaylistViewProps {
   tracks: TrackInfo[];
   currentIndex: number | null;
@@ -77,6 +99,7 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
           track.artist,
           track.title,
           track.path,
+          formatTrackPathForDisplay(track.path),
           track.duration_display,
         ]
           .join(" ")
@@ -472,6 +495,7 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
             const isDropTarget = track.index === dropTarget && dropTarget !== dragIndex;
             const isEditingArtist = editingCell?.trackIndex === track.index && editingCell?.field === "artist";
             const isEditingTitle = editingCell?.trackIndex === track.index && editingCell?.field === "title";
+            const displayPath = formatTrackPathForDisplay(track.path);
             let className = "track-row";
             if (isSelected) className += " selected";
             if (isCurrent) className += " current";
@@ -539,7 +563,7 @@ function PlaylistView({ tracks, currentIndex, playlistName, selectedIndices, cli
                     track.title
                   )}
                 </td>
-                <td className="col-path" title={track.path}>{track.path}</td>
+                <td className="col-path" title={displayPath}>{displayPath}</td>
                 <td className="col-duration">{track.duration_display}</td>
               </tr>
             );
