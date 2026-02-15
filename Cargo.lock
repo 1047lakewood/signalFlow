@@ -3857,6 +3857,7 @@ name = "signal_flow"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "dirs",
  "fastrand",
  "lofty",
  "printpdf",
@@ -3878,6 +3879,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
+ "tokio",
 ]
 
 [[package]]

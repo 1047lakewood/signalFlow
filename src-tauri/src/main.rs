@@ -301,8 +301,10 @@ fn get_audio_level(state: State<AppState>) -> f32 {
 // ── Waveform ────────────────────────────────────────────────────────────────
 
 #[tauri::command]
-fn get_waveform(path: String) -> Result<Vec<f32>, String> {
-    AppCore::get_waveform(&path)
+async fn get_waveform(path: String) -> Result<Vec<f32>, String> {
+    tokio::task::spawn_blocking(move || AppCore::get_waveform(&path))
+        .await
+        .map_err(|e| format!("Waveform task failed: {}", e))?
 }
 
 // ── Schedule ────────────────────────────────────────────────────────────────

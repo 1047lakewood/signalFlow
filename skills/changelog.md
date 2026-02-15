@@ -1,3 +1,9 @@
+## 2026-02-15 — Fix window freeze during waveform generation
+- Replaced full-file `collect()` in `generate_peaks()` with streaming iteration — memory drops from ~100MB to ~1KB per track.
+- Added disk cache for waveform peaks (`<data_dir>/signalFlow/waveform_cache/`), keyed by path+size+mtime. 800 bytes per cached track.
+- Made `get_waveform` Tauri command async with `tokio::task::spawn_blocking` so decode never blocks a tokio worker thread.
+- Added `dirs` dep to core crate, `tokio` dep to Tauri crate.
+
 ## 2026-02-15 — Phase O/P file-browser + layout completion
 - Added indexed-location/favorites persistence to engine config (`indexed_locations`, `favorite_folders`) with new AppCore/Tauri setters.
 - Implemented file browser APIs for directory listing and indexed filename search (`list_directory`, `search_indexed_files`).

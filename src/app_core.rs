@@ -721,7 +721,7 @@ impl AppCore {
     // ── Waveform ────────────────────────────────────────────────────────
 
     pub fn get_waveform(path: &str) -> Result<Vec<f32>, String> {
-        crate::waveform::generate_peaks_default(Path::new(path))
+        crate::waveform::generate_peaks_cached(Path::new(path))
     }
 
     // ── Schedule ────────────────────────────────────────────────────────
