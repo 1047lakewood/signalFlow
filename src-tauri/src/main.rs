@@ -5,7 +5,7 @@ use signal_flow::app_core::{
     AdData, AppCore, ConfigData, LogEntry, PlaylistData, RdsConfigData, ScheduleEventData,
     StatusData, TrackData, TransportData,
 };
-use signal_flow::audio_runtime::{AudioEvent, AudioHandle, spawn_audio_runtime};
+use signal_flow::audio_runtime::{spawn_audio_runtime, AudioEvent, AudioHandle};
 use signal_flow::level_monitor::LevelMonitor;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -370,6 +370,32 @@ fn set_conflict_policy(state: State<AppState>, policy: String) -> Result<(), Str
 }
 
 #[tauri::command]
+fn set_stream_output(
+    state: State<AppState>,
+    enabled: bool,
+    endpoint_url: String,
+) -> Result<(), String> {
+    state
+        .core
+        .lock()
+        .unwrap()
+        .set_stream_output(enabled, endpoint_url)
+}
+
+#[tauri::command]
+fn set_recording(
+    state: State<AppState>,
+    enabled: bool,
+    output_dir: Option<String>,
+) -> Result<(), String> {
+    state
+        .core
+        .lock()
+        .unwrap()
+        .set_recording(enabled, output_dir)
+}
+
+#[tauri::command]
 fn set_nowplaying_path(state: State<AppState>, path: Option<String>) -> Result<(), String> {
     state.core.lock().unwrap().set_nowplaying_path(path)
 }
@@ -686,6 +712,8 @@ fn main() {
             set_intros_folder,
             set_recurring_intro,
             set_conflict_policy,
+            set_stream_output,
+            set_recording,
             set_nowplaying_path,
         ])
         .run(tauri::generate_context!())

@@ -13,6 +13,40 @@ fn default_duck_volume() -> f32 {
     0.3
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamOutputConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub endpoint_url: String,
+}
+
+impl Default for StreamOutputConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            endpoint_url: String::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecordingConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub output_dir: Option<String>,
+}
+
+impl Default for RecordingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            output_dir: None,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Engine {
     pub playlists: Vec<Playlist>,
@@ -57,6 +91,12 @@ pub struct Engine {
     /// RDS (Radio Data System) message rotation configuration.
     #[serde(default)]
     pub rds: RdsConfig,
+    /// Internet stream relay output (ffmpeg-based sidecar).
+    #[serde(default)]
+    pub stream_output: StreamOutputConfig,
+    /// Daily playback recording output settings.
+    #[serde(default)]
+    pub recording: RecordingConfig,
     /// Runtime-only: path to the state file. Not serialized.
     #[serde(skip)]
     state_path: Option<PathBuf>,
@@ -81,6 +121,8 @@ impl Engine {
             ad_inserter: AdInserterSettings::default(),
             lecture_detector: LectureDetector::new(),
             rds: RdsConfig::default(),
+            stream_output: StreamOutputConfig::default(),
+            recording: RecordingConfig::default(),
             state_path: None,
         }
     }
@@ -123,8 +165,7 @@ impl Engine {
         };
         if let Some(parent) = path.parent() {
             if !parent.exists() {
-                fs::create_dir_all(parent)
-                    .map_err(|e| format!("Create dir error: {}", e))?;
+                fs::create_dir_all(parent).map_err(|e| format!("Create dir error: {}", e))?;
             }
         }
         let json =
@@ -178,7 +219,11 @@ impl Engine {
     }
 
     /// Copy tracks from a playlist by indices (0-based). Returns cloned tracks.
-    pub fn copy_tracks(&self, from_name: &str, indices: &[usize]) -> Result<Vec<crate::track::Track>, String> {
+    pub fn copy_tracks(
+        &self,
+        from_name: &str,
+        indices: &[usize],
+    ) -> Result<Vec<crate::track::Track>, String> {
         let pl = self
             .find_playlist(from_name)
             .ok_or_else(|| format!("Playlist '{}' not found", from_name))?;
@@ -187,7 +232,9 @@ impl Engine {
             if idx >= pl.tracks.len() {
                 return Err(format!(
                     "Index {} out of range (playlist '{}' has {} tracks)",
-                    idx, from_name, pl.tracks.len()
+                    idx,
+                    from_name,
+                    pl.tracks.len()
                 ));
             }
             tracks.push(pl.tracks[idx].clone());
@@ -224,17 +271,12 @@ impl Engine {
             .find_playlist_mut(playlist_name)
             .ok_or_else(|| format!("Playlist '{}' not found", playlist_name))?;
         let track_count = pl.tracks.len();
-        let track = pl
-            .tracks
-            .get_mut(track_index)
-            .ok_or_else(|| {
-                format!(
-                    "Track index {} out of range (playlist '{}' has {} tracks)",
-                    track_index,
-                    playlist_name,
-                    track_count
-                )
-            })?;
+        let track = pl.tracks.get_mut(track_index).ok_or_else(|| {
+            format!(
+                "Track index {} out of range (playlist '{}' has {} tracks)",
+                track_index, playlist_name, track_count
+            )
+        })?;
         track.write_tags(new_artist, new_title)
     }
 
@@ -269,9 +311,10 @@ impl Engine {
     /// Toggle an ad's enabled state. Returns the new state.
     pub fn toggle_ad(&mut self, index: usize) -> Result<bool, String> {
         let len = self.ads.len();
-        let ad = self.ads.get_mut(index).ok_or_else(|| {
-            format!("Ad index {} out of range ({} ads)", index, len)
-        })?;
+        let ad = self
+            .ads
+            .get_mut(index)
+            .ok_or_else(|| format!("Ad index {} out of range ({} ads)", index, len))?;
         ad.enabled = !ad.enabled;
         Ok(ad.enabled)
     }
@@ -303,10 +346,7 @@ impl Engine {
     /// Check if there is a next track in the active playlist.
     pub fn has_next_track(&self) -> bool {
         self.active_playlist()
-            .and_then(|pl| {
-                pl.current_index
-                    .map(|idx| idx + 1 < pl.tracks.len())
-            })
+            .and_then(|pl| pl.current_index.map(|idx| idx + 1 < pl.tracks.len()))
             .unwrap_or(false)
     }
 
@@ -416,6 +456,31 @@ mod tests {
         assert_eq!(engine.silence_duration_secs, 0.0);
     }
 
+    #[test]
+    fn stream_and_recording_defaults() {
+        let engine = Engine::new();
+        assert!(!engine.stream_output.enabled);
+        assert!(engine.stream_output.endpoint_url.is_empty());
+        assert!(!engine.recording.enabled);
+        assert!(engine.recording.output_dir.is_none());
+    }
+
+    #[test]
+    fn stream_and_recording_survive_serialization() {
+        let mut engine = Engine::new();
+        engine.stream_output.enabled = true;
+        engine.stream_output.endpoint_url = "icecast://example/live".to_string();
+        engine.recording.enabled = true;
+        engine.recording.output_dir = Some("/tmp/records".to_string());
+
+        let json = serde_json::to_string(&engine).unwrap();
+        let loaded: Engine = serde_json::from_str(&json).unwrap();
+        assert!(loaded.stream_output.enabled);
+        assert_eq!(loaded.stream_output.endpoint_url, "icecast://example/live");
+        assert!(loaded.recording.enabled);
+        assert_eq!(loaded.recording.output_dir.as_deref(), Some("/tmp/records"));
+    }
+
     fn make_track(name: &str) -> crate::track::Track {
         crate::track::Track {
             path: format!("{}.mp3", name).into(),
@@ -492,7 +557,9 @@ mod tests {
     #[test]
     fn paste_tracks_bad_name_errors() {
         let mut engine = Engine::new();
-        assert!(engine.paste_tracks("Ghost", vec![make_track("A")], None).is_err());
+        assert!(engine
+            .paste_tracks("Ghost", vec![make_track("A")], None)
+            .is_err());
     }
 
     #[test]
@@ -688,7 +755,10 @@ mod tests {
         let mut engine = Engine::new();
         engine.rds.ip = "10.0.0.1".to_string();
         engine.rds.port = 5000;
-        engine.rds.messages.push(crate::rds::RdsMessage::new("Test"));
+        engine
+            .rds
+            .messages
+            .push(crate::rds::RdsMessage::new("Test"));
         let json = serde_json::to_string(&engine).unwrap();
         let loaded: Engine = serde_json::from_str(&json).unwrap();
         assert_eq!(loaded.rds.ip, "10.0.0.1");

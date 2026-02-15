@@ -116,14 +116,14 @@
 
 - [x] Playtime format — Display playtime as `Sun 4:54:25 PM` (day-of-week + 12-hour clock) instead of raw elapsed time
 - [x] File path display — Show drive-letter paths (`D:\Music\...`) instead of UNC paths (`\\UNC\...`) in the file path column
-- [ ] Playlist right-margin padding — Add padding to the last column so text (e.g. "DURATION") doesn't touch the panel edge
-- [ ] Separate Play and Pause buttons — Replace the combined play/pause toggle with distinct Play and Pause buttons; Play should start playback of the currently selected track (even while another track is playing), Pause should pause the current track
-- [ ] Suppress browser context menu — Ensure the default browser right-click context menu never appears anywhere in the app; only show custom context menus where defined
+- [x] Playlist right-margin padding — Add padding to the last column so text (e.g. "DURATION") doesn't touch the panel edge
+- [x] Separate Play and Pause buttons — Replace the combined play/pause toggle with distinct Play and Pause buttons; Play should start playback of the currently selected track (even while another track is playing), Pause should pause the current track
+- [x] Suppress browser context menu — Ensure the default browser right-click context menu never appears anywhere in the app; only show custom context menus where defined
 
 ## Phase N: Streaming & Recording
 
-- [ ] Internet streaming output — Add ability to stream audio output to an internet streaming service (Icecast, Shoutcast, or similar)
-- [ ] Playback recording — Record all playback output to audio files, one file per calendar day; evaluate whether loopback from the streaming service or direct audio capture is the best approach
+- [x] Internet streaming output — Add ability to stream audio output to an internet streaming service (Icecast, Shoutcast, or similar)
+- [x] Playback recording — Record all playback output to audio files, one file per calendar day; evaluate whether loopback from the streaming service or direct audio capture is the best approach
 
 ## Phase O: File Browser Enhancements
 

@@ -1,3 +1,14 @@
+## 2026-02-15 — Phase M/N UI + config plumbing
+- Playlist table: added right padding on the last column to avoid edge-clipped header/cell text in tight layouts.
+- Transport controls: replaced conditional Play/Resume toggle with distinct Play and Pause buttons; Pause is disabled when not applicable.
+- Global context-menu suppression: disabled native browser context menus app-wide to keep only custom in-app menus.
+- Added streaming/recording configuration surfaces:
+  - Engine/AppCore state now persists `stream_output` (enabled + endpoint URL) and `recording` (enabled + output dir).
+  - New Tauri commands: `set_stream_output`, `set_recording`.
+  - Settings window tabs for Streaming and Recording with enable toggles + endpoint/output path controls.
+- Added tests for new Engine/AppCore config defaults, serialization, and setter validation.
+- Validation: GUI build passes; full cargo test blocked in this environment by missing ALSA development libs.
+
 # signalFlow — Changelog
 
 > Maintenance note (2026-02-13): treat this as a living design record. Verify behavior against current code and tests before implementation decisions.
