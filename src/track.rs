@@ -14,7 +14,11 @@ pub struct Track {
     #[serde(with = "duration_serde")]
     pub duration: Duration,
     /// Actual playback time (set after track finishes playing).
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "option_duration_serde")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "option_duration_serde"
+    )]
     pub played_duration: Option<Duration>,
     /// Whether an intro file exists for this track's artist.
     #[serde(default)]
@@ -24,10 +28,7 @@ pub struct Track {
 impl Track {
     /// Create a Track by reading metadata from an audio file.
     pub fn from_path(path: &Path) -> Result<Self, String> {
-        // Avoid canonicalize — it resolves mapped drives to UNC paths on Windows
-        // (e.g. G:\Music → \\NAS\share\Music), losing the drive letter the user expects.
-        let path = std::path::absolute(path)
-            .map_err(|e| format!("Invalid path '{}': {}", path.display(), e))?;
+        let path = normalize_input_path(path)?;
 
         let tagged_file = lofty::read_from_path(&path)
             .map_err(|e| format!("Failed to read '{}': {}", path.display(), e))?;
@@ -35,7 +36,9 @@ impl Track {
         let properties = tagged_file.properties();
         let duration = properties.duration();
 
-        let tag = tagged_file.primary_tag().or_else(|| tagged_file.first_tag());
+        let tag = tagged_file
+            .primary_tag()
+            .or_else(|| tagged_file.first_tag());
 
         let tag_title = tag.and_then(|t| t.title().map(|s| s.to_string()));
         let tag_artist = tag.and_then(|t| t.artist().map(|s| s.to_string()));
@@ -111,6 +114,18 @@ impl Track {
 
         Ok(())
     }
+}
+
+fn normalize_input_path(path: &Path) -> Result<PathBuf, String> {
+    // Avoid canonicalize — it resolves mapped drives to UNC paths on Windows
+    // (e.g. G:\Music → \\NAS\share\Music), losing the drive letter the user expects.
+    // Also avoid `absolute` for already-absolute paths, because on Windows it can expand
+    // mapped drive letters into verbatim UNC form (\\?\UNC\...), which leaks into the UI.
+    if path.is_absolute() {
+        return Ok(path.to_path_buf());
+    }
+
+    std::path::absolute(path).map_err(|e| format!("Invalid path '{}': {}", path.display(), e))
 }
 
 /// Format a Duration as M:SS.
@@ -248,6 +263,20 @@ mod tests {
     }
 
     #[test]
+    fn normalize_input_path_makes_relative_paths_absolute() {
+        let path = normalize_input_path(Path::new("nonexistent.mp3")).unwrap();
+        assert!(path.is_absolute());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn normalize_input_path_keeps_windows_drive_prefix() {
+        let input = Path::new(r"G:\Music\track.mp3");
+        let path = normalize_input_path(input).unwrap();
+        assert_eq!(path, PathBuf::from(r"G:\Music\track.mp3"));
+    }
+
+    #[test]
     fn parse_filename_artist_dash_title() {
         let (artist, title) = parse_filename(Path::new("Cool Band - Great Song.mp3"));
         assert_eq!(artist, "Cool Band");
@@ -274,7 +303,10 @@ mod tests {
         track.played_duration = Some(Duration::new(120, 500_000_000));
         let json = serde_json::to_string(&track).unwrap();
         let loaded: Track = serde_json::from_str(&json).unwrap();
-        assert_eq!(loaded.played_duration, Some(Duration::new(120, 500_000_000)));
+        assert_eq!(
+            loaded.played_duration,
+            Some(Duration::new(120, 500_000_000))
+        );
     }
 
     #[test]
@@ -294,14 +326,16 @@ mod tests {
 
     #[test]
     fn has_intro_defaults_when_missing_from_json() {
-        let json = r#"{"path":"test.mp3","title":"T","artist":"A","duration":{"secs":60,"nanos":0}}"#;
+        let json =
+            r#"{"path":"test.mp3","title":"T","artist":"A","duration":{"secs":60,"nanos":0}}"#;
         let track: Track = serde_json::from_str(json).unwrap();
         assert!(!track.has_intro);
     }
 
     #[test]
     fn played_duration_defaults_when_missing() {
-        let json = r#"{"path":"test.mp3","title":"T","artist":"A","duration":{"secs":60,"nanos":0}}"#;
+        let json =
+            r#"{"path":"test.mp3","title":"T","artist":"A","duration":{"secs":60,"nanos":0}}"#;
         let track: Track = serde_json::from_str(json).unwrap();
         assert!(track.played_duration.is_none());
     }
