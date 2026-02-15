@@ -103,8 +103,10 @@ function WaveformDisplay({ trackPath, elapsed, duration, isPlaying, onSeek }: Wa
     }
   }, [peaks, elapsed, duration, isPlaying]);
 
-  // Handle click-to-seek
-  const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  // Handle left/right click-to-seek
+  const handlePointerSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0 && e.button !== 2) return;
+    e.preventDefault();
     if (duration <= 0) return;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -117,7 +119,8 @@ function WaveformDisplay({ trackPath, elapsed, duration, isPlaying, onSeek }: Wa
     <div
       ref={containerRef}
       className="waveform-display"
-      onClick={handleClick}
+      onMouseDown={handlePointerSeek}
+      onContextMenu={(e) => e.preventDefault()}
       title={loading ? "Loading waveform..." : undefined}
     >
       <canvas ref={canvasRef} className="waveform-canvas" />
