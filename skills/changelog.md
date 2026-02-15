@@ -1,6 +1,13 @@
 # signalFlow — Changelog
 
 > Maintenance note (2026-02-13): treat this as a living design record. Verify behavior against current code and tests before implementation decisions.
+## 2026-02-15 — File Path Display Normalization (Phase M)
+- Completed Phase M todo item for file path display formatting in the playlist table
+- Added frontend-only path normalization for Windows admin-share UNC forms (for example `\\SERVER\D$\Music\track.mp3`) to display as drive-letter paths (`D:\Music\track.mp3`)
+- Added handling for verbatim Windows path prefixes (`\\?\`) so displayed values remain readable
+- Kept original path values unchanged for backend playback and metadata operations; formatting is display-only
+- Updated playlist find behavior so searching can match either raw stored path or formatted display path
+
 ## 2026-02-15 — Playtime Format (Phase M)
 - Completed Phase M todo item for playtime formatting in transport
 - Replaced raw elapsed time text in the transport bar with a playtime clock string formatted as `Sun 4:54:25 PM`
