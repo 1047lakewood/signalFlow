@@ -197,6 +197,7 @@ signalFlow/
   1. **Now-playing panel** — Title (bold, 13px) on top, artist (11px, secondary) below. Shows "No track loaded" when idle.
   2. **Controls + seek** — Play/Pause, Stop, Skip buttons + seek slider with elapsed/remaining time (unchanged from before)
   3. **Next up panel** — "Next" label + artist/title of the upcoming track. Shows dash when no next track.
+- Transport left time label shows current track playtime in day-of-week + 12-hour format (for example, `Sun 4:54:25 PM`) instead of raw elapsed seconds
 - `TransportState` extended with `next_artist: Option<String>` and `next_title: Option<String>`
 - Backend fetches next track from `pl.tracks.get(idx + 1)` in `transport_status`
 - No album art (by design — radio automation doesn't need it)
