@@ -23,6 +23,9 @@ pub enum AudioCmd {
     Pause,
     Resume,
     Seek(Duration),
+    /// Recreate the player on a different output device.
+    /// None = use default device.
+    SetDevice(Option<String>),
     Shutdown,
 }
 
@@ -68,6 +71,10 @@ impl AudioHandle {
         let _ = self.tx.send(AudioCmd::Seek(position));
     }
 
+    pub fn set_device(&self, device_name: Option<String>) {
+        let _ = self.tx.send(AudioCmd::SetDevice(device_name));
+    }
+
     pub fn shutdown(&self) {
         let _ = self.tx.send(AudioCmd::Shutdown);
     }
@@ -79,9 +86,10 @@ impl AudioHandle {
 ///
 /// `on_event` is called from the audio thread whenever a state change occurs.
 /// The caller should use this to update AppCore and emit Tauri events.
+/// `device_name` selects the initial output device (None = system default).
 ///
 /// Returns an `AudioHandle` for sending commands.
-pub fn spawn_audio_runtime<F>(on_event: F) -> AudioHandle
+pub fn spawn_audio_runtime<F>(device_name: Option<String>, on_event: F) -> AudioHandle
 where
     F: Fn(AudioEvent) + Send + 'static,
 {
@@ -90,7 +98,7 @@ where
     std::thread::Builder::new()
         .name("audio-runtime".into())
         .spawn(move || {
-            audio_thread_loop(rx, on_event);
+            audio_thread_loop(rx, device_name, on_event);
         })
         .expect("failed to spawn audio-runtime thread");
 
@@ -98,11 +106,15 @@ where
 }
 
 /// Main loop for the audio thread. Owns the Player.
-fn audio_thread_loop<F>(rx: mpsc::Receiver<AudioCmd>, on_event: F)
-where
+fn audio_thread_loop<F>(
+    rx: mpsc::Receiver<AudioCmd>,
+    initial_device: Option<String>,
+    on_event: F,
+) where
     F: Fn(AudioEvent),
 {
     let mut player: Option<Player> = None;
+    let mut device_name: Option<String> = initial_device;
     let mut was_playing = false;
 
     loop {
@@ -112,7 +124,11 @@ where
                 AudioCmd::Play { path, level_monitor } => {
                     // Lazy-init player on first use
                     if player.is_none() {
-                        match Player::new() {
+                        let result = match &device_name {
+                            Some(name) => Player::new_with_device(name),
+                            None => Player::new(),
+                        };
+                        match result {
                             Ok(p) => player = Some(p),
                             Err(e) => {
                                 on_event(AudioEvent::PlayError(e));
@@ -172,6 +188,31 @@ where
                     }
                 }
 
+                AudioCmd::SetDevice(new_device) => {
+                    // Stop current playback before switching device
+                    if let Some(p) = player.take() {
+                        p.stop();
+                    }
+                    was_playing = false;
+                    device_name = new_device;
+                    // Create a new player on the requested device
+                    let result = match &device_name {
+                        Some(name) => Player::new_with_device(name),
+                        None => Player::new(),
+                    };
+                    match result {
+                        Ok(p) => {
+                            player = Some(p);
+                        }
+                        Err(e) => {
+                            on_event(AudioEvent::PlayError(format!(
+                                "Device switch failed: {}",
+                                e
+                            )));
+                        }
+                    }
+                }
+
                 AudioCmd::Shutdown => {
                     if let Some(p) = &player {
                         p.stop();
@@ -215,7 +256,7 @@ mod tests {
 
     #[test]
     fn shutdown_stops_thread() {
-        let handle = spawn_audio_runtime(|_| {});
+        let handle = spawn_audio_runtime(None, |_| {});
         handle.shutdown();
         // Give the thread time to exit
         std::thread::sleep(Duration::from_millis(100));
@@ -227,7 +268,7 @@ mod tests {
         let events: Arc<Mutex<Vec<AudioEvent>>> = Arc::new(Mutex::new(Vec::new()));
         let events_clone = events.clone();
 
-        let handle = spawn_audio_runtime(move |evt| {
+        let handle = spawn_audio_runtime(None, move |evt| {
             events_clone.lock().unwrap().push(evt);
         });
 
@@ -253,7 +294,7 @@ mod tests {
         let events: Arc<Mutex<Vec<AudioEvent>>> = Arc::new(Mutex::new(Vec::new()));
         let events_clone = events.clone();
 
-        let handle = spawn_audio_runtime(move |evt| {
+        let handle = spawn_audio_runtime(None, move |evt| {
             events_clone.lock().unwrap().push(evt);
         });
 

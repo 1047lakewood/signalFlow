@@ -369,6 +369,21 @@ fn get_config(state: State<AppState>) -> ConfigData {
 }
 
 #[tauri::command]
+fn list_output_devices(state: State<AppState>) -> Vec<String> {
+    state.core.lock().unwrap().list_output_devices()
+}
+
+#[tauri::command]
+fn set_output_device(
+    state: State<AppState>,
+    name: Option<String>,
+) -> Result<(), String> {
+    state.core.lock().unwrap().set_output_device(name.clone())?;
+    state.audio.set_device(name);
+    Ok(())
+}
+
+#[tauri::command]
 fn set_crossfade(state: State<AppState>, secs: f32) -> Result<(), String> {
     state.core.lock().unwrap().set_crossfade(secs)
 }
@@ -645,9 +660,10 @@ fn main() {
             let audio_for_callback: Arc<Mutex<Option<AudioHandle>>> = Arc::new(Mutex::new(None));
 
             // Spawn audio runtime with event callback
+            let initial_device = core.lock().unwrap().get_config().output_device_name;
             let core_for_audio = core.clone();
             let audio_for_callback_clone = audio_for_callback.clone();
-            let audio = spawn_audio_runtime(move |event| {
+            let audio = spawn_audio_runtime(initial_device, move |event| {
                 match event {
                     AudioEvent::TrackFinished => {
                         let next_track = {
@@ -773,6 +789,8 @@ fn main() {
             set_indexed_locations,
             set_favorite_folders,
             set_nowplaying_path,
+            list_output_devices,
+            set_output_device,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

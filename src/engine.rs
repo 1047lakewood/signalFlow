@@ -112,6 +112,9 @@ pub struct Engine {
     /// Saved named profiles of open playlists.
     #[serde(default)]
     pub playlist_profiles: Vec<PlaylistProfile>,
+    /// Preferred audio output device name (None = system default).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_device_name: Option<String>,
     /// Runtime-only: path to the state file. Not serialized.
     #[serde(skip)]
     state_path: Option<PathBuf>,
@@ -141,6 +144,7 @@ impl Engine {
             indexed_locations: Vec::new(),
             favorite_folders: Vec::new(),
             playlist_profiles: Vec::new(),
+            output_device_name: None,
             state_path: None,
         }
     }

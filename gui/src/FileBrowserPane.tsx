@@ -143,18 +143,18 @@ function FileBrowserPane({
       </div>
       <div className="file-browser-content">
         <div className="file-browser-toolbar">
-          <select
-            className="file-browser-select"
-            value={currentPath ?? ""}
-            onChange={(e) => setCurrentPath(e.target.value || null)}
-          >
-            <option value="">Current directory</option>
+          <div className="file-browser-drives">
             {indexedLocations.map((loc) => (
-              <option key={loc} value={loc}>
-                {loc}
-              </option>
+              <button
+                key={loc}
+                className={`drive-btn ${currentPath === loc ? "active" : ""}`}
+                title={loc}
+                onClick={() => setCurrentPath(loc)}
+              >
+                {loc.match(/^([A-Za-z]):[/\\]?/)?.[1]?.toUpperCase() ?? loc}
+              </button>
             ))}
-          </select>
+          </div>
           <input
             className="file-browser-search"
             value={searchQuery}

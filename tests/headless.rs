@@ -514,7 +514,7 @@ fn audio_runtime_stop_emits_event() {
     let events: Arc<Mutex<Vec<AudioEvent>>> = Arc::new(Mutex::new(Vec::new()));
     let events_clone = events.clone();
 
-    let handle = spawn_audio_runtime(move |evt| {
+    let handle = spawn_audio_runtime(None, move |evt| {
         events_clone.lock().unwrap().push(evt);
     });
 
@@ -532,7 +532,7 @@ fn audio_runtime_play_bad_file_emits_error() {
     let events: Arc<Mutex<Vec<AudioEvent>>> = Arc::new(Mutex::new(Vec::new()));
     let events_clone = events.clone();
 
-    let handle = spawn_audio_runtime(move |evt| {
+    let handle = spawn_audio_runtime(None, move |evt| {
         events_clone.lock().unwrap().push(evt);
     });
 
@@ -552,7 +552,7 @@ fn audio_runtime_play_bad_file_emits_error() {
 
 #[test]
 fn audio_runtime_shutdown_is_clean() {
-    let handle = spawn_audio_runtime(|_| {});
+    let handle = spawn_audio_runtime(None, |_| {});
     handle.shutdown();
     // Give thread time to exit
     std::thread::sleep(Duration::from_millis(100));

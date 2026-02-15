@@ -349,6 +349,7 @@ body {
 .col-duration {
   width: 70px;
   text-align: right;
+  padding-right: 8px;
   font-variant-numeric: tabular-nums;
   color: var(--text-secondary);
 }
@@ -2168,7 +2169,29 @@ body {
   gap: 6px;
   padding: 8px;
 }
-.file-browser-select,
+.file-browser-drives {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.drive-btn {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 12px;
+}
+.drive-btn:hover {
+  background: var(--bg-hover);
+}
+.drive-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
 .file-browser-search {
   width: 100%;
   background: var(--bg-primary);

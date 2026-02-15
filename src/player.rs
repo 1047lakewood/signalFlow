@@ -1,10 +1,9 @@
 use crate::level_monitor::{LevelMonitor, LevelSource};
 use crate::silence::{SilenceDetector, SilenceMonitor};
-use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
+use rodio::{cpal, Decoder, DeviceTrait, OutputStream, OutputStreamHandle, Sink, Source};
 use std::fs::File;
 use std::io::BufReader;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 /// Runtime audio player wrapping rodio. Not serializable — created fresh per session.
@@ -15,10 +14,24 @@ pub struct Player {
 }
 
 impl Player {
-    /// Initialize audio output and create a playback sink.
+    /// Initialize audio output on the default device.
     pub fn new() -> Result<Self, String> {
         let (stream, handle) = OutputStream::try_default()
             .map_err(|e| format!("Failed to open audio output: {}", e))?;
+        let sink =
+            Sink::try_new(&handle).map_err(|e| format!("Failed to create audio sink: {}", e))?;
+        Ok(Player {
+            _stream: stream,
+            stream_handle: handle,
+            sink,
+        })
+    }
+
+    /// Initialize audio output on a specific named device.
+    pub fn new_with_device(device_name: &str) -> Result<Self, String> {
+        let device = find_output_device(device_name)?;
+        let (stream, handle) = OutputStream::try_from_device(&device)
+            .map_err(|e| format!("Failed to open device '{}': {}", device_name, e))?;
         let sink =
             Sink::try_new(&handle).map_err(|e| format!("Failed to create audio sink: {}", e))?;
         Ok(Player {
@@ -624,6 +637,38 @@ fn start_track(
 /// Check if a silence monitor has triggered.
 fn check_silence(monitor: &Option<SilenceMonitor>) -> bool {
     monitor.as_ref().map_or(false, |m| m.is_silent())
+}
+
+/// List the names of all available audio output devices.
+pub fn list_output_devices() -> Vec<String> {
+    use cpal::traits::HostTrait;
+    let host = cpal::default_host();
+    let mut names = Vec::new();
+    if let Ok(devices) = host.output_devices() {
+        for d in devices {
+            if let Ok(name) = d.name() {
+                names.push(name);
+            }
+        }
+    }
+    names
+}
+
+/// Find an output device by name.
+fn find_output_device(name: &str) -> Result<cpal::Device, String> {
+    use cpal::traits::HostTrait;
+    let host = cpal::default_host();
+    let devices = host
+        .output_devices()
+        .map_err(|e| format!("Cannot enumerate audio devices: {}", e))?;
+    for d in devices {
+        if let Ok(n) = d.name() {
+            if n == name {
+                return Ok(d);
+            }
+        }
+    }
+    Err(format!("Audio device '{}' not found", name))
 }
 
 #[cfg(test)]

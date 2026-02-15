@@ -1,3 +1,20 @@
+## 2026-02-15 — Phase Q: UI Polish
+
+### Duration column right padding
+- Added `padding-right: 8px` to `.col-duration` so text doesn't touch the window edge.
+
+### File browser drive buttons
+- Replaced the `<select>` dropdown for indexed locations with individual drive-letter buttons.
+- Active button highlights with accent color.
+
+### Output device selector
+- Added `output_device_name: Option<String>` to Engine config (persisted to JSON).
+- `Player::new_with_device()` opens a specific output device via `OutputStream::try_from_device()`.
+- `AudioCmd::SetDevice` command in audio runtime: stops playback, recreates player on new device.
+- `spawn_audio_runtime()` now takes initial device name so first play uses the saved device.
+- New Tauri commands: `list_output_devices`, `set_output_device`.
+- New "Audio Output" tab in Settings with a dropdown listing all available output devices.
+
 ## 2026-02-15 — Fix UNC paths showing instead of mapped drive letters
 - `list_directory()` and `collect_matches()` now use `parent.join(entry.file_name())` instead of `entry.path()`, preserving the user-provided drive letter on Windows mapped drives.
 - `normalize_input_path()` strips `\\?\UNC\` verbatim prefix as a safety net.

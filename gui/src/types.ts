@@ -61,6 +61,7 @@ export interface ConfigResponse {
   recording_output_dir: string | null;
   indexed_locations: string[];
   favorite_folders: string[];
+  output_device_name: string | null;
 }
 
 export interface AdInfo {

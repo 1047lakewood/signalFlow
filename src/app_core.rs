@@ -182,6 +182,7 @@ pub struct ConfigData {
     pub recording_output_dir: Option<String>,
     pub indexed_locations: Vec<String>,
     pub favorite_folders: Vec<String>,
+    pub output_device_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -332,7 +333,19 @@ impl AppCore {
             recording_output_dir: self.engine.recording.output_dir.clone(),
             indexed_locations: self.engine.indexed_locations.clone(),
             favorite_folders: self.engine.favorite_folders.clone(),
+            output_device_name: self.engine.output_device_name.clone(),
         }
+    }
+
+    // ── Audio Device ────────────────────────────────────────────────────
+
+    pub fn list_output_devices(&self) -> Vec<String> {
+        crate::player::list_output_devices()
+    }
+
+    pub fn set_output_device(&mut self, name: Option<String>) -> Result<(), String> {
+        self.engine.output_device_name = name;
+        self.engine.save()
     }
 
     // ── Playlist CRUD ───────────────────────────────────────────────────

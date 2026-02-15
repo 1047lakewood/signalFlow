@@ -11,6 +11,7 @@ interface SettingsWindowProps {
 
 type TabId =
   | "library"
+  | "audio"
   | "crossfade"
   | "silence"
   | "intro"
@@ -21,6 +22,7 @@ type TabId =
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "library", label: "Library" },
+  { id: "audio", label: "Audio Output" },
   { id: "crossfade", label: "Crossfade" },
   { id: "silence", label: "Silence Detection" },
   { id: "intro", label: "Auto-Intro" },
@@ -71,6 +73,10 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
   const [indexedLocations, setIndexedLocations] = useState<string[]>([]);
   const [favoriteFolders, setFavoriteFolders] = useState<string[]>([]);
 
+  // Audio Output
+  const [outputDevices, setOutputDevices] = useState<string[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
+
   useEffect(() => {
     (async () => {
       try {
@@ -90,6 +96,13 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
         setConflictPolicy(c.conflict_policy);
         setIndexedLocations(c.indexed_locations || []);
         setFavoriteFolders(c.favorite_folders || []);
+        setSelectedDevice(c.output_device_name ?? null);
+        try {
+          const devices = await invoke<string[]>("list_output_devices");
+          setOutputDevices(devices);
+        } catch (e2) {
+          console.error("Failed to list output devices:", e2);
+        }
       } catch (e) {
         console.error("Failed to load config:", e);
       }
@@ -345,6 +358,18 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
     }
   };
 
+  const saveAudioDevice = async () => {
+    setSaving(true);
+    try {
+      await invoke("set_output_device", { name: selectedDevice || null });
+      showSaved();
+    } catch (e) {
+      console.error("Failed to set output device:", e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const saveConflict = async () => {
     setSaving(true);
     try {
@@ -363,6 +388,8 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
     switch (activeTab) {
       case "library":
         return saveLibrary();
+      case "audio":
+        return saveAudioDevice();
       case "crossfade":
         return saveCrossfade();
       case "silence":
@@ -552,6 +579,33 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
                   >
                     Add favorite folder
                   </button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "audio" && (
+              <div className="settings-body">
+                <div className="settings-field">
+                  <label className="settings-label">Output Device</label>
+                  <select
+                    className="settings-select"
+                    value={selectedDevice ?? ""}
+                    onChange={(e) =>
+                      setSelectedDevice(e.target.value || null)
+                    }
+                  >
+                    <option value="">System Default</option>
+                    {outputDevices.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="settings-hint">
+                    {selectedDevice
+                      ? `Using: ${selectedDevice}`
+                      : "Using the system default audio device"}
+                  </span>
                 </div>
               </div>
             )}

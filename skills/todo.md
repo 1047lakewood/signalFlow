@@ -137,6 +137,12 @@
 - [x] Options/settings window — Add a centralized settings/configuration window (discuss and confirm which settings to include before implementing)
 - [x] Header bar declutter — Reduce button density on the header bar by relocating actions to the left sidebar pane; discuss exact layout and grouping before implementing
 
+## Phase Q: UI Polish
+
+- [x] Duration column right padding — Add right padding so the last letter of the DURATION column header doesn't touch the window edge
+- [x] File browser drive buttons — Replace the drive selector combo box with individual buttons for each drive (remove indexed-drive dropdown)
+- [x] Output device selector — Add an audio output device chooser in the Options/Settings window
+
 ## Phase Z: Future / Long-Term
 
 - [ ] Hosted web interface — Browser-based remote control and monitoring
