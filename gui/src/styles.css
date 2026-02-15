@@ -1229,6 +1229,11 @@ body {
   overflow: hidden;
 }
 
+.side-pane-left {
+  border-left: 0;
+  border-right: 1px solid var(--border);
+}
+
 .schedule-pane {
   display: flex;
   flex-direction: column;
@@ -2130,6 +2135,9 @@ body {
   transition: width 0.15s;
   border-right: 1px solid var(--border);
   overflow: hidden;
+}
+.favorites-pane.drop-active {
+  background: color-mix(in srgb, var(--highlight) 20%, transparent);
 }
 .favorites-pane:not(.collapsed) {
   width: 220px;
