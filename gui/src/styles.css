@@ -309,6 +309,11 @@ body {
   color: var(--text-secondary);
 }
 
+.track-table th.col-duration,
+.track-table td.col-duration {
+  padding-right: 18px;
+}
+
 /* ── Status indicators ─────────────────────────────────────────────── */
 
 .playing-indicator {

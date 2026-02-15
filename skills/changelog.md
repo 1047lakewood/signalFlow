@@ -1,6 +1,11 @@
 # signalFlow — Changelog
 
 > Maintenance note (2026-02-13): treat this as a living design record. Verify behavior against current code and tests before implementation decisions.
+## 2026-02-15 — Playlist Right-Margin Padding (Phase M)
+- Completed Phase M todo item for playlist right-margin padding in the track table
+- Added extra right-side padding to the Duration header and cells so last-column text no longer touches the playlist panel edge
+- Kept column resize behavior and persisted width logic unchanged (CSS-only spacing adjustment)
+
 ## 2026-02-15 — File Path Display Normalization (Phase M)
 - Completed Phase M todo item for file path display formatting in the playlist table
 - Added frontend-only path normalization for Windows admin-share UNC forms (for example `\\SERVER\D$\Music\track.mp3`) to display as drive-letter paths (`D:\Music\track.mp3`)
