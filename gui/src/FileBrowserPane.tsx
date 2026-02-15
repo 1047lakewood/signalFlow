@@ -6,6 +6,11 @@ import type {
   FileSearchResult,
 } from "./types";
 
+function formatDriveLabel(path: string): string {
+  const drive = path.match(/^([A-Za-z]):[/\\]?/);
+  return drive ? `${drive[1].toUpperCase()}:\\` : path;
+}
+
 interface FileBrowserPaneProps {
   onAddFiles: (paths: string[]) => void;
   onSearchFilename: (filename: string) => void;
@@ -151,7 +156,7 @@ function FileBrowserPane({
                 title={loc}
                 onClick={() => setCurrentPath(loc)}
               >
-                {loc.match(/^([A-Za-z]):[/\\]?/)?.[1]?.toUpperCase() ?? loc}
+                {formatDriveLabel(loc)}
               </button>
             ))}
           </div>
@@ -198,7 +203,7 @@ function FileBrowserPane({
                   </button>
                   <button
                     className="file-row-action"
-                    onClick={() => onSearchFilename(entry.name)}
+                    onClick={() => onSearchFilename(entry.name.replace(/\.[^.]+$/, ""))}
                   >
                     🔎
                   </button>

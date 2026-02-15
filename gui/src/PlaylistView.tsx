@@ -14,6 +14,7 @@ interface ColWidths {
   status: number;
   artist: number;
   path: number;
+  playtime: number;
   duration: number;
 }
 
@@ -30,6 +31,7 @@ const DEFAULT_COL_WIDTHS: ColWidths = {
   status: 36,
   artist: 220,
   path: 260,
+  playtime: 120,
   duration: 70,
 };
 const MIN_COL_WIDTHS: ColWidths = {
@@ -37,6 +39,7 @@ const MIN_COL_WIDTHS: ColWidths = {
   status: 24,
   artist: 60,
   path: 120,
+  playtime: 90,
   duration: 50,
 };
 
@@ -133,6 +136,7 @@ function PlaylistView({
           track.title,
           track.path,
           formatTrackPathForDisplay(track.path),
+          track.start_time_display ?? "",
           track.duration_display,
         ]
           .join(" ")
@@ -591,6 +595,13 @@ function PlaylistView({
                 onMouseDown={(e) => handleResizeMouseDown(e, "path")}
               />
             </th>
+            <th className="col-playtime" style={{ width: colWidths.playtime }}>
+              Playtime
+              <div
+                className="col-resize-handle"
+                onMouseDown={(e) => handleResizeMouseDown(e, "playtime")}
+              />
+            </th>
             <th className="col-duration" style={{ width: colWidths.duration }}>
               Duration
               <div
@@ -699,6 +710,7 @@ function PlaylistView({
                 <td className="col-path" title={displayPath}>
                   {displayPath}
                 </td>
+                <td className="col-playtime">{track.start_time_display ?? "—"}</td>
                 <td className="col-duration">{track.duration_display}</td>
               </tr>
             );

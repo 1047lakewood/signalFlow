@@ -13,7 +13,7 @@ use crate::ad_scheduler::AdConfig;
 use crate::auto_intro;
 use crate::engine::Engine;
 use crate::rds::{RdsMessage, RdsSchedule};
-use crate::scheduler::{ConflictPolicy, Priority, ScheduleMode, parse_time};
+use crate::scheduler::{parse_time, ConflictPolicy, Priority, ScheduleMode};
 use chrono::Local;
 use serde::Serialize;
 use std::collections::VecDeque;
@@ -163,6 +163,7 @@ pub struct TrackData {
     pub duration_secs: f64,
     pub duration_display: String,
     pub played_duration_secs: Option<f64>,
+    pub start_time_display: Option<String>,
     pub has_intro: bool,
 }
 
@@ -264,6 +265,7 @@ pub struct FileSearchResult {
 pub struct PlaylistProfileData {
     pub name: String,
     pub playlist_names: Vec<String>,
+    pub playlist_paths: Vec<Option<String>>,
 }
 
 // ── AppCore ─────────────────────────────────────────────────────────────────
@@ -432,6 +434,7 @@ impl AppCore {
                     duration_secs: t.duration.as_secs_f64(),
                     duration_display: t.duration_display(),
                     played_duration_secs: t.played_duration.map(|d| d.as_secs_f64()),
+                    start_time_display: t.played_duration_display(),
                     has_intro,
                 }
             })
@@ -985,6 +988,7 @@ impl AppCore {
             .map(|p| PlaylistProfileData {
                 name: p.name.clone(),
                 playlist_names: p.playlist_names.clone(),
+                playlist_paths: p.playlist_paths.clone(),
             })
             .collect()
     }
@@ -1001,6 +1005,12 @@ impl AppCore {
             .iter()
             .map(|p| p.name.clone())
             .collect::<Vec<_>>();
+        let playlist_paths = self
+            .engine
+            .playlists
+            .iter()
+            .map(|p| p.source_path.clone())
+            .collect::<Vec<_>>();
 
         if let Some(existing) = self
             .engine
@@ -1010,12 +1020,14 @@ impl AppCore {
         {
             existing.name = profile_name.to_string();
             existing.playlist_names = playlist_names;
+            existing.playlist_paths = playlist_paths;
         } else {
             self.engine
                 .playlist_profiles
                 .push(crate::engine::PlaylistProfile {
                     name: profile_name.to_string(),
                     playlist_names,
+                    playlist_paths,
                 });
             self.engine
                 .playlist_profiles
@@ -1037,8 +1049,12 @@ impl AppCore {
         self.engine.playlists.clear();
         self.engine.active_playlist_id = None;
 
-        for playlist_name in profile.playlist_names {
-            self.engine.create_playlist(playlist_name);
+        for (idx, playlist_name) in profile.playlist_names.into_iter().enumerate() {
+            let id = self.engine.create_playlist(playlist_name);
+            let source_path = profile.playlist_paths.get(idx).cloned().flatten();
+            if let Some(playlist) = self.engine.playlists.iter_mut().find(|p| p.id == id) {
+                playlist.source_path = source_path;
+            }
         }
 
         if let Some(first_name) = self.engine.playlists.first().map(|p| p.name.clone()) {
@@ -1047,6 +1063,103 @@ impl AppCore {
 
         self.playback.reset();
         self.engine.save()
+    }
+
+    pub fn import_m3u_playlist(&mut self, file_path: &str) -> Result<String, String> {
+        let path = Path::new(file_path);
+        let content = fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read playlist '{}': {}", path.display(), e))?;
+
+        let mut sources = Vec::new();
+        let base_dir = path.parent().unwrap_or_else(|| Path::new("."));
+        for raw_line in content.lines() {
+            let line = raw_line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            let track_path = if Path::new(line).is_absolute() {
+                PathBuf::from(line)
+            } else {
+                base_dir.join(line)
+            };
+            sources.push(track_path);
+        }
+
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Imported")
+            .trim();
+        let base_name = if stem.is_empty() { "Imported" } else { stem };
+        let mut name = base_name.to_string();
+        let mut suffix = 2usize;
+        while self.engine.find_playlist(&name).is_some() {
+            name = format!("{} ({})", base_name, suffix);
+            suffix += 1;
+        }
+
+        let id = self.engine.create_playlist(name.clone());
+        {
+            let playlist = self
+                .engine
+                .playlists
+                .iter_mut()
+                .find(|p| p.id == id)
+                .ok_or_else(|| "Failed to create imported playlist".to_string())?;
+            playlist.source_path = Some(path.to_string_lossy().to_string());
+            for src in sources {
+                if let Ok(track) = crate::track::Track::from_path(&src) {
+                    playlist.tracks.push(track);
+                }
+            }
+        }
+        self.engine.set_active(&name)?;
+        self.engine.save()?;
+        Ok(name)
+    }
+
+    pub fn export_playlist_to_m3u(
+        &mut self,
+        playlist_name: &str,
+        file_path: Option<&str>,
+    ) -> Result<String, String> {
+        let target_path = if let Some(path) = file_path {
+            PathBuf::from(path)
+        } else {
+            let pl = self
+                .engine
+                .find_playlist(playlist_name)
+                .ok_or_else(|| format!("Playlist '{}' not found", playlist_name))?;
+            let existing = pl
+                .source_path
+                .clone()
+                .ok_or_else(|| "Playlist has no source file; choose Save As".to_string())?;
+            PathBuf::from(existing)
+        };
+
+        let mut lines = vec!["#EXTM3U".to_string()];
+        let tracks = self
+            .engine
+            .find_playlist(playlist_name)
+            .ok_or_else(|| format!("Playlist '{}' not found", playlist_name))?
+            .tracks
+            .iter()
+            .map(|t| t.path.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+        lines.extend(tracks);
+        fs::write(&target_path, lines.join("\n") + "\n").map_err(|e| {
+            format!(
+                "Failed to write playlist '{}': {}",
+                target_path.display(),
+                e
+            )
+        })?;
+
+        if let Some(pl) = self.engine.find_playlist_mut(playlist_name) {
+            pl.source_path = Some(target_path.to_string_lossy().to_string());
+        }
+        self.engine.save()?;
+        Ok(target_path.to_string_lossy().to_string())
     }
 
     pub fn delete_playlist_profile(&mut self, name: &str) -> Result<(), String> {
@@ -1414,7 +1527,12 @@ fn collect_matches(path: &Path, query: &str, out: &mut Vec<FileSearchResult>, de
         if !is_audio_file(&p) {
             continue;
         }
-        if name.to_lowercase().contains(query) {
+        let stem = Path::new(&name)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(&name)
+            .to_lowercase();
+        if stem.contains(query) {
             out.push(FileSearchResult {
                 path: p.to_string_lossy().to_string(),
                 name,
@@ -1674,19 +1792,17 @@ mod tests {
     #[test]
     fn add_schedule_event_bad_time_errors() {
         let mut core = make_core();
-        assert!(
-            core.add_schedule_event("25:00", "stop", "x.mp3", None, None, None)
-                .is_err()
-        );
+        assert!(core
+            .add_schedule_event("25:00", "stop", "x.mp3", None, None, None)
+            .is_err());
     }
 
     #[test]
     fn add_schedule_event_bad_mode_errors() {
         let mut core = make_core();
-        assert!(
-            core.add_schedule_event("14:00", "bogus", "x.mp3", None, None, None)
-                .is_err()
-        );
+        assert!(core
+            .add_schedule_event("14:00", "bogus", "x.mp3", None, None, None)
+            .is_err());
     }
 
     #[test]
@@ -2063,6 +2179,51 @@ mod tests {
         assert!(core.search_indexed_files("a").unwrap().is_empty());
     }
 
+    #[test]
+    fn search_matches_filename_without_extension() {
+        let temp = tempfile::tempdir().unwrap();
+        let audio_path = temp.path().join("MySong.mp3");
+        fs::write(&audio_path, b"not real audio").unwrap();
+
+        let mut core = make_core();
+        core.engine
+            .indexed_locations
+            .push(temp.path().to_string_lossy().to_string());
+
+        let matches = core.search_indexed_files("mysong").unwrap();
+        assert!(matches.iter().any(|m| m.name == "MySong.mp3"));
+    }
+
+    #[test]
+    fn export_and_import_m3u_playlist_roundtrip() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("sample.m3u8");
+        fs::write(
+            &source,
+            "#EXTM3U
+track-a.mp3
+",
+        )
+        .unwrap();
+
+        let mut core = make_core();
+        let imported = core.import_m3u_playlist(&source.to_string_lossy()).unwrap();
+        assert_eq!(imported, "sample");
+
+        let out = temp.path().join("out.m3u");
+        core.export_playlist_to_m3u(&imported, Some(&out.to_string_lossy()))
+            .unwrap();
+        let saved = fs::read_to_string(&out).unwrap();
+        assert!(saved.contains("#EXTM3U"));
+
+        core.save_playlist_profile("WithPath").unwrap();
+        let profiles = core.get_playlist_profiles();
+        assert_eq!(profiles[0].playlist_paths.len(), 1);
+        assert_eq!(
+            profiles[0].playlist_paths[0],
+            Some(out.to_string_lossy().to_string())
+        );
+    }
     #[test]
     fn playlist_profiles_roundtrip() {
         let mut core = make_core();

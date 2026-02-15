@@ -14,6 +14,7 @@ export interface TrackInfo {
   duration_secs: number;
   duration_display: string;
   played_duration_secs: number | null;
+  start_time_display: string | null;
   has_intro: boolean;
 }
 
@@ -145,4 +146,5 @@ export interface FileSearchResult {
 export interface PlaylistProfileInfo {
   name: string;
   playlist_names: string[];
+  playlist_paths: (string | null)[];
 }

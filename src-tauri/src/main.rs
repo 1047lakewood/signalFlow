@@ -5,7 +5,7 @@ use signal_flow::app_core::{
     AdData, AppCore, ConfigData, FileBrowserEntry, FileSearchResult, LogEntry, PlaylistData,
     PlaylistProfileData, RdsConfigData, ScheduleEventData, StatusData, TrackData, TransportData,
 };
-use signal_flow::audio_runtime::{AudioEvent, AudioHandle, spawn_audio_runtime};
+use signal_flow::audio_runtime::{spawn_audio_runtime, AudioEvent, AudioHandle};
 use signal_flow::level_monitor::LevelMonitor;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -93,6 +93,24 @@ fn load_playlist_profile(state: State<AppState>, name: String) -> Result<(), Str
 #[tauri::command]
 fn delete_playlist_profile(state: State<AppState>, name: String) -> Result<(), String> {
     state.core.lock().unwrap().delete_playlist_profile(&name)
+}
+
+#[tauri::command]
+fn import_m3u_playlist(state: State<AppState>, file_path: String) -> Result<String, String> {
+    state.core.lock().unwrap().import_m3u_playlist(&file_path)
+}
+
+#[tauri::command]
+fn export_playlist_to_m3u(
+    state: State<AppState>,
+    playlist_name: String,
+    file_path: Option<String>,
+) -> Result<String, String> {
+    state
+        .core
+        .lock()
+        .unwrap()
+        .export_playlist_to_m3u(&playlist_name, file_path.as_deref())
 }
 
 // ── Track operations ────────────────────────────────────────────────────────
@@ -374,10 +392,7 @@ fn list_output_devices(state: State<AppState>) -> Vec<String> {
 }
 
 #[tauri::command]
-fn set_output_device(
-    state: State<AppState>,
-    name: Option<String>,
-) -> Result<(), String> {
+fn set_output_device(state: State<AppState>, name: Option<String>) -> Result<(), String> {
     state.core.lock().unwrap().set_output_device(name.clone())?;
     state.audio.set_device(name);
     Ok(())
@@ -730,6 +745,8 @@ fn main() {
             save_playlist_profile,
             load_playlist_profile,
             delete_playlist_profile,
+            import_m3u_playlist,
+            export_playlist_to_m3u,
             // Track operations
             get_playlist_tracks,
             add_track,

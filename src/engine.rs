@@ -17,6 +17,8 @@ fn default_duck_volume() -> f32 {
 pub struct PlaylistProfile {
     pub name: String,
     pub playlist_names: Vec<String>,
+    #[serde(default)]
+    pub playlist_paths: Vec<Option<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -670,11 +672,9 @@ mod tests {
     #[test]
     fn paste_tracks_bad_name_errors() {
         let mut engine = Engine::new();
-        assert!(
-            engine
-                .paste_tracks("Ghost", vec![make_track("A")], None)
-                .is_err()
-        );
+        assert!(engine
+            .paste_tracks("Ghost", vec![make_track("A")], None)
+            .is_err());
     }
 
     #[test]

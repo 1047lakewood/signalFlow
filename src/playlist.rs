@@ -6,6 +6,8 @@ use std::path::Path;
 pub struct Playlist {
     pub id: u32,
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_path: Option<String>,
     pub tracks: Vec<Track>,
     pub current_index: Option<usize>,
 }
@@ -15,6 +17,7 @@ impl Playlist {
         Playlist {
             id,
             name,
+            source_path: None,
             tracks: Vec::new(),
             current_index: None,
         }
@@ -114,7 +117,8 @@ mod tests {
     fn insert_tracks_appends_when_no_position() {
         let mut pl = Playlist::new(1, "Test".to_string());
         pl.tracks.push(make_track("A"));
-        pl.insert_tracks(vec![make_track("B"), make_track("C")], None).unwrap();
+        pl.insert_tracks(vec![make_track("B"), make_track("C")], None)
+            .unwrap();
         assert_eq!(pl.track_count(), 3);
         assert_eq!(pl.tracks[1].title, "B");
         assert_eq!(pl.tracks[2].title, "C");
@@ -124,7 +128,8 @@ mod tests {
     fn insert_tracks_at_beginning() {
         let mut pl = Playlist::new(1, "Test".to_string());
         pl.tracks.push(make_track("A"));
-        pl.insert_tracks(vec![make_track("B"), make_track("C")], Some(0)).unwrap();
+        pl.insert_tracks(vec![make_track("B"), make_track("C")], Some(0))
+            .unwrap();
         assert_eq!(pl.track_count(), 3);
         assert_eq!(pl.tracks[0].title, "B");
         assert_eq!(pl.tracks[1].title, "C");
@@ -136,7 +141,8 @@ mod tests {
         let mut pl = Playlist::new(1, "Test".to_string());
         pl.tracks.push(make_track("A"));
         pl.tracks.push(make_track("D"));
-        pl.insert_tracks(vec![make_track("B"), make_track("C")], Some(1)).unwrap();
+        pl.insert_tracks(vec![make_track("B"), make_track("C")], Some(1))
+            .unwrap();
         assert_eq!(pl.track_count(), 4);
         assert_eq!(pl.tracks[0].title, "A");
         assert_eq!(pl.tracks[1].title, "B");
