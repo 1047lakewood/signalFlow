@@ -89,7 +89,6 @@ function FileBrowserPane({
     <aside className="file-browser-pane">
       <div
         className={`favorites-pane ${favoritesCollapsed ? "collapsed" : ""}`}
-        onMouseEnter={() => setFavoritesCollapsed(false)}
         onMouseLeave={() => setFavoritesCollapsed(true)}
       >
         <div className="favorites-title">★</div>
@@ -98,6 +97,7 @@ function FileBrowserPane({
             key={folder}
             className="favorite-item"
             title={folder}
+            onMouseEnter={() => setFavoritesCollapsed(false)}
             onClick={() => setCurrentPath(folder)}
           >
             <span className="favorite-icon">📁</span>
