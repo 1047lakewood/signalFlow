@@ -11,6 +11,35 @@ function formatDriveLabel(path: string): string {
   return drive ? `${drive[1].toUpperCase()}:\\` : path;
 }
 
+function normalizeFavoritePath(path: string): string {
+  return path.trim().toLowerCase();
+}
+
+function getParentPath(path: string): string | null {
+  const normalized = path.replace(/[\\/]+$/, "");
+  if (!normalized) return null;
+
+  const windowsDriveRoot = normalized.match(/^[A-Za-z]:$/);
+  if (windowsDriveRoot) return null;
+  if (normalized === "/") return null;
+
+  const uncRoot = normalized.match(/^\\\\[^\\]+\\[^\\]+$/);
+  if (uncRoot) return null;
+
+  const next = normalized.replace(/[\\/][^\\/]+$/, "");
+  if (!next || next === normalized) return null;
+  return next;
+}
+
+function compareEntries(a: FileBrowserEntry, b: FileBrowserEntry): number {
+  if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
+  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+}
+
+function favoriteDriveKey(path: string): string {
+  return `drive:${path}`;
+}
+
 interface FileBrowserPaneProps {
   onAddFiles: (paths: string[]) => void;
   onSearchFilename: (filename: string) => void;
@@ -30,7 +59,12 @@ function FileBrowserPane({
   const [searchResults, setSearchResults] = useState<FileSearchResult[]>([]);
   const [favoritesCollapsed, setFavoritesCollapsed] = useState(true);
   const [favoritesDropActive, setFavoritesDropActive] = useState(false);
+  const [isLoadingDirectory, setIsLoadingDirectory] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const normalizedQuery = searchQuery.trim();
+  const atRootLocation =
+    currentPath !== null && indexedLocations.some((loc) => loc === currentPath);
 
   const loadConfig = useCallback(async () => {
     const cfg = await invoke<ConfigResponse>("get_config");
@@ -40,8 +74,19 @@ function FileBrowserPane({
   }, []);
 
   const loadDirectory = useCallback(async (path: string | null) => {
-    const rows = await invoke<FileBrowserEntry[]>("list_directory", { path });
-    setEntries(rows);
+    setIsLoadingDirectory(true);
+    setLoadError(null);
+    try {
+      const rows = await invoke<FileBrowserEntry[]>("list_directory", { path });
+      const sorted = [...rows].sort(compareEntries);
+      setEntries(sorted);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setLoadError(msg || "Failed to load directory");
+      setEntries([]);
+    } finally {
+      setIsLoadingDirectory(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -49,6 +94,12 @@ function FileBrowserPane({
       console.error("Failed to load file browser config", e),
     );
   }, [loadConfig]);
+
+  useEffect(() => {
+    if (!currentPath || indexedLocations.length === 0) return;
+    if (indexedLocations.includes(currentPath)) return;
+    setCurrentPath(indexedLocations[0]);
+  }, [currentPath, indexedLocations]);
 
   useEffect(() => {
     loadDirectory(currentPath).catch((e) =>
@@ -68,12 +119,26 @@ function FileBrowserPane({
       const q = normalizedQuery;
       if (q.length < 2) {
         setSearchResults([]);
+        setSearchError(null);
         return;
       }
-      const rows = await invoke<FileSearchResult[]>("search_indexed_files", {
-        query: q,
-      });
-      if (!cancelled) setSearchResults(rows);
+      try {
+        const rows = await invoke<FileSearchResult[]>("search_indexed_files", {
+          query: q,
+        });
+        if (!cancelled) {
+          const sorted = [...rows].sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+          );
+          setSearchResults(sorted);
+          setSearchError(null);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : String(e);
+        setSearchResults([]);
+        setSearchError(msg || "Search failed");
+      }
     };
     const id = setTimeout(
       () => run().catch((e) => console.error("Search failed", e)),
@@ -96,6 +161,40 @@ function FileBrowserPane({
     return entries;
   }, [entries, normalizedQuery, searchResults]);
 
+  const breadcrumbs = useMemo(() => {
+    if (!currentPath) return [] as Array<{ label: string; path: string }>;
+
+    const windowsDrive = currentPath.match(/^([A-Za-z]:)([\\/].*)?$/);
+    if (windowsDrive) {
+      const drive = windowsDrive[1];
+      const rest = (windowsDrive[2] ?? "").split(/[\\/]+/).filter(Boolean);
+      const crumbs = [{ label: `${drive}\\`, path: drive }];
+      let acc = drive;
+      for (const part of rest) {
+        acc = `${acc}\\${part}`;
+        crumbs.push({ label: part, path: acc });
+      }
+      return crumbs;
+    }
+
+    const parts = currentPath.split(/[\\/]+/).filter(Boolean);
+    if (currentPath.startsWith("/")) {
+      const crumbs = [{ label: "/", path: "/" }];
+      let acc = "";
+      for (const part of parts) {
+        acc = `${acc}/${part}`;
+        crumbs.push({ label: part, path: acc || "/" });
+      }
+      return crumbs;
+    }
+
+    let acc = "";
+    return parts.map((part) => {
+      acc = acc ? `${acc}/${part}` : part;
+      return { label: part, path: acc };
+    });
+  }, [currentPath]);
+
   const persistFavorites = useCallback(async (nextFolders: string[]) => {
     await invoke("set_favorite_folders", { folders: nextFolders });
     setFavoriteFolders(nextFolders);
@@ -109,7 +208,10 @@ function FileBrowserPane({
       if (!droppedPath) return;
       const normalized = droppedPath.trim();
       if (!normalized) return;
-      const alreadyFavorite = favoriteFolders.includes(normalized);
+      const normalizedTarget = normalizeFavoritePath(normalized);
+      const alreadyFavorite = favoriteFolders.some(
+        (folder) => normalizeFavoritePath(folder) === normalizedTarget,
+      );
       if (alreadyFavorite) return;
       const nextFolders = [...favoriteFolders, normalized];
       try {
@@ -121,11 +223,26 @@ function FileBrowserPane({
     [favoriteFolders, persistFavorites],
   );
 
+  const handleRemoveFavorite = useCallback(
+    async (folderToRemove: string) => {
+      const nextFolders = favoriteFolders.filter(
+        (folder) => folder !== folderToRemove,
+      );
+      try {
+        await persistFavorites(nextFolders);
+      } catch (e) {
+        console.error("Failed to remove favorite folder", e);
+      }
+    },
+    [favoriteFolders, persistFavorites],
+  );
+
   return (
     <aside className="file-browser-pane">
       <div
         className={`favorites-pane ${favoritesCollapsed ? "collapsed" : ""} ${favoritesDropActive ? "drop-active" : ""}`}
         onMouseLeave={() => setFavoritesCollapsed(true)}
+        onFocus={() => setFavoritesCollapsed(false)}
         onDragOver={(event) => {
           event.preventDefault();
           setFavoritesCollapsed(false);
@@ -135,19 +252,56 @@ function FileBrowserPane({
         onDrop={handleFavoriteDrop}
       >
         <div className="favorites-title">★</div>
+        <div className="favorites-section-divider" />
+        {indexedLocations.map((loc) => (
+          <div
+            key={favoriteDriveKey(loc)}
+            className="favorite-item"
+            title={`Switch to ${loc}`}
+            onMouseEnter={() => setFavoritesCollapsed(false)}
+          >
+            <button
+              className={`favorite-open-btn ${currentPath === loc ? "active" : ""}`}
+              onClick={() => setCurrentPath(loc)}
+            >
+              <span className="favorite-icon">💽</span>
+              {!favoritesCollapsed && (
+                <span className="favorite-label">{formatDriveLabel(loc)}</span>
+              )}
+            </button>
+          </div>
+        ))}
+        <div className="favorites-section-divider" />
         {favoriteFolders.map((folder) => (
-          <button
+          <div
             key={folder}
             className="favorite-item"
             title={folder}
             onMouseEnter={() => setFavoritesCollapsed(false)}
-            onClick={() => setCurrentPath(folder)}
           >
-            <span className="favorite-icon">📁</span>
+            <button
+              className={`favorite-open-btn ${currentPath === folder ? "active" : ""}`}
+              onClick={() => setCurrentPath(folder)}
+            >
+              <span className="favorite-icon">📁</span>
+              {!favoritesCollapsed && (
+                <span className="favorite-label">{folder}</span>
+              )}
+            </button>
             {!favoritesCollapsed && (
-              <span className="favorite-label">{folder}</span>
+              <button
+                className="favorite-remove-btn"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleRemoveFavorite(folder).catch(() => undefined);
+                }}
+                aria-label={`Remove ${folder} from favorites`}
+                title="Remove favorite"
+              >
+                ×
+              </button>
             )}
-          </button>
+          </div>
         ))}
       </div>
       <div className="file-browser-content">
@@ -163,58 +317,138 @@ function FileBrowserPane({
                 {formatDriveLabel(loc)}
               </button>
             ))}
+            <button
+              className="drive-btn"
+              title="Parent folder"
+              onClick={() => {
+                if (atRootLocation || !currentPath) return;
+                setCurrentPath(getParentPath(currentPath));
+              }}
+              disabled={atRootLocation || !currentPath || !getParentPath(currentPath)}
+            >
+              ↑
+            </button>
+            <button
+              className="drive-btn"
+              title="Refresh folder"
+              onClick={() => loadDirectory(currentPath)}
+              disabled={isLoadingDirectory}
+            >
+              ↻
+            </button>
           </div>
-          <input
-            className="file-browser-search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search indexed files (2+ chars)..."
-          />
+          {breadcrumbs.length > 0 && (
+            <div className="file-browser-breadcrumbs" aria-label="Current folder breadcrumbs">
+              {breadcrumbs.map((crumb, index) => (
+                <button
+                  key={crumb.path}
+                  className={`breadcrumb-btn ${index === breadcrumbs.length - 1 ? "active" : ""}`}
+                  onClick={() => setCurrentPath(crumb.path)}
+                  title={crumb.path}
+                >
+                  {crumb.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="file-browser-search-row">
+            <input
+              className="file-browser-search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  setSearchQuery("");
+                }
+                if (event.key === "Enter" && normalizedQuery.length >= 2) {
+                  const top = visible[0];
+                  if (top && !top.is_dir) {
+                    onAddFiles([top.path]);
+                  }
+                }
+              }}
+              placeholder="Search indexed files (2+ chars)..."
+            />
+            {searchQuery.length > 0 && (
+              <button
+                className="search-clear-btn"
+                onClick={() => setSearchQuery("")}
+                title="Clear search"
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          {normalizedQuery.length >= 2 && (
+            <div className="file-browser-search-status">
+              {searchError
+                ? `Search failed: ${searchError}`
+                : `${searchResults.length} result${searchResults.length === 1 ? "" : "s"}`}
+            </div>
+          )}
         </div>
         <div className="file-browser-list">
-          {visible.map((entry) => (
-            <div
-              key={entry.path}
-              className="file-row"
-              draggable={entry.is_dir}
-              onDragStart={(event) => {
-                if (!entry.is_dir) return;
-                event.dataTransfer.setData("text/signalflow-folder-path", entry.path);
-                event.dataTransfer.effectAllowed = "copy";
-              }}
-              onDoubleClick={() =>
-                entry.is_dir
-                  ? setCurrentPath(entry.path)
-                  : onAddFiles([entry.path])
-              }
-            >
-              <button
-                className="file-row-main"
-                onClick={() =>
-                  entry.is_dir ? setCurrentPath(entry.path) : undefined
+          {loadError ? (
+            <div className="file-browser-empty-state">
+              <div>Failed to load folder: {loadError}</div>
+              <button className="drive-btn" onClick={() => loadDirectory(currentPath)}>
+                Retry
+              </button>
+            </div>
+          ) : isLoadingDirectory ? (
+            <div className="file-browser-empty-state">Loading…</div>
+          ) : visible.length === 0 ? (
+            <div className="file-browser-empty-state">
+              {normalizedQuery.length >= 2
+                ? "No files match this search"
+                : "This folder is empty"}
+            </div>
+          ) : (
+            visible.map((entry) => (
+              <div
+                key={entry.path}
+                className="file-row"
+                draggable={entry.is_dir}
+                onDragStart={(event) => {
+                  if (!entry.is_dir) return;
+                  event.dataTransfer.setData("text/signalflow-folder-path", entry.path);
+                  event.dataTransfer.effectAllowed = "copy";
+                }}
+                onDoubleClick={() =>
+                  entry.is_dir
+                    ? setCurrentPath(entry.path)
+                    : onAddFiles([entry.path])
                 }
               >
-                <span>{entry.is_dir ? "📁" : "🎵"}</span>
-                <span title={entry.path}>{entry.name}</span>
-              </button>
-              {!entry.is_dir && (
-                <>
-                  <button
-                    className="file-row-action"
-                    onClick={() => onAddFiles([entry.path])}
-                  >
-                    +
-                  </button>
-                  <button
-                    className="file-row-action"
-                    onClick={() => onSearchFilename(entry.name.replace(/\.[^.]+$/, ""))}
-                  >
-                    🔎
-                  </button>
-                </>
-              )}
-            </div>
-          ))}
+                <button
+                  className="file-row-main"
+                  onClick={() =>
+                    entry.is_dir ? setCurrentPath(entry.path) : undefined
+                  }
+                >
+                  <span>{entry.is_dir ? "📁" : "🎵"}</span>
+                  <span title={entry.path}>{entry.name}</span>
+                </button>
+                {!entry.is_dir && (
+                  <>
+                    <button
+                      className="file-row-action"
+                      onClick={() => onAddFiles([entry.path])}
+                    >
+                      +
+                    </button>
+                    <button
+                      className="file-row-action"
+                      onClick={() => onSearchFilename(entry.name.replace(/\.[^.]+$/, ""))}
+                    >
+                      🔎
+                    </button>
+                  </>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
     </aside>
