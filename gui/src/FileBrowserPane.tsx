@@ -63,6 +63,7 @@ function FileBrowserPane({
   }, [searchSeed]);
 
   useEffect(() => {
+    let cancelled = false;
     const run = async () => {
       const q = normalizedQuery;
       if (q.length < 2) {
@@ -72,13 +73,16 @@ function FileBrowserPane({
       const rows = await invoke<FileSearchResult[]>("search_indexed_files", {
         query: q,
       });
-      setSearchResults(rows);
+      if (!cancelled) setSearchResults(rows);
     };
     const id = setTimeout(
       () => run().catch((e) => console.error("Search failed", e)),
       280,
     );
-    return () => clearTimeout(id);
+    return () => {
+      clearTimeout(id);
+      cancelled = true;
+    };
   }, [normalizedQuery]);
 
   const visible = useMemo(() => {

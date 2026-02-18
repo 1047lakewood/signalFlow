@@ -277,7 +277,7 @@ body {
   padding: 5px 10px;
   border-bottom: 1px solid var(--border);
   overflow: hidden;
-  text-overflow: clip;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .track-table th:last-child,
@@ -542,6 +542,7 @@ body {
   background: var(--highlight);
   cursor: pointer;
   border: none;
+  transition: transform 0.15s;
 }
 
 .transport-slider::-moz-range-thumb {
@@ -551,6 +552,7 @@ body {
   background: var(--highlight);
   cursor: pointer;
   border: none;
+  transition: transform 0.15s;
 }
 
 .transport-slider::-webkit-slider-thumb:hover {
@@ -2125,7 +2127,7 @@ body {
 }
 
 .menu-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
+  background: var(--bg-row-hover);
 }
 
 .menu-btn:disabled {
@@ -2142,6 +2144,8 @@ body {
   align-items: stretch;
   gap: 8px;
   padding: 8px 6px;
+  position: relative;
+  z-index: 10;
 }
 
 .sidebar-btn {
@@ -2163,6 +2167,8 @@ body {
 .sidebar-btn:hover,
 .sidebar-btn:focus-visible {
   width: 140px;
+  position: relative;
+  z-index: 11;
 }
 
 .sidebar-icon {
@@ -2240,11 +2246,11 @@ body {
   font-size: 12px;
 }
 .drive-btn:hover {
-  background: var(--bg-hover);
+  background: var(--bg-row-hover);
 }
 .drive-btn.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--text-primary);
   border-color: var(--accent);
 }
 .file-browser-search {

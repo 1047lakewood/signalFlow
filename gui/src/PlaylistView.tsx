@@ -210,7 +210,8 @@ function PlaylistView({
 
   // Listen for Tauri file drop events
   useEffect(() => {
-    let unlisten: (() => void) | null = null;
+    let mounted = true;
+    const unlisteners: Array<() => void> = [];
 
     async function setupDropListener() {
       try {
@@ -234,11 +235,15 @@ function PlaylistView({
           setIsDroppingFiles(false);
         });
 
-        unlisten = () => {
+        if (!mounted) {
+          // Component unmounted while we were setting up — clean up immediately
           unlistenDrop();
           unlistenHover();
           unlistenLeave();
-        };
+          return;
+        }
+
+        unlisteners.push(unlistenDrop, unlistenHover, unlistenLeave);
       } catch (e) {
         console.error("Failed to setup drop listener:", e);
       }
@@ -246,7 +251,8 @@ function PlaylistView({
 
     setupDropListener();
     return () => {
-      if (unlisten) unlisten();
+      mounted = false;
+      unlisteners.forEach((fn) => fn());
     };
   }, [onFileDrop]);
 
@@ -324,11 +330,12 @@ function PlaylistView({
       }
       await invoke("edit_track_metadata", params);
       onTracksChanged();
+      setEditingCell(null);
+      setEditValue("");
     } catch (e) {
       console.error("Failed to edit track metadata:", e);
+      // Keep editor open so the user can retry or cancel manually
     }
-    setEditingCell(null);
-    setEditValue("");
   }, [
     editingCell,
     editValue,

@@ -479,6 +479,30 @@ impl AppCore {
         Ok(count)
     }
 
+    /// Returns the configured intros folder path (used to pre-load intro flags off the lock).
+    pub fn intros_folder(&self) -> Option<String> {
+        self.engine.intros_folder.clone()
+    }
+
+    /// Push pre-loaded Track objects into a playlist and save. No file IO except the save.
+    /// Use this paired with Track::from_path called outside the core lock.
+    pub fn push_preloaded_tracks(
+        &mut self,
+        playlist: &str,
+        tracks: Vec<crate::track::Track>,
+    ) -> Result<usize, String> {
+        let pl = self
+            .engine
+            .find_playlist_mut(playlist)
+            .ok_or_else(|| format!("Playlist '{}' not found", playlist))?;
+        let count = tracks.len();
+        for track in tracks {
+            pl.tracks.push(track);
+        }
+        self.engine.save()?;
+        Ok(count)
+    }
+
     pub fn remove_tracks(&mut self, playlist: &str, indices: &[usize]) -> Result<(), String> {
         let pl = self
             .engine
@@ -925,39 +949,12 @@ impl AppCore {
         Ok(())
     }
 
-    pub fn list_directory(&self, path: Option<String>) -> Result<Vec<FileBrowserEntry>, String> {
-        let target = path
-            .map(PathBuf::from)
+    /// Resolve the target directory path without doing any filesystem IO.
+    /// Use `list_directory_at` (free function) in a `spawn_blocking` task for the actual read.
+    pub fn resolve_directory_path(&self, path: Option<String>) -> PathBuf {
+        path.map(PathBuf::from)
             .or_else(|| self.engine.indexed_locations.first().map(PathBuf::from))
-            .unwrap_or_else(|| PathBuf::from("."));
-
-        let mut entries = Vec::new();
-        let dir_entries = fs::read_dir(&target)
-            .map_err(|e| format!("Failed to read directory '{}': {}", target.display(), e))?;
-
-        for entry in dir_entries.flatten() {
-            // Use target.join(file_name) instead of entry.path() to preserve
-            // the user-provided drive letter on Windows mapped drives.
-            // entry.path() resolves to \\?\UNC\... on mapped drives.
-            let path = target.join(entry.file_name());
-            let file_type = match entry.file_type() {
-                Ok(ft) => ft,
-                Err(_) => continue,
-            };
-            let is_dir = file_type.is_dir();
-            if !is_dir && !is_audio_file(&path) {
-                continue;
-            }
-            let name = entry.file_name().to_string_lossy().to_string();
-            entries.push(FileBrowserEntry {
-                path: path.to_string_lossy().to_string(),
-                name,
-                is_dir,
-            });
-        }
-
-        entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        Ok(entries)
+            .unwrap_or_else(|| PathBuf::from("."))
     }
 
     pub fn search_indexed_files(&self, query: &str) -> Result<Vec<FileSearchResult>, String> {
@@ -1116,6 +1113,99 @@ impl AppCore {
         self.engine.set_active(&name)?;
         self.engine.save()?;
         Ok(name)
+    }
+
+    /// Parse an M3U file and return (name_stem, source_path_str, track_paths).
+    /// No lock needed — pure file/string IO. Intended to be called in spawn_blocking.
+    pub fn parse_m3u_file(file_path: &str) -> Result<(String, String, Vec<PathBuf>), String> {
+        let path = Path::new(file_path);
+        let content = fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read playlist '{}': {}", path.display(), e))?;
+        let mut sources = Vec::new();
+        let base_dir = path.parent().unwrap_or_else(|| Path::new("."));
+        for raw_line in content.lines() {
+            let line = raw_line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            let track_path = if Path::new(line).is_absolute() {
+                PathBuf::from(line)
+            } else {
+                base_dir.join(line)
+            };
+            sources.push(track_path);
+        }
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Imported")
+            .trim()
+            .to_string();
+        let stem = if stem.is_empty() { "Imported".to_string() } else { stem };
+        Ok((stem, path.to_string_lossy().to_string(), sources))
+    }
+
+    /// Create a new playlist from pre-loaded tracks (no file IO except save).
+    pub fn import_preloaded_m3u(
+        &mut self,
+        name_stem: &str,
+        source_path: &str,
+        tracks: Vec<crate::track::Track>,
+    ) -> Result<String, String> {
+        let base_name = if name_stem.is_empty() { "Imported" } else { name_stem };
+        let mut name = base_name.to_string();
+        let mut suffix = 2usize;
+        while self.engine.find_playlist(&name).is_some() {
+            name = format!("{} ({})", base_name, suffix);
+            suffix += 1;
+        }
+        let id = self.engine.create_playlist(name.clone());
+        {
+            let playlist = self
+                .engine
+                .playlists
+                .iter_mut()
+                .find(|p| p.id == id)
+                .ok_or_else(|| "Failed to create imported playlist".to_string())?;
+            playlist.source_path = Some(source_path.to_string());
+            for track in tracks {
+                playlist.tracks.push(track);
+            }
+        }
+        self.engine.set_active(&name)?;
+        self.engine.save()?;
+        Ok(name)
+    }
+
+    /// Extract track paths + optional source path from a playlist (no IO).
+    /// Used to prepare data for async M3U export without holding the lock.
+    pub fn get_m3u_export_data(
+        &self,
+        playlist_name: &str,
+    ) -> Result<(Vec<String>, Option<String>), String> {
+        let pl = self
+            .engine
+            .find_playlist(playlist_name)
+            .ok_or_else(|| format!("Playlist '{}' not found", playlist_name))?;
+        Ok((
+            pl.tracks
+                .iter()
+                .map(|t| t.path.to_string_lossy().to_string())
+                .collect(),
+            pl.source_path.clone(),
+        ))
+    }
+
+    /// Update the source path after an M3U export and save.
+    pub fn set_playlist_source_path(
+        &mut self,
+        playlist_name: &str,
+        source_path: &str,
+    ) -> Result<(), String> {
+        if let Some(pl) = self.engine.find_playlist_mut(playlist_name) {
+            pl.source_path = Some(source_path.to_string());
+        }
+        self.engine.save()
     }
 
     pub fn export_playlist_to_m3u(
@@ -1502,6 +1592,56 @@ fn is_audio_file(path: &Path) -> bool {
         .and_then(|ext| ext.to_str())
         .map(|ext| AUDIO_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()))
         .unwrap_or(false)
+}
+
+/// List a directory's audio files and subdirectories. Intended to be called
+/// from a `spawn_blocking` task so it doesn't hold the core mutex.
+pub fn list_directory_at(target: PathBuf) -> Result<Vec<FileBrowserEntry>, String> {
+    let mut entries = Vec::new();
+    let dir_entries = fs::read_dir(&target)
+        .map_err(|e| format!("Failed to read directory '{}': {}", target.display(), e))?;
+
+    for entry in dir_entries.flatten() {
+        let path = target.join(entry.file_name());
+        let file_type = match entry.file_type() {
+            Ok(ft) => ft,
+            Err(_) => continue,
+        };
+        let is_dir = file_type.is_dir();
+        if !is_dir && !is_audio_file(&path) {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().to_string();
+        entries.push(FileBrowserEntry {
+            path: path.to_string_lossy().to_string(),
+            name,
+            is_dir,
+        });
+    }
+
+    entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(entries)
+}
+
+/// Search `locations` for audio files matching `query`. Intended to be called
+/// from a `spawn_blocking` task so it doesn't hold the core mutex.
+pub fn search_files_in_locations(locations: &[String], query: &str) -> Vec<FileSearchResult> {
+    let trimmed = query.trim().to_lowercase();
+    if trimmed.len() < 2 {
+        return Vec::new();
+    }
+    let mut results = Vec::new();
+    for root in locations {
+        let root_path = Path::new(root);
+        if !root_path.exists() {
+            continue;
+        }
+        collect_matches(root_path, &trimmed, &mut results, 0);
+        if results.len() >= 120 {
+            break;
+        }
+    }
+    results
 }
 
 fn collect_matches(path: &Path, query: &str, out: &mut Vec<FileSearchResult>, depth: usize) {

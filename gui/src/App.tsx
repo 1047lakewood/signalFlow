@@ -25,6 +25,7 @@ function getInitialTheme(): "dark" | "light" {
 function App() {
   const [playlists, setPlaylists] = useState<PlaylistInfo[]>([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
+  const selectedPlaylistRef = useRef<string | null>(null);
   const [tracks, setTracks] = useState<TrackInfo[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number | null>(null);
   const [renamingTab, setRenamingTab] = useState<string | null>(null);
@@ -106,6 +107,12 @@ function App() {
     }
   }, [selectedProfile, loadProfiles]);
 
+  // Keep ref in sync so loadPlaylists can read the current value without being
+  // listed as a dependency (avoiding extra fetches on every tab switch).
+  useEffect(() => {
+    selectedPlaylistRef.current = selectedPlaylist;
+  }, [selectedPlaylist]);
+
   const loadPlaylists = useCallback(async () => {
     try {
       const pls = await invoke<PlaylistInfo[]>("get_playlists");
@@ -113,9 +120,10 @@ function App() {
       // Auto-select active playlist, or first, or null
       const active = pls.find((p) => p.is_active);
       const target = active ?? pls[0];
+      const current = selectedPlaylistRef.current;
       const hasCurrentSelection =
-        selectedPlaylist !== null &&
-        pls.some((playlist) => playlist.name === selectedPlaylist);
+        current !== null &&
+        pls.some((playlist) => playlist.name === current);
       if (target && !hasCurrentSelection) {
         setSelectedPlaylist(target.name);
         // If no playlist was active on the backend, activate the auto-selected one
@@ -129,7 +137,7 @@ function App() {
     } catch (e) {
       console.error("Failed to load playlists:", e);
     }
-  }, [selectedPlaylist]);
+  }, []);
 
   const loadTracks = useCallback(async () => {
     if (!selectedPlaylist) {
@@ -316,6 +324,7 @@ function App() {
         // Insert position is after the clicked row
         const insertAt = afterIndex + 1;
         if (clipboard.isCut) {
+          const count = clipboard.sourceIndices.length;
           // For cut: copy from source, paste at destination, then remove from source
           await invoke("copy_paste_tracks", {
             fromPlaylist: clipboard.sourcePlaylist,
@@ -323,10 +332,17 @@ function App() {
             toPlaylist: selectedPlaylist,
             at: insertAt,
           });
-          // Remove from source (only if same playlist, adjust for insertion)
+          // When cutting within the same playlist, insertion shifts all indices
+          // at or after insertAt by `count` positions — adjust before removing.
+          const removeIndices =
+            clipboard.sourcePlaylist === selectedPlaylist
+              ? clipboard.sourceIndices.map((i) =>
+                  i >= insertAt ? i + count : i,
+                )
+              : clipboard.sourceIndices;
           await invoke("remove_tracks", {
             playlist: clipboard.sourcePlaylist,
-            indices: clipboard.sourceIndices,
+            indices: removeIndices,
           });
           setClipboard(null); // Cut is one-time
         } else {

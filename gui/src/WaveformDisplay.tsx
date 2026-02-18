@@ -12,6 +12,7 @@ interface WaveformDisplayProps {
 function WaveformDisplay({ trackPath, elapsed, duration, isPlaying, onSeek }: WaveformDisplayProps) {
   const [peaks, setPeaks] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastPathRef = useRef<string | null>(null);
@@ -21,17 +22,18 @@ function WaveformDisplay({ trackPath, elapsed, duration, isPlaying, onSeek }: Wa
     if (!trackPath || trackPath === lastPathRef.current) return;
     lastPathRef.current = trackPath;
     setLoading(true);
+    let mounted = true;
 
     invoke<number[]>("get_waveform", { path: trackPath })
       .then((data) => {
-        setPeaks(data);
-        setLoading(false);
+        if (mounted) { setPeaks(data); setLoading(false); }
       })
       .catch((e) => {
         console.error("get_waveform error:", e);
-        setPeaks([]);
-        setLoading(false);
+        if (mounted) { setPeaks([]); setLoading(false); }
       });
+
+    return () => { mounted = false; };
   }, [trackPath]);
 
   // Reset when no track
@@ -41,6 +43,18 @@ function WaveformDisplay({ trackPath, elapsed, duration, isPlaying, onSeek }: Wa
       lastPathRef.current = null;
     }
   }, [trackPath]);
+
+  // Re-draw when container resizes
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0].contentRect;
+      setContainerSize({ width: r.width, height: r.height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Draw waveform
   useEffect(() => {
@@ -101,7 +115,7 @@ function WaveformDisplay({ trackPath, elapsed, duration, isPlaying, onSeek }: Wa
       ctx.lineTo(playheadX, height);
       ctx.stroke();
     }
-  }, [peaks, elapsed, duration, isPlaying]);
+  }, [peaks, elapsed, duration, isPlaying, containerSize]);
 
   // Handle left/right click-to-seek
   const handlePointerSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {

@@ -2,8 +2,9 @@
 
 use serde::Serialize;
 use signal_flow::app_core::{
-    AdData, AppCore, ConfigData, FileBrowserEntry, FileSearchResult, LogEntry, PlaylistData,
-    PlaylistProfileData, RdsConfigData, ScheduleEventData, StatusData, TrackData, TransportData,
+    list_directory_at, search_files_in_locations, AdData, AppCore, ConfigData, FileBrowserEntry,
+    FileSearchResult, LogEntry, PlaylistData, PlaylistProfileData, RdsConfigData,
+    ScheduleEventData, StatusData, TrackData, TransportData,
 };
 use signal_flow::audio_runtime::{spawn_audio_runtime, AudioEvent, AudioHandle};
 use signal_flow::level_monitor::LevelMonitor;
@@ -96,21 +97,82 @@ fn delete_playlist_profile(state: State<AppState>, name: String) -> Result<(), S
 }
 
 #[tauri::command]
-fn import_m3u_playlist(state: State<AppState>, file_path: String) -> Result<String, String> {
-    state.core.lock().unwrap().import_m3u_playlist(&file_path)
-}
-
-#[tauri::command]
-fn export_playlist_to_m3u(
-    state: State<AppState>,
-    playlist_name: String,
-    file_path: Option<String>,
+async fn import_m3u_playlist(
+    state: State<'_, AppState>,
+    file_path: String,
 ) -> Result<String, String> {
+    use signal_flow::auto_intro;
+    use signal_flow::track::Track;
+
+    // Phase 1: parse M3U + read all track metadata off the lock.
+    let intros_folder = state.core.lock().unwrap().intros_folder();
+    let (name_stem, source_path, track_paths, loaded) =
+        tokio::task::spawn_blocking(move || {
+            let (stem, src, paths) = signal_flow::app_core::AppCore::parse_m3u_file(&file_path)?;
+            let mut tracks = Vec::new();
+            for p in &paths {
+                if let Ok(mut t) = Track::from_path(p) {
+                    if let Some(ref folder) = intros_folder {
+                        t.has_intro = auto_intro::has_intro(std::path::Path::new(folder), &t.artist);
+                    }
+                    tracks.push(t);
+                }
+            }
+            Ok::<_, String>((stem, src, paths, tracks))
+        })
+        .await
+        .map_err(|e| format!("Import task panicked: {e}"))??;
+
+    let _ = track_paths; // paths used only for loading above
+    // Phase 2: lock briefly to create playlist + save.
     state
         .core
         .lock()
         .unwrap()
-        .export_playlist_to_m3u(&playlist_name, file_path.as_deref())
+        .import_preloaded_m3u(&name_stem, &source_path, loaded)
+}
+
+#[tauri::command]
+async fn export_playlist_to_m3u(
+    state: State<'_, AppState>,
+    playlist_name: String,
+    file_path: Option<String>,
+) -> Result<String, String> {
+    // Phase 1: extract track paths while briefly holding the lock.
+    let (track_paths, existing_source) = {
+        let core = state.core.lock().unwrap();
+        core.get_m3u_export_data(&playlist_name)?
+    };
+
+    let target_path = if let Some(path) = file_path {
+        std::path::PathBuf::from(path)
+    } else {
+        std::path::PathBuf::from(
+            existing_source.ok_or_else(|| "Playlist has no source file; choose Save As".to_string())?,
+        )
+    };
+    let target_str = target_path.to_string_lossy().to_string();
+
+    // Phase 2: write the M3U file on a blocking thread (no lock held).
+    let target_path_clone = target_path.clone();
+    tokio::task::spawn_blocking(move || {
+        let mut lines = vec!["#EXTM3U".to_string()];
+        lines.extend(track_paths);
+        std::fs::write(&target_path_clone, lines.join("\n") + "\n").map_err(|e| {
+            format!("Failed to write playlist '{}': {}", target_path_clone.display(), e)
+        })
+    })
+    .await
+    .map_err(|e| format!("Export task panicked: {e}"))??;
+
+    // Phase 3: update source_path in core and save.
+    state
+        .core
+        .lock()
+        .unwrap()
+        .set_playlist_source_path(&playlist_name, &target_str)?;
+
+    Ok(target_str)
 }
 
 // ── Track operations ────────────────────────────────────────────────────────
@@ -126,12 +188,44 @@ fn add_track(state: State<AppState>, playlist: String, path: String) -> Result<u
 }
 
 #[tauri::command]
-fn add_tracks(
-    state: State<AppState>,
+async fn add_tracks(
+    state: State<'_, AppState>,
     playlist: String,
     paths: Vec<String>,
 ) -> Result<usize, String> {
-    state.core.lock().unwrap().add_tracks(&playlist, &paths)
+    use signal_flow::auto_intro;
+    use signal_flow::track::Track;
+
+    // Phase 1: extract intros_folder while briefly holding the lock, then drop it.
+    let intros_folder = {
+        let core = state.core.lock().unwrap();
+        if core.engine.find_playlist(&playlist).is_none() {
+            return Err(format!("Playlist '{}' not found", playlist));
+        }
+        core.intros_folder()
+    };
+
+    // Phase 2: read all file metadata on a blocking thread (no lock held).
+    let loaded = tokio::task::spawn_blocking(move || {
+        let mut tracks = Vec::new();
+        for path_str in &paths {
+            match Track::from_path(std::path::Path::new(path_str)) {
+                Ok(mut t) => {
+                    if let Some(ref folder) = intros_folder {
+                        t.has_intro = auto_intro::has_intro(std::path::Path::new(folder), &t.artist);
+                    }
+                    tracks.push(t);
+                }
+                Err(e) => eprintln!("Failed to load '{}': {}", path_str, e),
+            }
+        }
+        tracks
+    })
+    .await
+    .map_err(|e| format!("Track loading panicked: {e}"))?;
+
+    // Phase 3: lock briefly to push pre-built tracks + save.
+    state.core.lock().unwrap().push_preloaded_tracks(&playlist, loaded)
 }
 
 #[tauri::command]
@@ -193,19 +287,33 @@ fn edit_track_metadata(
 // ── File browser / search ───────────────────────────────────────────────
 
 #[tauri::command]
-fn list_directory(
-    state: State<AppState>,
+async fn list_directory(
+    state: State<'_, AppState>,
     path: Option<String>,
 ) -> Result<Vec<FileBrowserEntry>, String> {
-    state.core.lock().unwrap().list_directory(path)
+    let target = {
+        let core = state.core.lock().unwrap();
+        core.resolve_directory_path(path)
+    };
+    tokio::task::spawn_blocking(move || list_directory_at(target))
+        .await
+        .map_err(|e| format!("Directory read task panicked: {e}"))?
 }
 
 #[tauri::command]
-fn search_indexed_files(
-    state: State<AppState>,
+async fn search_indexed_files(
+    state: State<'_, AppState>,
     query: String,
 ) -> Result<Vec<FileSearchResult>, String> {
-    state.core.lock().unwrap().search_indexed_files(&query)
+    // Extract indexed_locations while holding the lock briefly, then drop it
+    // before doing the blocking filesystem walk so we don't freeze all IPC.
+    let locations = {
+        let core = state.core.lock().unwrap();
+        core.engine.indexed_locations.clone()
+    };
+    tokio::task::spawn_blocking(move || Ok(search_files_in_locations(&locations, &query)))
+        .await
+        .map_err(|e| format!("Search task panicked: {e}"))?
 }
 
 // ── Transport controls ─────────────────────────────────────────────────────
@@ -387,8 +495,12 @@ fn get_config(state: State<AppState>) -> ConfigData {
 }
 
 #[tauri::command]
-fn list_output_devices(state: State<AppState>) -> Vec<String> {
-    state.core.lock().unwrap().list_output_devices()
+async fn list_output_devices() -> Vec<String> {
+    // Device enumeration via cpal can stall 200-500ms on Windows — run it
+    // off the async executor so we don't block other IPC commands.
+    tokio::task::spawn_blocking(signal_flow::player::list_output_devices)
+        .await
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -569,21 +681,44 @@ fn get_ad_failures(state: State<AppState>) -> Vec<AdFailureResponse> {
 }
 
 #[tauri::command]
-fn generate_ad_report(
-    state: State<AppState>,
+async fn generate_ad_report(
     start: String,
     end: String,
     output_dir: String,
     ad_name: Option<String>,
     company_name: Option<String>,
 ) -> Result<Vec<String>, String> {
-    state.core.lock().unwrap().generate_ad_report(
-        &start,
-        &end,
-        &output_dir,
-        ad_name.as_deref(),
-        company_name.as_deref(),
-    )
+    // Report generation reads/writes files; run on blocking thread pool so we
+    // don't stall the async runtime or hold the core mutex.
+    tokio::task::spawn_blocking(move || {
+        use signal_flow::ad_logger::AdPlayLogger;
+        use signal_flow::ad_report::AdReportGenerator;
+        use std::path::Path;
+        let logger = AdPlayLogger::new(Path::new("."));
+        let reporter = AdReportGenerator::new(&logger);
+        let out_path = Path::new(&output_dir);
+        if !out_path.is_dir() {
+            return Err(format!("'{}' is not a valid directory", output_dir));
+        }
+        match ad_name.as_deref() {
+            Some(name) => match reporter.generate_single_report(name, &start, &end, company_name.as_deref(), out_path) {
+                Some(r) => Ok(vec![
+                    r.csv_path.to_string_lossy().to_string(),
+                    r.pdf_path.to_string_lossy().to_string(),
+                ]),
+                None => Ok(vec![]),
+            },
+            None => {
+                let results = reporter.generate_report(&start, &end, company_name.as_deref(), out_path);
+                Ok(results.into_iter().flat_map(|r| vec![
+                    r.csv_path.to_string_lossy().to_string(),
+                    r.pdf_path.to_string_lossy().to_string(),
+                ]).collect())
+            }
+        }
+    })
+    .await
+    .map_err(|e| format!("Report task panicked: {e}"))?
 }
 
 // ── RDS ─────────────────────────────────────────────────────────────────────

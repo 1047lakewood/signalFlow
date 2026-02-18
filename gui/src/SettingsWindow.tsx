@@ -37,6 +37,7 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
     (initialTab as TabId) || "library",
   );
   const [config, setConfig] = useState<ConfigResponse | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -105,6 +106,7 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
         }
       } catch (e) {
         console.error("Failed to load config:", e);
+        setLoadError(String(e));
       }
     })();
   }, []);
@@ -487,9 +489,9 @@ function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
           </div>
           <div
             className="settings-body"
-            style={{ padding: 32, textAlign: "center" }}
+            style={{ padding: 32, textAlign: "center", color: loadError ? "var(--highlight)" : undefined }}
           >
-            Loading...
+            {loadError ? `Failed to load settings: ${loadError}` : "Loading..."}
           </div>
         </div>
       </div>

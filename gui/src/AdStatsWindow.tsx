@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { cleanPath } from "./pathUtils";
@@ -195,9 +195,8 @@ function AdStatsWindow({ onClose }: AdStatsWindowProps) {
                       </tr>
                     )}
                     {sortedAds.map((ad) => (
-                      <>
+                      <Fragment key={ad.name}>
                         <tr
-                          key={ad.name}
                           className={`ad-stats-row ${expandedAd === ad.name ? "expanded" : ""}`}
                           onClick={() => handleExpandAd(ad.name)}
                         >
@@ -220,7 +219,7 @@ function AdStatsWindow({ onClose }: AdStatsWindowProps) {
                             <td colSpan={2} className="ad-stats-td ad-stats-detail-date">No daily data</td>
                           </tr>
                         )}
-                      </>
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
