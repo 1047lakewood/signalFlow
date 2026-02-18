@@ -1,9 +1,10 @@
-use chrono::NaiveTime;
+use chrono::{NaiveTime, Timelike};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::PathBuf;
 
 const DAY_NAMES: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_INDEX_MAX: u8 = 6;
 
 /// Policy for resolving conflicts between manual playback and scheduled events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -81,9 +82,9 @@ impl ScheduleMode {
     /// Parse a mode from a string (case-insensitive).
     pub fn from_str_loose(s: &str) -> Result<Self, String> {
         match normalize_token(s).as_str() {
-            "overlay" => Ok(ScheduleMode::Overlay),
-            "stop" => Ok(ScheduleMode::Stop),
-            "insert" => Ok(ScheduleMode::Insert),
+            "overlay" | "over" => Ok(ScheduleMode::Overlay),
+            "stop" | "kill" | "interrupt" => Ok(ScheduleMode::Stop),
+            "insert" | "queue" | "next" => Ok(ScheduleMode::Insert),
             _ => Err(format!(
                 "Unknown schedule mode '{}'. Expected: overlay, stop, insert",
                 s
@@ -97,9 +98,15 @@ impl ScheduleMode {
 pub struct Priority(pub u8);
 
 impl Priority {
+    pub const MIN: u8 = 1;
+    pub const MAX: u8 = 9;
     pub const LOW: Priority = Priority(1);
     pub const NORMAL: Priority = Priority(5);
     pub const HIGH: Priority = Priority(9);
+
+    pub fn clamped(value: u8) -> Self {
+        Priority(value.clamp(Self::MIN, Self::MAX))
+    }
 }
 
 impl Default for Priority {
@@ -154,10 +161,13 @@ impl ScheduleEvent {
         if self.days.is_empty() {
             return "daily".to_string();
         }
-        self.days
+        let mut unique_days = self.days.clone();
+        unique_days.sort_unstable();
+        unique_days.dedup();
+
+        unique_days
             .iter()
-            .filter_map(|&d| DAY_NAMES.get(d as usize))
-            .copied()
+            .map(|&d| DAY_NAMES.get(d as usize).copied().unwrap_or("Invalid"))
             .collect::<Vec<_>>()
             .join(",")
     }
@@ -173,6 +183,13 @@ pub struct Schedule {
 
 fn default_next_id() -> u32 {
     1
+}
+
+fn normalize_days(days: Vec<u8>) -> Vec<u8> {
+    let mut cleaned: Vec<u8> = days.into_iter().filter(|d| *d <= DAY_INDEX_MAX).collect();
+    cleaned.sort_unstable();
+    cleaned.dedup();
+    cleaned
 }
 
 impl Default for Schedule {
@@ -206,10 +223,10 @@ impl Schedule {
             time,
             mode,
             file,
-            priority,
+            priority: Priority::clamped(priority.0),
             enabled: true,
             label,
-            days,
+            days: normalize_days(days),
         });
         id
     }
@@ -246,7 +263,12 @@ impl Schedule {
     /// Get all events sorted by time.
     pub fn events_by_time(&self) -> Vec<&ScheduleEvent> {
         let mut sorted: Vec<&ScheduleEvent> = self.events.iter().collect();
-        sorted.sort_by_key(|e| e.time);
+        sorted.sort_by(|a, b| {
+            a.time
+                .cmp(&b.time)
+                .then_with(|| b.priority.cmp(&a.priority))
+                .then_with(|| a.id.cmp(&b.id))
+        });
         sorted
     }
 
@@ -314,13 +336,20 @@ impl Schedule {
     /// Get events that should fire at a given time, considering a tolerance window (in seconds).
     /// Returns enabled events whose time falls within [time - tolerance, time + tolerance].
     pub fn events_at_time(&self, time: NaiveTime, tolerance_secs: i64) -> Vec<&ScheduleEvent> {
+        let tolerance_secs = tolerance_secs.abs();
+        let day_secs = 24 * 60 * 60;
+
         self.events
             .iter()
             .filter(|e| {
                 if !e.enabled {
                     return false;
                 }
-                let diff = (e.time - time).num_seconds().abs();
+                let event_secs = i64::from(e.time.num_seconds_from_midnight());
+                let time_secs = i64::from(time.num_seconds_from_midnight());
+                let direct = (event_secs - time_secs).abs();
+                let wrapped = day_secs - direct;
+                let diff = direct.min(wrapped);
                 diff <= tolerance_secs
             })
             .collect()
@@ -329,10 +358,34 @@ impl Schedule {
 
 /// Parse a time string in HH:MM or HH:MM:SS format.
 pub fn parse_time(s: &str) -> Result<NaiveTime, String> {
-    // Try HH:MM:SS first, then HH:MM
-    NaiveTime::parse_from_str(s, "%H:%M:%S")
-        .or_else(|_| NaiveTime::parse_from_str(s, "%H:%M"))
-        .map_err(|_| format!("Invalid time '{}'. Expected HH:MM or HH:MM:SS", s))
+    let normalized = s.trim();
+    if normalized.is_empty() {
+        return Err(format!("Invalid time '{}'. Expected HH:MM or HH:MM:SS", s));
+    }
+
+    let parts: Vec<&str> = normalized.split(':').collect();
+    let parsed = match parts.as_slice() {
+        [h, m] => {
+            let hour = h.parse::<u32>().ok();
+            let minute = m.parse::<u32>().ok();
+            match (hour, minute) {
+                (Some(hh), Some(mm)) => NaiveTime::from_hms_opt(hh, mm, 0),
+                _ => None,
+            }
+        }
+        [h, m, sec] => {
+            let hour = h.parse::<u32>().ok();
+            let minute = m.parse::<u32>().ok();
+            let second = sec.parse::<u32>().ok();
+            match (hour, minute, second) {
+                (Some(hh), Some(mm), Some(ss)) => NaiveTime::from_hms_opt(hh, mm, ss),
+                _ => None,
+            }
+        }
+        _ => None,
+    };
+
+    parsed.ok_or_else(|| format!("Invalid time '{}'. Expected HH:MM or HH:MM:SS", s))
 }
 
 fn normalize_token(s: &str) -> String {
@@ -353,6 +406,18 @@ mod tests {
     fn parse_time_hhmmss() {
         let t = parse_time("14:30:15").unwrap();
         assert_eq!(t, NaiveTime::from_hms_opt(14, 30, 15).unwrap());
+    }
+
+    #[test]
+    fn parse_time_trims_input() {
+        let t = parse_time(" 09:15 ").unwrap();
+        assert_eq!(t, NaiveTime::from_hms_opt(9, 15, 0).unwrap());
+    }
+
+    #[test]
+    fn parse_time_single_digit_hour() {
+        let t = parse_time("9:05").unwrap();
+        assert_eq!(t, NaiveTime::from_hms_opt(9, 5, 0).unwrap());
     }
 
     #[test]
@@ -377,6 +442,22 @@ mod tests {
             ScheduleMode::Insert
         );
         assert!(ScheduleMode::from_str_loose("bogus").is_err());
+    }
+
+    #[test]
+    fn schedule_mode_aliases() {
+        assert_eq!(
+            ScheduleMode::from_str_loose("queue").unwrap(),
+            ScheduleMode::Insert
+        );
+        assert_eq!(
+            ScheduleMode::from_str_loose("kill").unwrap(),
+            ScheduleMode::Stop
+        );
+        assert_eq!(
+            ScheduleMode::from_str_loose("over").unwrap(),
+            ScheduleMode::Overlay
+        );
     }
 
     #[test]
@@ -551,6 +632,77 @@ mod tests {
             days: vec![0, 1, 2, 3, 4],
         };
         assert_eq!(event.days_display(), "Mon,Tue,Wed,Thu,Fri");
+    }
+
+    #[test]
+    fn days_display_sorts_and_deduplicates() {
+        let event = ScheduleEvent {
+            id: 1,
+            time: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+            mode: ScheduleMode::Overlay,
+            file: "test.mp3".into(),
+            priority: Priority::NORMAL,
+            enabled: true,
+            label: None,
+            days: vec![4, 1, 4, 0],
+        };
+        assert_eq!(event.days_display(), "Mon,Tue,Fri");
+    }
+
+    #[test]
+    fn add_event_normalizes_days_and_priority() {
+        let mut sched = Schedule::new();
+        let id = sched.add_event(
+            NaiveTime::from_hms_opt(10, 0, 0).unwrap(),
+            ScheduleMode::Overlay,
+            "test.mp3".into(),
+            Priority(99),
+            None,
+            vec![6, 3, 8, 3, 0],
+        );
+
+        let event = sched.find_event(id).unwrap();
+        assert_eq!(event.priority, Priority(Priority::MAX));
+        assert_eq!(event.days, vec![0, 3, 6]);
+    }
+
+    #[test]
+    fn days_display_marks_invalid_day_values() {
+        let event = ScheduleEvent {
+            id: 1,
+            time: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+            mode: ScheduleMode::Overlay,
+            file: "test.mp3".into(),
+            priority: Priority::NORMAL,
+            enabled: true,
+            label: None,
+            days: vec![0, 9],
+        };
+        assert_eq!(event.days_display(), "Mon,Invalid");
+    }
+
+    #[test]
+    fn events_by_time_sorts_priority_and_id_for_ties() {
+        let mut sched = Schedule::new();
+        let low = sched.add_event(
+            NaiveTime::from_hms_opt(8, 0, 0).unwrap(),
+            ScheduleMode::Overlay,
+            "low.mp3".into(),
+            Priority::LOW,
+            None,
+            vec![],
+        );
+        let high = sched.add_event(
+            NaiveTime::from_hms_opt(8, 0, 0).unwrap(),
+            ScheduleMode::Overlay,
+            "high.mp3".into(),
+            Priority::HIGH,
+            None,
+            vec![],
+        );
+        let sorted = sched.events_by_time();
+        assert_eq!(sorted[0].id, high);
+        assert_eq!(sorted[1].id, low);
     }
 
     #[test]
@@ -757,6 +909,36 @@ mod tests {
         let at_noon = sched.events_at_time(NaiveTime::from_hms_opt(12, 0, 0).unwrap(), 0);
         assert_eq!(at_noon.len(), 1);
         assert_eq!(at_noon[0].file, PathBuf::from("noon.mp3"));
+    }
+
+    #[test]
+    fn events_at_time_wraps_around_midnight() {
+        let mut sched = Schedule::new();
+        sched.add_event(
+            NaiveTime::from_hms_opt(23, 59, 58).unwrap(),
+            ScheduleMode::Stop,
+            "late.mp3".into(),
+            Priority::NORMAL,
+            None,
+            vec![],
+        );
+        let found = sched.events_at_time(NaiveTime::from_hms_opt(0, 0, 1).unwrap(), 5);
+        assert_eq!(found.len(), 1);
+    }
+
+    #[test]
+    fn events_at_time_negative_tolerance_treated_as_positive() {
+        let mut sched = Schedule::new();
+        sched.add_event(
+            NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+            ScheduleMode::Stop,
+            "noon.mp3".into(),
+            Priority::NORMAL,
+            None,
+            vec![],
+        );
+        let found = sched.events_at_time(NaiveTime::from_hms_opt(12, 0, 2).unwrap(), -5);
+        assert_eq!(found.len(), 1);
     }
 
     #[test]
