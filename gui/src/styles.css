@@ -2211,14 +2211,56 @@ body {
 }
 .favorite-item {
   width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+}
+
+.favorite-open-btn {
+  flex: 1;
   border: 0;
   background: transparent;
   color: var(--text-primary);
   text-align: left;
-  padding: 6px 8px;
+  padding: 4px 6px;
   display: flex;
+  align-items: center;
   gap: 8px;
   cursor: pointer;
+  border-radius: 4px;
+}
+
+.favorite-open-btn:hover {
+  background: var(--bg-row-hover);
+}
+
+
+.favorites-section-divider {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--border);
+}
+
+.favorite-open-btn.active {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--text-primary);
+}
+
+.favorite-remove-btn {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.favorite-remove-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-row-hover);
 }
 .file-browser-content {
   flex: 1;
@@ -2253,6 +2295,74 @@ body {
   color: var(--text-primary);
   border-color: var(--accent);
 }
+
+.drive-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.file-browser-breadcrumbs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.breadcrumb-btn {
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.breadcrumb-btn.active {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.file-browser-search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.search-clear-btn {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.search-clear-btn:hover {
+  background: var(--bg-row-hover);
+  color: var(--text-primary);
+}
+
+.file-browser-search-status {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.file-browser-empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 12px 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
 .file-browser-search {
   width: 100%;
   background: var(--bg-primary);
