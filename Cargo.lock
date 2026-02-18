@@ -3874,6 +3874,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "dirs",
+ "lofty",
  "serde",
  "serde_json",
  "signal_flow",

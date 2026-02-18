@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open as dialogOpen } from "@tauri-apps/plugin-dialog";
 import type { TrackInfo } from "./types";
 
 export interface ClipboardData {
@@ -118,6 +119,15 @@ function PlaylistView({
   const [editValue, setEditValue] = useState("");
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [anchorIndex, setAnchorIndex] = useState<number | null>(null);
+  const [renameDialog, setRenameDialog] = useState<{
+    trackIndex: number;
+    currentPath: string;
+  } | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [convertConfirm, setConvertConfirm] = useState<{
+    indices: number[];
+  } | null>(null);
+  const [processingMsg, setProcessingMsg] = useState<string | null>(null);
   const [findQuery, setFindQuery] = useState("");
   const [findBarOpen, setFindBarOpen] = useState(false);
   const [findCurrentMatch, setFindCurrentMatch] = useState(0);
@@ -491,6 +501,207 @@ function PlaylistView({
     setContextMenu(null);
   }, [contextMenu, tracks, onSearchFilename]);
 
+  // ── New context menu handlers ────────────────────────────────────────────
+
+  const handleContextMenuDelete = useCallback(async () => {
+    const indices =
+      selectedIndices.size > 0
+        ? Array.from(selectedIndices).sort((a, b) => a - b)
+        : contextMenu
+          ? [contextMenu.trackIndex]
+          : [];
+    if (indices.length === 0) return;
+    setContextMenu(null);
+    try {
+      await invoke("remove_tracks", { playlist: playlistName, indices });
+      onTracksChanged();
+    } catch (e) {
+      console.error("Delete failed:", e);
+    }
+  }, [contextMenu, selectedIndices, playlistName, onTracksChanged]);
+
+  const handleDeleteKey = useCallback(
+    async (e: KeyboardEvent) => {
+      if (e.key !== "Delete") return;
+      // Don't delete while editing a cell or rename dialog is open
+      if (editingCell || renameDialog) return;
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement
+      )
+        return;
+      if (selectedIndices.size === 0) return;
+      const indices = Array.from(selectedIndices).sort((a, b) => a - b);
+      try {
+        await invoke("remove_tracks", { playlist: playlistName, indices });
+        onTracksChanged();
+      } catch (e) {
+        console.error("Delete failed:", e);
+      }
+    },
+    [editingCell, renameDialog, selectedIndices, playlistName, onTracksChanged],
+  );
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener("keydown", handleDeleteKey);
+    return () => el.removeEventListener("keydown", handleDeleteKey);
+  }, [handleDeleteKey]);
+
+  const handleContextMenuOpenLocation = useCallback(async () => {
+    if (!contextMenu) return;
+    const track = tracks.find((t) => t.index === contextMenu.trackIndex);
+    setContextMenu(null);
+    if (!track) return;
+    try {
+      await invoke("open_file_location", { path: track.path });
+    } catch (e) {
+      console.error("Open file location failed:", e);
+    }
+  }, [contextMenu, tracks]);
+
+  const handleContextMenuOpenAudacity = useCallback(async () => {
+    if (!contextMenu) return;
+    const track = tracks.find((t) => t.index === contextMenu.trackIndex);
+    setContextMenu(null);
+    if (!track) return;
+    try {
+      await invoke("open_in_audacity", { path: track.path });
+    } catch (e) {
+      alert(`Failed to open in Audacity: ${e}`);
+    }
+  }, [contextMenu, tracks]);
+
+  const handleContextMenuConvertMp3 = useCallback(() => {
+    if (!contextMenu) return;
+    const indices =
+      selectedIndices.size > 0
+        ? Array.from(selectedIndices).sort((a, b) => a - b)
+        : [contextMenu.trackIndex];
+    setContextMenu(null);
+    setConvertConfirm({ indices });
+  }, [contextMenu, selectedIndices]);
+
+  const handleConvertConfirm = useCallback(async () => {
+    if (!convertConfirm) return;
+    const { indices } = convertConfirm;
+    setConvertConfirm(null);
+    setProcessingMsg("Converting to MP3…");
+    try {
+      const [converted, skipped, failed] = (await invoke(
+        "convert_tracks_to_mp3",
+        { playlist: playlistName, indices },
+      )) as [number, number, number];
+      onTracksChanged();
+      alert(
+        `Conversion complete:\n• Converted: ${converted}\n• Skipped (already MP3): ${skipped}\n• Failed: ${failed}`,
+      );
+    } catch (e) {
+      alert(`Conversion failed: ${e}`);
+    } finally {
+      setProcessingMsg(null);
+    }
+  }, [convertConfirm, playlistName, onTracksChanged]);
+
+  const handleContextMenuRenamePath = useCallback(() => {
+    if (!contextMenu) return;
+    const track = tracks.find((t) => t.index === contextMenu.trackIndex);
+    setContextMenu(null);
+    if (!track) return;
+    setRenameValue(track.path);
+    setRenameDialog({ trackIndex: track.index, currentPath: track.path });
+  }, [contextMenu, tracks]);
+
+  const handleRenameSubmit = useCallback(async () => {
+    if (!renameDialog) return;
+    const newPath = renameValue.trim();
+    if (!newPath || newPath === renameDialog.currentPath) {
+      setRenameDialog(null);
+      return;
+    }
+    setRenameDialog(null);
+    setProcessingMsg("Renaming…");
+    try {
+      await invoke("rename_track_file", {
+        playlist: playlistName,
+        trackIndex: renameDialog.trackIndex,
+        newPath,
+      });
+      onTracksChanged();
+    } catch (e) {
+      alert(`Rename failed: ${e}`);
+    } finally {
+      setProcessingMsg(null);
+    }
+  }, [renameDialog, renameValue, playlistName, onTracksChanged]);
+
+  const handleContextMenuRenameBrowse = useCallback(async () => {
+    if (!contextMenu) return;
+    const track = tracks.find((t) => t.index === contextMenu.trackIndex);
+    setContextMenu(null);
+    if (!track) return;
+    try {
+      const selected = await dialogOpen({
+        title: "Select New Audio File",
+        defaultPath: track.path,
+        filters: [
+          {
+            name: "Audio",
+            extensions: ["mp3", "wav", "flac", "aac", "ogg", "m4a"],
+          },
+          { name: "All Files", extensions: ["*"] },
+        ],
+        multiple: false,
+      });
+      if (!selected || Array.isArray(selected)) return;
+      await invoke("update_track_path", {
+        playlist: playlistName,
+        trackIndex: track.index,
+        newPath: selected,
+      });
+      onTracksChanged();
+    } catch (e) {
+      console.error("Rename by browsing failed:", e);
+    }
+  }, [contextMenu, tracks, playlistName, onTracksChanged]);
+
+  const handleContextMenuReplaceMacro = useCallback(async () => {
+    if (!contextMenu) return;
+    const track = tracks.find((t) => t.index === contextMenu.trackIndex);
+    setContextMenu(null);
+    if (!track) return;
+    setProcessingMsg("Waiting for macro output file…");
+    try {
+      await invoke("replace_from_macro_output", {
+        playlist: playlistName,
+        trackIndex: track.index,
+      });
+      onTracksChanged();
+    } catch (e) {
+      alert(`Replace from Macro Output failed: ${e}`);
+    } finally {
+      setProcessingMsg(null);
+    }
+  }, [contextMenu, tracks, playlistName, onTracksChanged]);
+
+  const handleContextMenuAddAm = useCallback(async () => {
+    if (!contextMenu) return;
+    const track = tracks.find((t) => t.index === contextMenu.trackIndex);
+    setContextMenu(null);
+    if (!track) return;
+    try {
+      await invoke("add_am_to_filename", {
+        playlist: playlistName,
+        trackIndex: track.index,
+      });
+      onTracksChanged();
+    } catch (e) {
+      alert(`Add AM to Filename failed: ${e}`);
+    }
+  }, [contextMenu, tracks, playlistName, onTracksChanged]);
+
   const scrollToTrackIndex = useCallback((trackIndex: number) => {
     requestAnimationFrame(() => {
       containerRef.current
@@ -817,10 +1028,151 @@ function PlaylistView({
           <div className="context-menu-divider" />
           <button
             className="playlist-context-item"
+            onClick={handleContextMenuDelete}
+          >
+            Delete
+            {selectedIndices.size > 1 ? ` (${selectedIndices.size})` : ""}
+          </button>
+          <div className="context-menu-divider" />
+          <button
+            className={`playlist-context-item${selectedIndices.size > 1 ? " disabled" : ""}`}
+            onClick={handleContextMenuOpenLocation}
+            disabled={selectedIndices.size > 1}
+          >
+            Open File Location
+          </button>
+          <button
+            className={`playlist-context-item${selectedIndices.size > 1 ? " disabled" : ""}`}
+            onClick={handleContextMenuOpenAudacity}
+            disabled={selectedIndices.size > 1}
+          >
+            Open in Audacity
+          </button>
+          <button
+            className="playlist-context-item"
+            onClick={handleContextMenuConvertMp3}
+          >
+            Convert to MP3
+            {selectedIndices.size > 1 ? ` (${selectedIndices.size})` : ""}
+          </button>
+          <div className="context-menu-divider" />
+          <button
+            className={`playlist-context-item${selectedIndices.size > 1 ? " disabled" : ""}`}
+            onClick={handleContextMenuRenamePath}
+            disabled={selectedIndices.size > 1}
+          >
+            Rename File Path
+          </button>
+          <button
+            className={`playlist-context-item${selectedIndices.size > 1 ? " disabled" : ""}`}
+            onClick={handleContextMenuRenameBrowse}
+            disabled={selectedIndices.size > 1}
+          >
+            Rename by Browsing
+          </button>
+          <button
+            className={`playlist-context-item${selectedIndices.size > 1 ? " disabled" : ""}`}
+            onClick={handleContextMenuReplaceMacro}
+            disabled={selectedIndices.size > 1}
+          >
+            Replace from Macro Output
+          </button>
+          <button
+            className={`playlist-context-item${selectedIndices.size > 1 ? " disabled" : ""}`}
+            onClick={handleContextMenuAddAm}
+            disabled={selectedIndices.size > 1}
+          >
+            Add AM to Filename
+          </button>
+          <div className="context-menu-divider" />
+          <button
+            className="playlist-context-item"
             onClick={handleContextMenuSearchFilename}
           >
             Search filename across index
           </button>
+        </div>
+      )}
+      {/* Rename File Path dialog */}
+      {renameDialog && (
+        <div
+          className="playlist-modal-backdrop"
+          onClick={() => setRenameDialog(null)}
+        >
+          <div
+            className="playlist-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="playlist-modal-title">Rename File Path</div>
+            <input
+              className="playlist-modal-input"
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleRenameSubmit();
+                if (e.key === "Escape") setRenameDialog(null);
+              }}
+              autoFocus
+            />
+            <div className="playlist-modal-actions">
+              <button
+                className="playlist-modal-btn"
+                onClick={handleRenameSubmit}
+              >
+                OK
+              </button>
+              <button
+                className="playlist-modal-btn secondary"
+                onClick={() => setRenameDialog(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Convert to MP3 confirmation dialog */}
+      {convertConfirm && (
+        <div
+          className="playlist-modal-backdrop"
+          onClick={() => setConvertConfirm(null)}
+        >
+          <div
+            className="playlist-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="playlist-modal-title">Convert to MP3</div>
+            <p className="playlist-modal-body">
+              {convertConfirm.indices.length === 1
+                ? "Convert 1 track to MP3?"
+                : `Convert ${convertConfirm.indices.length} tracks to MP3?`}
+              <br />
+              Original files will be deleted after conversion.
+            </p>
+            <div className="playlist-modal-actions">
+              <button
+                className="playlist-modal-btn"
+                onClick={handleConvertConfirm}
+              >
+                Convert
+              </button>
+              <button
+                className="playlist-modal-btn secondary"
+                onClick={() => setConvertConfirm(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Processing overlay */}
+      {processingMsg && (
+        <div className="playlist-processing-overlay">
+          <span>{processingMsg}</span>
         </div>
       )}
     </div>

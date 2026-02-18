@@ -792,6 +792,464 @@ fn clear_logs(state: State<AppState>) {
     state.core.lock().unwrap().clear_logs();
 }
 
+// ── File / shell operations ──────────────────────────────────────────────────
+
+/// Open the containing folder of a file in the system file manager,
+/// with the file highlighted (Windows: explorer /select, macOS: open -R,
+/// Linux: xdg-open on parent dir).
+#[tauri::command]
+fn open_file_location(path: String) -> Result<(), String> {
+    let p = std::path::Path::new(&path);
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .args(["/select,", &path])
+            .spawn()
+            .map_err(|e| format!("Failed to open file location: {e}"))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .args(["-R", &path])
+            .spawn()
+            .map_err(|e| format!("Failed to open file location: {e}"))?;
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        let parent = p
+            .parent()
+            .ok_or_else(|| "File has no parent directory".to_string())?;
+        std::process::Command::new("xdg-open")
+            .arg(parent)
+            .spawn()
+            .map_err(|e| format!("Failed to open file location: {e}"))?;
+    }
+    let _ = p; // suppress unused warning on non-Linux paths
+    Ok(())
+}
+
+/// Open a file in Audacity (or the platform's default Audacity command).
+#[tauri::command]
+fn open_in_audacity(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        let audacity = r"C:\Program Files\Audacity\audacity.exe";
+        std::process::Command::new(audacity)
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to launch Audacity: {e}"))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .args(["-a", "Audacity", &path])
+            .spawn()
+            .map_err(|e| format!("Failed to launch Audacity: {e}"))?;
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        std::process::Command::new("audacity")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to launch Audacity: {e}"))?;
+    }
+    Ok(())
+}
+
+/// Update a track's path in the playlist without touching the file system.
+/// Re-reads metadata from the new path and saves state.
+#[tauri::command]
+fn update_track_path(
+    state: State<AppState>,
+    playlist: String,
+    track_index: usize,
+    new_path: String,
+) -> Result<(), String> {
+    state
+        .core
+        .lock()
+        .unwrap()
+        .update_track_path(&playlist, track_index, std::path::Path::new(&new_path))
+}
+
+/// Rename / move a track's file on disk then update the playlist path.
+/// Implements the truth-table from the spec:
+///   original exists + new free  → rename/move (create dirs as needed)
+///   original exists + new file  → overwrite move
+///   original exists + new dir   → move into dir keeping filename
+///   original absent + any       → path-only update, no file ops
+#[tauri::command]
+async fn rename_track_file(
+    state: State<'_, AppState>,
+    playlist: String,
+    track_index: usize,
+    new_path: String,
+) -> Result<(), String> {
+    use std::path::Path;
+
+    // Grab current path while holding lock briefly.
+    let old_path_str = {
+        let core = state.core.lock().unwrap();
+        let tracks = core.get_playlist_tracks(&playlist)?;
+        tracks
+            .get(track_index)
+            .map(|t| t.path.clone())
+            .ok_or_else(|| format!("Track index {track_index} out of range"))?
+    };
+
+    let old_path = std::path::PathBuf::from(&old_path_str);
+    let mut target = std::path::PathBuf::from(&new_path);
+
+    let resolved_path = tokio::task::spawn_blocking(move || -> Result<String, String> {
+        if old_path.exists() {
+            // Resolve directory target → keep original filename
+            if target.is_dir() {
+                let fname = old_path
+                    .file_name()
+                    .ok_or_else(|| "Source has no filename".to_string())?;
+                target = target.join(fname);
+            }
+            // Create parent dirs if needed
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| format!("Cannot create directories: {e}"))?;
+            }
+            std::fs::rename(&old_path, &target)
+                .map_err(|e| format!("Failed to rename file: {e}"))?;
+        }
+        // Path-only update in both cases (file existed or not)
+        Ok(target.to_string_lossy().to_string())
+    })
+    .await
+    .map_err(|e| format!("Rename task panicked: {e}"))??;
+
+    state
+        .core
+        .lock()
+        .unwrap()
+        .update_track_path(&playlist, track_index, Path::new(&resolved_path))
+}
+
+/// Convert one or more tracks to MP3 using ffmpeg.
+/// Returns a summary: (converted, skipped, failed).
+#[tauri::command]
+async fn convert_tracks_to_mp3(
+    state: State<'_, AppState>,
+    playlist: String,
+    indices: Vec<usize>,
+) -> Result<(usize, usize, usize), String> {
+    use std::path::Path;
+
+    // Grab paths while holding lock briefly.
+    let paths: Vec<(usize, String)> = {
+        let core = state.core.lock().unwrap();
+        let tracks = core.get_playlist_tracks(&playlist)?;
+        indices
+            .iter()
+            .filter_map(|&i| tracks.get(i).map(|t| (i, t.path.clone())))
+            .collect()
+    };
+
+    let mut converted = 0usize;
+    let mut skipped = 0usize;
+    let mut failed = 0usize;
+
+    for (idx, path_str) in paths {
+        let p = std::path::PathBuf::from(&path_str);
+        let ext = p
+            .extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+
+        if ext == "mp3" {
+            skipped += 1;
+            continue;
+        }
+
+        let mp3_path = p.with_extension("mp3");
+        let p_clone = p.clone();
+        let mp3_clone = mp3_path.clone();
+
+        let ok = tokio::task::spawn_blocking(move || -> bool {
+            let status = std::process::Command::new("ffmpeg")
+                .args([
+                    "-i",
+                    p_clone.to_str().unwrap_or(""),
+                    "-q:a",
+                    "0",
+                    mp3_clone.to_str().unwrap_or(""),
+                    "-y",
+                ])
+                .status();
+            match status {
+                Ok(s) if s.success() => {
+                    // Delete original
+                    let _ = std::fs::remove_file(&p_clone);
+                    true
+                }
+                _ => false,
+            }
+        })
+        .await
+        .unwrap_or(false);
+
+        if ok {
+            // Update track path in playlist
+            if let Ok(()) = state
+                .core
+                .lock()
+                .unwrap()
+                .update_track_path(&playlist, idx, Path::new(&mp3_path))
+            {
+                converted += 1;
+            } else {
+                failed += 1;
+            }
+        } else {
+            failed += 1;
+        }
+    }
+
+    Ok((converted, skipped, failed))
+}
+
+/// Replace a track's file with the processed version from the `macro-output`
+/// subfolder in the same directory. Waits for the file to finish writing
+/// (stable size for 2 consecutive 500ms checks) before moving it.
+#[tauri::command]
+async fn replace_from_macro_output(
+    state: State<'_, AppState>,
+    playlist: String,
+    track_index: usize,
+) -> Result<String, String> {
+    use std::path::Path;
+
+    let path_str = {
+        let core = state.core.lock().unwrap();
+        let tracks = core.get_playlist_tracks(&playlist)?;
+        tracks
+            .get(track_index)
+            .map(|t| t.path.clone())
+            .ok_or_else(|| format!("Track index {track_index} out of range"))?
+    };
+
+    let new_path = tokio::task::spawn_blocking(move || -> Result<String, String> {
+        let orig = Path::new(&path_str);
+        let parent = orig
+            .parent()
+            .ok_or_else(|| "File has no parent directory".to_string())?;
+        let macro_dir = parent.join("macro-output");
+
+        if !macro_dir.is_dir() {
+            return Err(format!(
+                "No macro-output folder found in '{}'",
+                parent.display()
+            ));
+        }
+
+        let stem = orig
+            .file_stem()
+            .ok_or_else(|| "Source file has no stem".to_string())?
+            .to_string_lossy()
+            .to_lowercase();
+
+        // Find a file in macro-output whose stem matches (case-insensitive)
+        let entry = std::fs::read_dir(&macro_dir)
+            .map_err(|e| format!("Cannot read macro-output: {e}"))?
+            .filter_map(|e| e.ok())
+            .find(|e| {
+                let name = e.file_name();
+                let s = name.to_string_lossy();
+                let entry_stem = Path::new(s.as_ref())
+                    .file_stem()
+                    .map(|x| x.to_string_lossy().to_lowercase())
+                    .unwrap_or_default();
+                entry_stem == stem
+            })
+            .ok_or_else(|| format!("No matching file in macro-output for '{}'", stem))?;
+
+        let macro_file = entry.path();
+
+        // Wait for file to be stable (2 × 500ms checks)
+        let mut prev_size = macro_file
+            .metadata()
+            .map(|m| m.len())
+            .unwrap_or(0);
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        let size1 = macro_file
+            .metadata()
+            .map(|m| m.len())
+            .unwrap_or(0);
+        if size1 != prev_size {
+            prev_size = size1;
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            let size2 = macro_file
+                .metadata()
+                .map(|m| m.len())
+                .unwrap_or(0);
+            if size2 != prev_size {
+                return Err("Macro output file is still being written. Try again shortly.".to_string());
+            }
+        }
+
+        // Determine destination path (may differ in extension)
+        let macro_ext = macro_file
+            .extension()
+            .map(|e| e.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let orig_ext = orig
+            .extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+
+        let dest = parent.join(
+            macro_file
+                .file_name()
+                .ok_or_else(|| "macro-output file has no name".to_string())?,
+        );
+
+        std::fs::rename(&macro_file, &dest)
+            .map_err(|e| format!("Failed to move macro output file: {e}"))?;
+
+        // Verify destination is non-empty
+        let dest_size = dest.metadata().map(|m| m.len()).unwrap_or(0);
+        if dest_size == 0 {
+            return Err("Moved file is empty at destination".to_string());
+        }
+
+        // Delete original if extension changed
+        if macro_ext.to_lowercase() != orig_ext && orig.exists() {
+            let _ = std::fs::remove_file(orig);
+        }
+
+        // Clean up empty macro-output dir
+        if let Ok(mut dir_entries) = std::fs::read_dir(&macro_dir) {
+            if dir_entries.next().is_none() {
+                let _ = std::fs::remove_dir(&macro_dir);
+            }
+        }
+
+        Ok(dest.to_string_lossy().to_string())
+    })
+    .await
+    .map_err(|e| format!("Replace task panicked: {e}"))??;
+
+    state
+        .core
+        .lock()
+        .unwrap()
+        .update_track_path(&playlist, track_index, std::path::Path::new(&new_path))?;
+
+    Ok(new_path)
+}
+
+/// Append " AM" to a track's filename and title tag.
+/// Renames the file on disk (if it exists) and updates in-playlist metadata.
+#[tauri::command]
+async fn add_am_to_filename(
+    state: State<'_, AppState>,
+    playlist: String,
+    track_index: usize,
+) -> Result<(), String> {
+    use std::path::Path;
+
+    let path_str = {
+        let core = state.core.lock().unwrap();
+        let tracks = core.get_playlist_tracks(&playlist)?;
+        tracks
+            .get(track_index)
+            .map(|t| t.path.clone())
+            .ok_or_else(|| format!("Track index {track_index} out of range"))?
+    };
+
+    let p = std::path::PathBuf::from(&path_str);
+    let stem = p
+        .file_stem()
+        .ok_or_else(|| "File has no stem".to_string())?
+        .to_string_lossy()
+        .to_string();
+
+    if stem.ends_with(" AM") {
+        return Err("Filename already ends with \" AM\"".to_string());
+    }
+
+    let ext = p
+        .extension()
+        .map(|e| format!(".{}", e.to_string_lossy()))
+        .unwrap_or_default();
+    let new_filename = format!("{} AM{}", stem, ext);
+    let parent = p
+        .parent()
+        .ok_or_else(|| "File has no parent directory".to_string())?;
+    let new_path = parent.join(&new_filename);
+
+    if new_path.exists() {
+        return Err(format!("'{}' already exists", new_path.display()));
+    }
+
+    let path_str_clone = path_str.clone();
+    let new_path_clone = new_path.clone();
+    let stem_clone = stem.clone();
+
+    let final_path = tokio::task::spawn_blocking(move || -> Result<String, String> {
+        let orig = Path::new(&path_str_clone);
+        if orig.exists() {
+            std::fs::rename(orig, &new_path_clone)
+                .map_err(|e| format!("Failed to rename file: {e}"))?;
+        }
+
+        // Write " AM" title tag if file now exists
+        let target = if new_path_clone.exists() {
+            new_path_clone.clone()
+        } else {
+            // File didn't exist (path-only mode) - can't write tags
+            return Ok(new_path_clone.to_string_lossy().to_string());
+        };
+
+        // Update the title tag via lofty
+        use lofty::file::TaggedFileExt;
+        use lofty::prelude::TagExt;
+        use lofty::tag::Accessor;
+        let mut tagged = lofty::read_from_path(&target)
+            .map_err(|e| format!("Failed to read tags: {e}"))?;
+        let tag = match tagged.primary_tag_mut() {
+            Some(t) => t,
+            None => match tagged.first_tag_mut() {
+                Some(t) => t,
+                None => {
+                    let tag_type = tagged.primary_tag_type();
+                    tagged.insert_tag(lofty::tag::Tag::new(tag_type));
+                    tagged.primary_tag_mut().unwrap()
+                }
+            },
+        };
+
+        let current_title: String = tag
+            .title()
+            .map(|t| t.to_string())
+            .unwrap_or_else(|| stem_clone.clone());
+        let new_title = if current_title.ends_with(" AM") {
+            current_title
+        } else {
+            format!("{} AM", current_title)
+        };
+        tag.set_title(new_title);
+
+        tag.save_to_path(&target, lofty::config::WriteOptions::default())
+            .map_err(|e| format!("Failed to write title tag: {e}"))?;
+
+        Ok(target.to_string_lossy().to_string())
+    })
+    .await
+    .map_err(|e| format!("Add AM task panicked: {e}"))??;
+
+    state
+        .core
+        .lock()
+        .unwrap()
+        .update_track_path(&playlist, track_index, std::path::Path::new(&final_path))
+}
+
 // ── App entry ───────────────────────────────────────────────────────────────
 
 fn main() {
@@ -943,6 +1401,14 @@ fn main() {
             set_nowplaying_path,
             list_output_devices,
             set_output_device,
+            // File / shell operations
+            open_file_location,
+            open_in_audacity,
+            update_track_path,
+            rename_track_file,
+            convert_tracks_to_mp3,
+            replace_from_macro_output,
+            add_am_to_filename,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

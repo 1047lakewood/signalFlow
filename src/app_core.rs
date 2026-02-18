@@ -541,6 +541,17 @@ impl AppCore {
         Ok(())
     }
 
+    pub fn update_track_path(
+        &mut self,
+        playlist: &str,
+        track_index: usize,
+        new_path: &std::path::Path,
+    ) -> Result<(), String> {
+        self.engine.update_track_path(playlist, track_index, new_path)?;
+        self.engine.save()?;
+        Ok(())
+    }
+
     pub fn copy_tracks(
         &self,
         from_playlist: &str,

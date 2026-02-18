@@ -13,6 +13,7 @@ tauri-plugin-dialog = "2"
 chrono = "0.4"
 dirs = "6"
 tokio = { version = "1", features = ["rt"] }
+lofty = "0.22"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

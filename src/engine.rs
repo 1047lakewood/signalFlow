@@ -328,7 +328,35 @@ impl Engine {
         track.write_tags(new_artist, new_title)
     }
 
+    /// Update the file path for a track in a playlist and reload its metadata.
+    /// `track_index` is 0-based. Does not perform any file-system operations.
+    pub fn update_track_path(
+        &mut self,
+        playlist_name: &str,
+        track_index: usize,
+        new_path: &std::path::Path,
+    ) -> Result<(), String> {
+        let pl = self
+            .find_playlist_mut(playlist_name)
+            .ok_or_else(|| format!("Playlist '{}' not found", playlist_name))?;
+        let track_count = pl.tracks.len();
+        let track = pl.tracks.get_mut(track_index).ok_or_else(|| {
+            format!(
+                "Track index {} out of range (playlist '{}' has {} tracks)",
+                track_index, playlist_name, track_count
+            )
+        })?;
+        let reloaded = crate::track::Track::from_path(new_path)
+            .map_err(|e| format!("Failed to read new path '{}': {}", new_path.display(), e))?;
+        track.path = reloaded.path;
+        track.title = reloaded.title;
+        track.artist = reloaded.artist;
+        track.duration = reloaded.duration;
+        Ok(())
+    }
+
     // --- Ad management ---
+
 
     /// Add a new ad configuration. Returns its index (0-based).
     pub fn add_ad(&mut self, ad: AdConfig) -> usize {
