@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use signal_flow::app_core::{
     list_directory_at, search_files_in_locations, AdData, AppCore, ConfigData, FileBrowserEntry,
     FileSearchResult, LogEntry, PlaylistData, PlaylistProfileData, RdsConfigData,
@@ -13,10 +13,22 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State};
 
+/// Shared editor playback state — written by editor IPC commands, read by editor_status.
+#[derive(Default)]
+struct EditorPlaybackState {
+    is_playing: bool,
+    start_secs: f64,
+    started_at: Option<std::time::Instant>,
+}
+
 struct AppState {
     core: Arc<Mutex<AppCore>>,
     audio: AudioHandle,
     level_monitor: LevelMonitor,
+    /// Dedicated audio handle for the in-app editor (independent of main transport).
+    editor_audio: AudioHandle,
+    /// Shared editor playback position tracking.
+    editor_info: Arc<Mutex<EditorPlaybackState>>,
 }
 
 // ── Ad stats response types (thin wrappers for field name mapping) ──────────
@@ -1250,6 +1262,205 @@ async fn add_am_to_filename(
         .update_track_path(&playlist, track_index, std::path::Path::new(&final_path))
 }
 
+// ── In-App Audio Editor ─────────────────────────────────────────────────────
+
+/// High-resolution peak data returned to the editor frontend.
+#[derive(Serialize)]
+struct EditorWaveformResponse {
+    peaks: Vec<f32>,
+    duration_secs: f64,
+    sample_rate: u32,
+    num_peaks: usize,
+    resolution_ms: u32,
+}
+
+/// Audio file technical information.
+#[derive(Serialize)]
+struct AudioFileInfo {
+    format: String,
+    duration_secs: f64,
+    sample_rate: u32,
+    channels: u32,
+    bitrate_kbps: u32,
+    file_size_bytes: u64,
+}
+
+/// Editor playback status returned to the frontend.
+#[derive(Serialize)]
+struct EditorStatusData {
+    is_playing: bool,
+    position_secs: f64,
+}
+
+/// Export request sent from the frontend.
+#[derive(Deserialize)]
+struct ExportRequest {
+    input_path: String,
+    output_path: String,
+    format: String,
+    quality: u8,
+    operations: signal_flow::audio_editor::EditorOperations,
+}
+
+/// Fetch high-resolution waveform peaks for the audio editor.
+/// `resolution_ms` = milliseconds per peak (10 → ~100 peaks/sec). Cached on disk.
+#[tauri::command]
+async fn get_editor_waveform(
+    path: String,
+    resolution_ms: u32,
+) -> Result<EditorWaveformResponse, String> {
+    let resolution_ms = resolution_ms.clamp(5, 500);
+    tokio::task::spawn_blocking(move || {
+        let data = signal_flow::waveform::generate_editor_peaks_cached(
+            std::path::Path::new(&path),
+            resolution_ms,
+        )?;
+        Ok(EditorWaveformResponse {
+            peaks: data.peaks,
+            duration_secs: data.duration_secs,
+            sample_rate: data.sample_rate,
+            num_peaks: data.num_peaks,
+            resolution_ms: data.resolution_ms,
+        })
+    })
+    .await
+    .map_err(|e| format!("Waveform task panicked: {e}"))?
+}
+
+/// Return technical information about an audio file using lofty.
+#[tauri::command]
+async fn get_audio_info(path: String) -> Result<AudioFileInfo, String> {
+    tokio::task::spawn_blocking(move || {
+        use lofty::file::AudioFile;
+        let p = std::path::Path::new(&path);
+        let file_size = std::fs::metadata(p).map(|m| m.len()).unwrap_or(0);
+        let ext = p
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        let tagged =
+            lofty::read_from_path(p).map_err(|e| format!("Cannot read audio info: {e}"))?;
+        let props = tagged.properties();
+        Ok(AudioFileInfo {
+            format: ext.to_uppercase(),
+            duration_secs: props.duration().as_secs_f64(),
+            sample_rate: props.sample_rate().unwrap_or(0),
+            channels: props.channels().unwrap_or(0) as u32,
+            bitrate_kbps: props.audio_bitrate().unwrap_or(0) as u32,
+            file_size_bytes: file_size,
+        })
+    })
+    .await
+    .map_err(|e| format!("Audio info task panicked: {e}"))?
+}
+
+/// Start editor audio playback from `start_secs` into the file.
+/// Sends Play then Seek to the dedicated editor audio handle.
+#[tauri::command]
+fn editor_play(state: State<AppState>, path: String, start_secs: f64) -> Result<(), String> {
+    let path_buf = PathBuf::from(&path);
+    state
+        .editor_audio
+        .play(path_buf, state.level_monitor.clone());
+    if start_secs > 0.01 {
+        state
+            .editor_audio
+            .seek(std::time::Duration::from_secs_f64(start_secs.max(0.0)));
+    }
+
+    let mut info = state.editor_info.lock().unwrap();
+    info.is_playing = true;
+    info.start_secs = start_secs.max(0.0);
+    info.started_at = Some(std::time::Instant::now());
+    Ok(())
+}
+
+/// Stop editor audio playback, recording the current position for resume.
+#[tauri::command]
+fn editor_stop(state: State<AppState>) -> Result<(), String> {
+    state.editor_audio.stop();
+    let mut info = state.editor_info.lock().unwrap();
+    if let Some(started_at) = info.started_at.take() {
+        info.start_secs += started_at.elapsed().as_secs_f64();
+    }
+    info.is_playing = false;
+    Ok(())
+}
+
+/// Seek the editor audio to `position_secs`.
+#[tauri::command]
+fn editor_seek(state: State<AppState>, position_secs: f64) -> Result<(), String> {
+    let pos = std::time::Duration::from_secs_f64(position_secs.max(0.0));
+    state.editor_audio.seek(pos);
+    let mut info = state.editor_info.lock().unwrap();
+    info.start_secs = position_secs.max(0.0);
+    if info.is_playing {
+        info.started_at = Some(std::time::Instant::now());
+    }
+    Ok(())
+}
+
+/// Return current editor playback status (position computed from elapsed wall time).
+#[tauri::command]
+fn editor_status(state: State<AppState>) -> EditorStatusData {
+    let info = state.editor_info.lock().unwrap();
+    let position_secs = if info.is_playing {
+        if let Some(started_at) = info.started_at {
+            info.start_secs + started_at.elapsed().as_secs_f64()
+        } else {
+            info.start_secs
+        }
+    } else {
+        info.start_secs
+    };
+    EditorStatusData {
+        is_playing: info.is_playing,
+        position_secs,
+    }
+}
+
+/// Export the edited audio file via ffmpeg.
+/// Builds and runs the filter chain, writes to `output_path`.
+#[tauri::command]
+async fn export_edited_audio(request: ExportRequest) -> Result<String, String> {
+    use signal_flow::audio_editor::{build_ffmpeg_args, run_ffmpeg};
+
+    tokio::task::spawn_blocking(move || {
+        let args = build_ffmpeg_args(
+            &request.input_path,
+            &request.output_path,
+            &request.operations,
+            &request.format,
+            request.quality,
+        );
+        run_ffmpeg(&args)?;
+        Ok(request.output_path)
+    })
+    .await
+    .map_err(|e| format!("Export task panicked: {e}"))?
+}
+
+/// Scan an audio file for silence regions below `threshold_db` dB lasting at
+/// least `min_duration_secs` seconds. Returns a list of silence regions.
+#[tauri::command]
+async fn detect_silence_regions(
+    path: String,
+    threshold_db: f64,
+    min_duration_secs: f64,
+) -> Result<Vec<signal_flow::audio_editor::SilenceRegion>, String> {
+    tokio::task::spawn_blocking(move || {
+        signal_flow::audio_editor::detect_silence_regions(
+            std::path::Path::new(&path),
+            threshold_db,
+            min_duration_secs,
+        )
+    })
+    .await
+    .map_err(|e| format!("Silence detection task panicked: {e}"))?
+}
+
 // ── App entry ───────────────────────────────────────────────────────────────
 
 fn main() {
@@ -1266,6 +1477,22 @@ fn main() {
             let app_handle = app.handle().clone();
             let level_monitor_for_audio = level_monitor.clone();
             let audio_for_callback: Arc<Mutex<Option<AudioHandle>>> = Arc::new(Mutex::new(None));
+
+            // Spawn dedicated editor audio runtime (independent of main transport)
+            let editor_info: Arc<Mutex<EditorPlaybackState>> =
+                Arc::new(Mutex::new(EditorPlaybackState::default()));
+            let editor_info_for_cb = editor_info.clone();
+            let editor_audio = spawn_audio_runtime(None, move |event| {
+                // On track end or stop, mark editor as stopped
+                match event {
+                    AudioEvent::TrackFinished | AudioEvent::Stopped => {
+                        let mut info = editor_info_for_cb.lock().unwrap();
+                        info.is_playing = false;
+                        info.started_at = None;
+                    }
+                    _ => {}
+                }
+            });
 
             // Spawn audio runtime with event callback
             let initial_device = core.lock().unwrap().get_config().output_device_name;
@@ -1321,6 +1548,8 @@ fn main() {
                 core,
                 audio,
                 level_monitor,
+                editor_audio,
+                editor_info,
             });
 
             Ok(())
@@ -1409,6 +1638,15 @@ fn main() {
             convert_tracks_to_mp3,
             replace_from_macro_output,
             add_am_to_filename,
+            // In-app audio editor
+            get_editor_waveform,
+            get_audio_info,
+            editor_play,
+            editor_stop,
+            editor_seek,
+            editor_status,
+            export_edited_audio,
+            detect_silence_regions,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

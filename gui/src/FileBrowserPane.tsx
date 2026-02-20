@@ -40,16 +40,20 @@ function favoriteDriveKey(path: string): string {
   return `drive:${path}`;
 }
 
+const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "flac", "ogg", "aac", "m4a"]);
+
 interface FileBrowserPaneProps {
   onAddFiles: (paths: string[]) => void;
   onSearchFilename: (filename: string) => void;
   searchSeed: string;
+  onEditAudio?: (path: string) => void;
 }
 
 function FileBrowserPane({
   onAddFiles,
   onSearchFilename,
   searchSeed,
+  onEditAudio,
 }: FileBrowserPaneProps) {
   const [indexedLocations, setIndexedLocations] = useState<string[]>([]);
   const [favoriteFolders, setFavoriteFolders] = useState<string[]>([]);
@@ -438,6 +442,15 @@ function FileBrowserPane({
                     >
                       +
                     </button>
+                    {onEditAudio && AUDIO_EXTENSIONS.has(entry.name.split(".").pop()?.toLowerCase() ?? "") && (
+                      <button
+                        className="file-row-action"
+                        onClick={() => onEditAudio(entry.path)}
+                        title="Edit audio"
+                      >
+                        ✎
+                      </button>
+                    )}
                     <button
                       className="file-row-action"
                       onClick={() => onSearchFilename(entry.name.replace(/\.[^.]+$/, ""))}

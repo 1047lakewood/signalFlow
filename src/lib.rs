@@ -21,3 +21,4 @@ pub mod silence;
 pub mod track;
 pub mod rds;
 pub mod waveform;
+pub mod audio_editor;

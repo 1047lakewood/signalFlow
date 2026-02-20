@@ -13,6 +13,7 @@ import RdsConfigWindow from "./RdsConfigWindow";
 import SchedulePane from "./SchedulePane";
 import LogPane from "./LogPane";
 import FileBrowserPane from "./FileBrowserPane";
+import AudioEditorModal from "./editor/AudioEditorModal";
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "ogg", "aac", "m4a"];
 
@@ -45,6 +46,7 @@ function App() {
   const [profiles, setProfiles] = useState<PlaylistProfileInfo[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<string>("");
   const [findRequestToken, setFindRequestToken] = useState(0);
+  const [editorPath, setEditorPath] = useState<string | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -635,6 +637,7 @@ function App() {
               onAddFiles={handleFileDrop}
               onSearchFilename={handleSearchFilename}
               searchSeed={fileSearchSeed}
+              onEditAudio={setEditorPath}
             />
           )}
           {showSchedulePane && (
@@ -662,6 +665,7 @@ function App() {
                 onTracksChanged={loadTracks}
                 onSearchFilename={handleSearchFilename}
                 findRequestToken={findRequestToken}
+                onEditAudio={setEditorPath}
               />
             ) : (
               <div className="no-playlist">
@@ -687,6 +691,12 @@ function App() {
       {showAdStats && <AdStatsWindow onClose={() => setShowAdStats(false)} />}
       {showRdsConfig && (
         <RdsConfigWindow onClose={() => setShowRdsConfig(false)} />
+      )}
+      {editorPath && (
+        <AudioEditorModal
+          path={editorPath}
+          onClose={() => setEditorPath(null)}
+        />
       )}
     </div>
   );

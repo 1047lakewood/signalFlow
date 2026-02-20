@@ -143,8 +143,74 @@
 - [x] File browser drive buttons — Replace the drive selector combo box with individual buttons for each drive (remove indexed-drive dropdown)
 - [x] Output device selector — Add an audio output device chooser in the Options/Settings window
 
+## Phase R: In-App Audio Editor
+
+> Opens via right-click context menu on audio files in playlist or file browser. Non-destructive editing — all effects applied at export via ffmpeg. Independent editor playback (separate from main transport).
+
+### R1 — Backend: Waveform & Audio Info
+- [ ] `EditorPeakData` struct + `generate_editor_peaks(path, resolution_ms)` in `waveform.rs` with disk caching
+- [ ] `get_editor_waveform` IPC command (async, returns high-res peaks + duration + sample_rate)
+- [ ] `AudioFileInfo` struct + `get_audio_info` IPC command (format, sample rate, channels, bitrate, duration, file size)
+
+### R2 — Backend: Editor Playback
+- [ ] Add `EditorPlay { path, start_secs }`, `EditorStop`, `EditorSeek(Duration)` to `AudioCmd` enum
+- [ ] Manage `editor_sink: Option<Sink>` in audio runtime thread loop (no new Mutex)
+- [ ] `editor_play`, `editor_stop`, `editor_seek`, `editor_status` IPC commands
+- [ ] Auto-pause main transport when editor opens; resume option on close
+
+### R3 — Frontend: Editor Shell & Waveform
+- [ ] `editorTypes.ts` — all TypeScript interfaces (`EditorState`, `EditorAction`, `EditorPeakData`, etc.)
+- [ ] `AudioEditorModal.tsx` — full-screen modal overlay with close/escape, file info header
+- [ ] `useEditorWaveform.ts` — peak fetching hook with `getVisiblePeaks(zoom, scrollOffset, width)` downsampler
+- [ ] `EditorWaveform.tsx` — canvas rendering: waveform bars, playhead, DPR scaling, ResizeObserver
+- [ ] Zoom: Ctrl+scroll to zoom in/out centered on cursor position
+- [ ] Scroll: mouse wheel horizontal pan, scrollbar, minimap overview bar
+- [ ] Click-to-seek: click sets playhead and seeks editor audio
+- [ ] `EditorTimeline.tsx` — time ruler above waveform with zoom-aware tick marks (mm:ss.ms)
+- [ ] `editorStyles.css` — modal layout, waveform container, toolbar, panels
+
+### R4 — Frontend: Transport & Playback
+- [ ] `useEditorPlayback.ts` — hook wrapping editor IPC commands, polls `editor_status` via RAF while playing
+- [ ] `EditorTransport.tsx` — play/pause/stop buttons, elapsed/duration display, loop toggle
+- [ ] Space key toggles play/pause, Home/End jump to start/end
+
+### R5 — Frontend: Selection & Editing
+- [ ] `editorReducer.ts` — useReducer with undo stack (past states array) + redo stack
+- [ ] Click+drag selection on waveform (visual highlight overlay)
+- [ ] `EditorToolbar.tsx` — trim to selection (T key), cut selection (Delete), undo (Ctrl+Z), redo (Ctrl+Y)
+- [ ] Visual overlays: trim markers (vertical lines), cut regions (grayed out), selection (semi-transparent)
+- [ ] Set in-point (I key) / set out-point (O key) for trim
+
+### R6 — Frontend: Effects Panel
+- [ ] `EditorEffectsPanel.tsx` — volume slider (-30 to +20 dB), visual dB readout
+- [ ] Fade in / fade out duration sliders with envelope preview on waveform
+- [ ] Speed slider (0.5x to 2.0x)
+- [ ] Pitch shift slider (+/- 12 semitones)
+- [ ] Normalize toggle (EBU R128 loudnorm)
+
+### R7 — Backend: Export Pipeline
+- [ ] `src/audio_editor.rs` — `build_ffmpeg_args()` filter chain builder from `EditorOperations`
+- [ ] Handle trim (`-ss`/`-to`), cuts (`aselect`+`asetpts`), volume (`volume=XdB`), speed (`atempo`), pitch (`asetrate`+`aresample`), fades (`afade`), normalize (`loudnorm`)
+- [ ] `export_edited_audio` IPC command — runs ffmpeg, returns output path
+- [ ] Export dialog in editor — format (MP3/WAV), quality settings, output path via save dialog
+- [ ] "Replace in playlist" option after successful export
+
+### R8 — Silence Detection & Markers
+- [ ] `detect_silence_regions` IPC command — scan file for silence below threshold, return `Vec<SilenceRegion>`
+- [ ] `EditorSidebar.tsx` — markers list (add/remove/rename), silence regions list, file properties panel
+- [ ] "Scan for Silence" button — highlights silent regions on waveform, one-click "trim silence from edges" or "remove all silence"
+- [ ] Marker system — click to place named markers, display as colored flags on waveform, list in sidebar
+
+### R9 — Integration & Polish
+- [ ] Add "Edit Audio" to PlaylistView context menu (wire `onEditAudio` prop through App.tsx)
+- [ ] Add right-click context menu to FileBrowserPane for audio files with "Edit Audio" option
+- [ ] Loop selection preview mode (plays selected region in a loop)
+- [ ] Minimap: thin overview bar below waveform showing full file with viewport rectangle
+- [ ] Separate canvas layers (static waveform vs dynamic playhead) for render performance
+- [ ] Keyboard shortcut reference tooltip/panel
+- [ ] Test with large files (30+ min), verify peak caching and scroll performance
+
 ## Phase Z: Future / Long-Term
 
 - [ ] Hosted web interface — Browser-based remote control and monitoring
 - [ ] Advanced auto playlist builder — Rule-based automatic playlist generation
-- [ ] In-app audio editor — Audacity-style editor with audio preview, trim, volume, playback speed, and similar edits; support batch editing by loading a file list, applying edits globally, and previewing before saving

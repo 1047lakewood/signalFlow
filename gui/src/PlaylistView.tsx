@@ -81,6 +81,7 @@ interface PlaylistViewProps {
   onTracksChanged: () => void;
   onSearchFilename: (filename: string) => void;
   findRequestToken: number;
+  onEditAudio?: (path: string) => void;
 }
 
 interface ContextMenuState {
@@ -111,6 +112,7 @@ function PlaylistView({
   onTracksChanged,
   onSearchFilename,
   findRequestToken,
+  onEditAudio,
 }: PlaylistViewProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
@@ -573,6 +575,14 @@ function PlaylistView({
       alert(`Failed to open in Audacity: ${e}`);
     }
   }, [contextMenu, tracks]);
+
+  const handleContextMenuEditAudio = useCallback(() => {
+    if (!contextMenu) return;
+    const track = tracks.find((t) => t.index === contextMenu.trackIndex);
+    setContextMenu(null);
+    if (!track || !onEditAudio) return;
+    onEditAudio(track.path);
+  }, [contextMenu, tracks, onEditAudio]);
 
   const handleContextMenuConvertMp3 = useCallback(() => {
     if (!contextMenu) return;
@@ -1048,6 +1058,15 @@ function PlaylistView({
           >
             Open in Audacity
           </button>
+          {onEditAudio && (
+            <button
+              className={`playlist-context-item${selectedIndices.size > 1 ? " disabled" : ""}`}
+              onClick={handleContextMenuEditAudio}
+              disabled={selectedIndices.size > 1}
+            >
+              Edit Audio
+            </button>
+          )}
           <button
             className="playlist-context-item"
             onClick={handleContextMenuConvertMp3}
