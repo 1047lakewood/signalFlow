@@ -27,6 +27,9 @@ struct AppState {
     level_monitor: LevelMonitor,
     /// Dedicated audio handle for the in-app editor (independent of main transport).
     editor_audio: AudioHandle,
+    /// Dedicated level monitor for the editor — keeps it isolated from the
+    /// main transport's level meter so they don't overwrite each other.
+    editor_level_monitor: LevelMonitor,
     /// Shared editor playback position tracking.
     editor_info: Arc<Mutex<EditorPlaybackState>>,
 }
@@ -361,15 +364,16 @@ fn transport_play(
 
 #[tauri::command]
 fn transport_stop(state: State<AppState>, app: AppHandle) -> Result<(), String> {
-    // Stop audio
-    state.audio.stop();
-    state.level_monitor.reset();
-
-    // Update core state
+    // Mark core as stopped BEFORE sending the Stop command to the audio thread.
+    // This ensures any concurrent TrackFinished callback that acquires the core
+    // lock after us sees is_playing=false and aborts the auto-advance.
     {
         let mut core = state.core.lock().unwrap();
         core.on_stop();
     }
+
+    state.audio.stop();
+    state.level_monitor.reset();
 
     let _ = app.emit("transport-changed", ());
     let _ = app.emit("logs-changed", ());
@@ -989,7 +993,7 @@ async fn convert_tracks_to_mp3(
         let p_clone = p.clone();
         let mp3_clone = mp3_path.clone();
 
-        let ok = tokio::task::spawn_blocking(move || -> bool {
+        let converted_path = tokio::task::spawn_blocking(move || -> Option<std::path::PathBuf> {
             let status = std::process::Command::new("ffmpeg")
                 .args([
                     "-i",
@@ -1001,27 +1005,28 @@ async fn convert_tracks_to_mp3(
                 ])
                 .status();
             match status {
-                Ok(s) if s.success() => {
-                    // Delete original
-                    let _ = std::fs::remove_file(&p_clone);
-                    true
-                }
-                _ => false,
+                Ok(s) if s.success() => Some(mp3_clone),
+                _ => None,
             }
         })
         .await
-        .unwrap_or(false);
+        .unwrap_or(None);
 
-        if ok {
-            // Update track path in playlist
-            if let Ok(()) = state
+        if let Some(new_path) = converted_path {
+            // Update playlist path first; only delete original on success to
+            // prevent data loss if the path update fails.
+            if state
                 .core
                 .lock()
                 .unwrap()
-                .update_track_path(&playlist, idx, Path::new(&mp3_path))
+                .update_track_path(&playlist, idx, Path::new(&new_path))
+                .is_ok()
             {
+                let _ = std::fs::remove_file(&p);
                 converted += 1;
             } else {
+                // Conversion succeeded but playlist update failed — keep both
+                // files, report as failed so the user can retry.
                 failed += 1;
             }
         } else {
@@ -1370,7 +1375,7 @@ fn editor_play(state: State<AppState>, path: String, start_secs: f64) -> Result<
     let path_buf = PathBuf::from(&path);
     state
         .editor_audio
-        .play(path_buf, state.level_monitor.clone());
+        .play(path_buf, state.editor_level_monitor.clone());
     if start_secs > 0.01 {
         state
             .editor_audio
@@ -1476,6 +1481,7 @@ fn main() {
         .join("signalFlow");
     let state_path = data_dir.join("signalflow_state.json");
     let level_monitor = LevelMonitor::new();
+    let editor_level_monitor = LevelMonitor::new();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -1510,6 +1516,11 @@ fn main() {
                     AudioEvent::TrackFinished => {
                         let next_track = {
                             let mut core = core_for_audio.lock().unwrap();
+                            // If stop was issued before we acquired the lock,
+                            // don't auto-advance — the user explicitly stopped.
+                            if !core.playback.is_playing {
+                                return;
+                            }
                             core.prepare_skip()
                         };
 
@@ -1556,6 +1567,7 @@ fn main() {
                 audio,
                 level_monitor,
                 editor_audio,
+                editor_level_monitor,
                 editor_info,
             });
 

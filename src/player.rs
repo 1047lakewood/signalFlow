@@ -276,6 +276,11 @@ fn decode_with_m4a_fallback(path: &Path) -> Result<Decoder<BufReader<File>>, Str
             let wav_file = File::open(&wav_path).map_err(|e| {
                 format!("Cannot open transcoded wav '{}': {}", wav_path.display(), e)
             })?;
+            // Delete the temp file now — the data is buffered in BufReader so
+            // the decoder doesn't need the path to remain on disk.
+            // On Windows the file is still open so deletion is deferred by the OS
+            // until the handle closes; on Linux/macOS it unlinks immediately.
+            let _ = std::fs::remove_file(&wav_path);
             Decoder::new(BufReader::new(wav_file)).map_err(|e| {
                 format!(
                     "Cannot decode transcoded wav for '{}': {}",
@@ -395,7 +400,14 @@ pub fn play_playlist(
     let mut current_start_time: Option<Instant> = None;
     let mut played_durations: Vec<(usize, Duration)> = Vec::new();
     let mut last_intro_artist: Option<String> = None;
-    let mut last_recurring_intro_time: Option<Instant>;
+    // Initialize once before the loop so the interval isn't reset on every
+    // track change. The timer only resets when an intro actually plays.
+    let mut last_recurring_intro_time: Option<Instant> =
+        if recurring_intro.enabled() && intros_folder.is_some() {
+            Some(Instant::now())
+        } else {
+            None
+        };
 
     while current < tracks.len() {
         let track = &tracks[current];
@@ -451,13 +463,6 @@ pub fn play_playlist(
                     continue;
                 }
             }
-        };
-
-        // Reset recurring intro timer for each new track
-        last_recurring_intro_time = if recurring_intro.enabled() && intros_folder.is_some() {
-            Some(Instant::now())
-        } else {
-            None
         };
 
         let track_duration = track.duration;

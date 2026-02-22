@@ -89,28 +89,36 @@ function TransportBar({ onTrackChange, selectedTrackIndex, onPlayingIndexChange 
     };
   }, [fetchStatus]);
 
-  // Smooth elapsed time interpolation via requestAnimationFrame
+  // Keep a ref to duration_secs so the RAF tick always reads the latest value
+  // without needing to restart the loop on every track change.
+  const durationSecsRef = useRef(state.duration_secs);
+  durationSecsRef.current = state.duration_secs;
+
+  // Smooth elapsed time interpolation via requestAnimationFrame.
+  // The loop only runs while playing; it stops itself when paused/stopped
+  // to avoid burning CPU when no progress is happening.
   useEffect(() => {
+    if (!state.is_playing || state.is_paused) {
+      setDisplayElapsed(baseElapsed.current);
+      return;
+    }
+
     let rafId: number;
 
     const tick = () => {
-      if (state.is_playing && !state.is_paused) {
-        const now = performance.now();
-        const delta = (now - baseTimestamp.current) / 1000;
-        const interpolated = Math.min(
-          baseElapsed.current + delta,
-          state.duration_secs
-        );
-        setDisplayElapsed(interpolated);
-      } else {
-        setDisplayElapsed(baseElapsed.current);
-      }
+      const now = performance.now();
+      const delta = (now - baseTimestamp.current) / 1000;
+      const interpolated = Math.min(
+        baseElapsed.current + delta,
+        durationSecsRef.current,
+      );
+      setDisplayElapsed(interpolated);
       rafId = requestAnimationFrame(tick);
     };
 
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [state.is_playing, state.is_paused, state.duration_secs]);
+  }, [state.is_playing, state.is_paused]);
 
   const handlePlay = async () => {
     try {

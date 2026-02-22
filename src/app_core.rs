@@ -34,12 +34,17 @@ pub struct LogEntry {
 
 pub struct LogBuffer {
     entries: VecDeque<LogEntry>,
+    /// Monotonically increasing total count of all entries ever pushed.
+    /// Used to convert an absolute caller-held index into a buffer offset
+    /// even after old entries have been evicted from the front.
+    total_pushed: usize,
 }
 
 impl LogBuffer {
     pub fn new() -> Self {
         LogBuffer {
             entries: VecDeque::new(),
+            total_pushed: 0,
         }
     }
 
@@ -50,21 +55,34 @@ impl LogBuffer {
             level: level.to_string(),
             message,
         });
+        self.total_pushed += 1;
         while self.entries.len() > LOG_BUFFER_MAX {
             self.entries.pop_front();
         }
     }
 
+    /// Return entries starting from absolute index `since_index`.
+    /// `since_index` is a monotonic cursor value returned by `total_pushed()`,
+    /// not a buffer-relative position, so it stays valid after eviction.
     pub fn get(&self, since_index: usize) -> Vec<LogEntry> {
-        self.entries.iter().skip(since_index).cloned().collect()
+        let evicted = self.total_pushed.saturating_sub(self.entries.len());
+        let skip = since_index.saturating_sub(evicted);
+        self.entries.iter().skip(skip).cloned().collect()
     }
 
     pub fn clear(&mut self) {
         self.entries.clear();
+        // Reset total_pushed so callers with a saved cursor start fresh.
+        self.total_pushed = 0;
     }
 
     pub fn len(&self) -> usize {
         self.entries.len()
+    }
+
+    /// Monotonic count of all entries ever pushed (caller cursor value).
+    pub fn total_pushed(&self) -> usize {
+        self.total_pushed
     }
 }
 
@@ -79,6 +97,9 @@ pub struct PlaybackState {
     pub start_time: Option<Instant>,
     pub total_paused: Duration,
     pub pause_start: Option<Instant>,
+    /// Incremented by `on_stop`; checked by `prepare_skip` to detect a
+    /// stop that races with a natural `TrackFinished` event.
+    pub stop_generation: u64,
 }
 
 impl PlaybackState {
@@ -92,6 +113,7 @@ impl PlaybackState {
             start_time: None,
             total_paused: Duration::ZERO,
             pause_start: None,
+            stop_generation: 0,
         }
     }
 
@@ -119,6 +141,8 @@ impl PlaybackState {
         self.start_time = None;
         self.total_paused = Duration::ZERO;
         self.pause_start = None;
+        // Bump generation so any in-flight prepare_skip can detect this stop.
+        self.stop_generation = self.stop_generation.wrapping_add(1);
     }
 }
 
@@ -764,14 +788,21 @@ impl AppCore {
             return Err("Nothing is playing".to_string());
         }
         let seek_pos = Duration::from_secs_f64(position_secs.max(0.0));
-        let is_paused = self.playback.is_paused;
-        self.playback.start_time = Some(Instant::now() - seek_pos);
-        self.playback.total_paused = Duration::ZERO;
-        self.playback.pause_start = if is_paused {
-            Some(Instant::now())
+        if self.playback.is_paused {
+            // While paused: represent elapsed as a frozen offset.
+            // Set start_time = now - seek_pos and total_paused = seek_pos so
+            // that elapsed() = raw - total_paused = seek_pos - seek_pos = 0.
+            // Then pause_start is set to now so the already-elapsed paused
+            // duration accumulates from zero again — keeping elapsed frozen.
+            self.playback.start_time = Some(Instant::now() - seek_pos);
+            self.playback.total_paused = seek_pos;
+            self.playback.pause_start = Some(Instant::now());
         } else {
-            None
-        };
+            // While playing: elapsed advances normally from seek_pos.
+            self.playback.start_time = Some(Instant::now() - seek_pos);
+            self.playback.total_paused = Duration::ZERO;
+            self.playback.pause_start = None;
+        }
         Ok(())
     }
 

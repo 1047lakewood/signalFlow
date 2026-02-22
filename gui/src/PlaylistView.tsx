@@ -220,7 +220,13 @@ function PlaylistView({
     [colWidths],
   );
 
-  // Listen for Tauri file drop events
+  // Keep a stable ref to onFileDrop so the Tauri event listeners don't need
+  // to re-register on every prop change (which would accumulate stale listeners).
+  const onFileDropRef = useRef(onFileDrop);
+  onFileDropRef.current = onFileDrop;
+
+  // Listen for Tauri file drop events — registered once on mount, cleaned up
+  // on unmount. The ref above ensures the callback always calls the latest prop.
   useEffect(() => {
     let mounted = true;
     const unlisteners: Array<() => void> = [];
@@ -234,7 +240,7 @@ function PlaylistView({
           (event) => {
             setIsDroppingFiles(false);
             if (event.payload.paths && event.payload.paths.length > 0) {
-              onFileDrop(event.payload.paths);
+              onFileDropRef.current(event.payload.paths);
             }
           },
         );
@@ -266,7 +272,8 @@ function PlaylistView({
       mounted = false;
       unlisteners.forEach((fn) => fn());
     };
-  }, [onFileDrop]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Focus input when editing starts
   useEffect(() => {

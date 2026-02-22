@@ -70,6 +70,9 @@ export function useEditorPlayback(
     async (startSecs: number) => {
       if (!path) return;
       try {
+        // Cancel any existing poll chain before starting a new one so we
+        // never have two concurrent RAF loops running simultaneously.
+        stopPolling();
         await invoke("editor_play", { path, startSecs });
         isPlayingRef.current = true;
         setState((prev) => ({ ...prev, isPlaying: true, positionSecs: startSecs }));
@@ -78,7 +81,7 @@ export function useEditorPlayback(
         console.error("editor_play failed:", e);
       }
     },
-    [path, startPolling],
+    [path, startPolling, stopPolling],
   );
 
   const pause = useCallback(async () => {

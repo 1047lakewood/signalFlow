@@ -162,7 +162,9 @@ export default function AudioEditorModal({
     containerRef.current?.focus();
   }, []);
 
-  // Loop: when playing and position reaches selectionEnd, restart from selectionStart
+  // Loop: when playing and position reaches selectionEnd, restart from selectionStart.
+  // Use play(loopStart) only — editor_play already seeks before starting
+  // audio, so calling seek() + play() separately would race.
   useEffect(() => {
     if (
       loopEnabled &&
@@ -172,11 +174,10 @@ export default function AudioEditorModal({
     ) {
       const end = Math.max(present.selectionStart, present.selectionEnd);
       if (positionSecs >= end) {
-        seek(Math.min(present.selectionStart, present.selectionEnd));
         play(Math.min(present.selectionStart, present.selectionEnd));
       }
     }
-  }, [positionSecs, loopEnabled, isPlaying, present.selectionStart, present.selectionEnd, seek, play]);
+  }, [positionSecs, loopEnabled, isPlaying, present.selectionStart, present.selectionEnd, play]);
 
   // Keep playhead visible in scroll
   useEffect(() => {
