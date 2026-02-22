@@ -116,6 +116,7 @@ fn audio_thread_loop<F>(
     let mut player: Option<Player> = None;
     let mut device_name: Option<String> = initial_device;
     let mut was_playing = false;
+    let mut last_seek: Option<std::time::Instant> = None;
 
     loop {
         // Poll for commands with a short timeout to detect track end
@@ -179,6 +180,7 @@ fn audio_thread_loop<F>(
                     if let Some(p) = &player {
                         match p.try_seek(position) {
                             Ok(()) => {
+                                last_seek = Some(std::time::Instant::now());
                                 on_event(AudioEvent::Seeked(position.as_secs_f64()));
                             }
                             Err(e) => {
@@ -222,8 +224,12 @@ fn audio_thread_loop<F>(
             },
 
             Err(mpsc::RecvTimeoutError::Timeout) => {
-                // Check for natural track end
-                if was_playing {
+                // Check for natural track end, but skip the check briefly after a seek
+                // because rodio's try_seek flushes the buffer, making is_empty() transiently true.
+                let seek_cooldown = last_seek
+                    .map(|t| t.elapsed() < Duration::from_millis(500))
+                    .unwrap_or(false);
+                if was_playing && !seek_cooldown {
                     if let Some(p) = &player {
                         if p.is_empty() {
                             was_playing = false;

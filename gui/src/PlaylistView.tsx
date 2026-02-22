@@ -803,12 +803,7 @@ function PlaylistView({
                 onMouseDown={(e) => handleResizeMouseDown(e, "num")}
               />
             </th>
-            <th className="col-status" style={{ width: colWidths.status }}>
-              <div
-                className="col-resize-handle"
-                onMouseDown={(e) => handleResizeMouseDown(e, "status")}
-              />
-            </th>
+            <th className="col-status" />
             <th className="col-artist" style={{ width: colWidths.artist }}>
               Artist
               <div

@@ -340,6 +340,11 @@ body {
   text-align: center;
 }
 
+.track-table td.col-status {
+  overflow: visible;
+  text-overflow: clip;
+}
+
 .col-artist {
   width: 30%;
 }
