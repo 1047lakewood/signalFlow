@@ -299,6 +299,13 @@ fn edit_track_metadata(
 // ── File browser / search ───────────────────────────────────────────────
 
 #[tauri::command]
+async fn list_available_drives() -> Vec<String> {
+    tokio::task::spawn_blocking(signal_flow::app_core::list_available_drives)
+        .await
+        .unwrap_or_default()
+}
+
+#[tauri::command]
 async fn list_directory(
     state: State<'_, AppState>,
     path: Option<String>,
@@ -1577,6 +1584,7 @@ fn main() {
             reorder_track,
             copy_paste_tracks,
             edit_track_metadata,
+            list_available_drives,
             list_directory,
             search_indexed_files,
             // Transport

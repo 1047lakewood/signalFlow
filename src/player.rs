@@ -598,7 +598,7 @@ fn maybe_play_recurring_intro(
         match player.play_file_new_sink(&intro_path) {
             Ok(overlay_sink) => {
                 // Duck main track volume
-                let original_volume = 1.0_f32;
+                let original_volume = main_sink.volume();
                 main_sink.set_volume(config.duck_volume);
 
                 // Wait for overlay to finish

@@ -83,8 +83,8 @@ export function useEditorPlayback(
 
   const pause = useCallback(async () => {
     try {
-      await invoke("editor_stop");
       stopPolling();
+      await invoke("editor_stop");
       // Position is preserved by editor_stop (it accumulates elapsed time)
       const status = await invoke<{ is_playing: boolean; position_secs: number }>(
         "editor_status",

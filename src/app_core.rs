@@ -1605,6 +1605,23 @@ fn is_audio_file(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+/// List all available drive letters / mount points on the current system.
+/// On Windows: scans A–Z for existing directories. On Unix: returns ["/"].
+/// Intended to be called from a `spawn_blocking` task.
+pub fn list_available_drives() -> Vec<String> {
+    #[cfg(target_os = "windows")]
+    {
+        ('A'..='Z')
+            .map(|c| format!("{}:\\", c))
+            .filter(|p| std::path::Path::new(p).is_dir())
+            .collect()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        vec!["/".to_string()]
+    }
+}
+
 /// List a directory's audio files and subdirectories. Intended to be called
 /// from a `spawn_blocking` task so it doesn't hold the core mutex.
 pub fn list_directory_at(target: PathBuf) -> Result<Vec<FileBrowserEntry>, String> {

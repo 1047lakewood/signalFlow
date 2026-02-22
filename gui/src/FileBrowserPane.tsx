@@ -56,6 +56,7 @@ function FileBrowserPane({
   onEditAudio,
 }: FileBrowserPaneProps) {
   const [indexedLocations, setIndexedLocations] = useState<string[]>([]);
+  const [availableDrives, setAvailableDrives] = useState<string[]>([]);
   const [favoriteFolders, setFavoriteFolders] = useState<string[]>([]);
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [entries, setEntries] = useState<FileBrowserEntry[]>([]);
@@ -68,7 +69,12 @@ function FileBrowserPane({
   const [searchError, setSearchError] = useState<string | null>(null);
   const normalizedQuery = searchQuery.trim();
   const atRootLocation =
-    currentPath !== null && indexedLocations.some((loc) => loc === currentPath);
+    currentPath !== null &&
+    (indexedLocations.some((loc) => loc === currentPath) ||
+      availableDrives.some(
+        (d) =>
+          d.replace(/[\\/]+$/, "") === currentPath.replace(/[\\/]+$/, ""),
+      ));
 
   const loadConfig = useCallback(async () => {
     const cfg = await invoke<ConfigResponse>("get_config");
@@ -97,13 +103,24 @@ function FileBrowserPane({
     loadConfig().catch((e) =>
       console.error("Failed to load file browser config", e),
     );
+    invoke<string[]>("list_available_drives")
+      .then(setAvailableDrives)
+      .catch((e) => console.error("Failed to list drives", e));
   }, [loadConfig]);
 
+  // Only reset currentPath when indexed locations themselves change (e.g. user
+  // removes a location from settings). Do NOT depend on currentPath so that
+  // navigating to non-indexed paths doesn't immediately snap back.
   useEffect(() => {
-    if (!currentPath || indexedLocations.length === 0) return;
-    if (indexedLocations.includes(currentPath)) return;
-    setCurrentPath(indexedLocations[0]);
-  }, [currentPath, indexedLocations]);
+    if (indexedLocations.length === 0) return;
+    setCurrentPath((prev) => {
+      if (!prev) return indexedLocations[0] ?? null;
+      if (indexedLocations.includes(prev)) return prev;
+      if (favoriteFolders.some((f) => prev.startsWith(f))) return prev;
+      return indexedLocations[0] ?? null;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [indexedLocations]);
 
   useEffect(() => {
     loadDirectory(currentPath).catch((e) =>
@@ -257,18 +274,20 @@ function FileBrowserPane({
       >
         <div className="favorites-title">★</div>
         <div className="favorites-section-divider" />
-        {indexedLocations.map((loc) => (
+        {availableDrives.map((loc) => (
           <div
             key={favoriteDriveKey(loc)}
             className="favorite-item"
-            title={`Switch to ${loc}`}
+            title={`${loc}${indexedLocations.includes(loc) ? " (indexed)" : ""}`}
             onMouseEnter={() => setFavoritesCollapsed(false)}
           >
             <button
-              className={`favorite-open-btn ${currentPath === loc ? "active" : ""}`}
+              className={`favorite-open-btn ${currentPath?.toUpperCase().startsWith(loc.toUpperCase()) ? "active" : ""}`}
               onClick={() => setCurrentPath(loc)}
             >
-              <span className="favorite-icon">💽</span>
+              <span className="favorite-icon">
+                {indexedLocations.includes(loc) ? "💽" : "💿"}
+              </span>
               {!favoritesCollapsed && (
                 <span className="favorite-label">{formatDriveLabel(loc)}</span>
               )}
@@ -311,11 +330,11 @@ function FileBrowserPane({
       <div className="file-browser-content">
         <div className="file-browser-toolbar">
           <div className="file-browser-drives">
-            {indexedLocations.map((loc) => (
+            {availableDrives.map((loc) => (
               <button
                 key={loc}
-                className={`drive-btn ${currentPath === loc ? "active" : ""}`}
-                title={loc}
+                className={`drive-btn ${currentPath?.toUpperCase().startsWith(loc.toUpperCase()) ? "active" : ""}`}
+                title={`${loc}${indexedLocations.includes(loc) ? " (indexed)" : ""}`}
                 onClick={() => setCurrentPath(loc)}
               >
                 {formatDriveLabel(loc)}
